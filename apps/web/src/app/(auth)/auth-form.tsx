@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Field, Input, Notice } from "@/components/ui";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
-  const supabase = createClient();
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") ?? "/";
@@ -17,6 +16,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const callback = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
   async function submit(form: FormData) {
+    const supabase = createClient();
     setPending(true);
     setError(null);
     setInfo(null);
@@ -60,6 +60,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   }
 
   async function google() {
+    const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback() } });
     if (error) setError(error.message);
   }

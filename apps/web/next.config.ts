@@ -3,7 +3,7 @@ import { loadEnvConfig } from "@next/env";
 import type { NextConfig } from "next";
 
 // One env file for the whole monorepo: <repo>/.env.local
-loadEnvConfig(path.resolve(process.cwd(), "../.."));
+loadEnvConfig(path.resolve(process.cwd(), "../.."), process.env.NODE_ENV !== "production", undefined, true);
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@autonomos/schemas", "@autonomos/ai", "@autonomos/integrations", "@autonomos/agents", "@autonomos/db", "@autonomos/workflows"],

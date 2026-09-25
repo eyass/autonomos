@@ -169,6 +169,15 @@ export async function startTestRun(session: Session, agentId: string, input: Rec
   }
 }
 
+// Test runs of ticket-driven agents get a fresh sandbox ticket so nothing real is touched.
+export async function startTestRunWithSample(session: Session, agentId: string, sampleKey: string) {
+  const sample = SAMPLE_TICKETS.find((t) => t.key === sampleKey);
+  if (!sample) throw new HttpError(400, "Unknown sample ticket");
+  const ticket = buildSandboxTicket(sample);
+  await sandboxStore(adminDb(), session.org.id).put("zendesk", "ticket", { ...ticket, test: true });
+  return startTestRun(session, agentId, { ticket_id: ticket.id });
+}
+
 export async function startProductionRun(session: Session, agentId: string, input: Record<string, unknown>) {
   try {
     const { runId } = await createRun(adminDb(), { organizationId: session.org.id, agentId, mode: "production", trigger: { type: "manual", userId: session.user.id }, input, startedBy: session.user.id });
