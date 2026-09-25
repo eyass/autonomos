@@ -1,0 +1,23 @@
+{
+  "name": "autonomos",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "pnpm --filter @autonomos/web dev",
+    "build": "pnpm --filter @autonomos/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @autonomos/web test:e2e",
+    "db:start": "supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta",
+    "db:reset": "supabase db reset",
+    "db:seed:demo": "pnpm --filter @autonomos/web seed:demo",
+    "trigger:dev": "pnpm --filter @autonomos/workflows dev"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "supabase": "^2.118.0",
+    "typescript": "^5.9",
+    "vitest": "^5.0.2"
+  }
+}

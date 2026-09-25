@@ -1,0 +1,20 @@
+{
+  "name": "@autonomos/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.63",
+    "@ai-sdk/openai": "^4.0.75",
+    "@autonomos/schemas": "workspace:*",
+    "ai": "^7.0.114",
+    "zod": "^4.6.5"
+  }
+}
