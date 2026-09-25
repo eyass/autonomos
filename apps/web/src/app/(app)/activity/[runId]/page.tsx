@@ -107,7 +107,14 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
                       {s.tool ? <Badge>{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
                       {s.status === "simulated" ? <Badge tone="info">simulated</Badge> : null}
                     </div>
-                    {decision?.reasoningSummary ? (
+                    {s.type === "approval_requested" ? (
+                      <ul className="mt-1 list-inside list-disc text-xs text-muted">
+                        {((s.output as { reasons?: string[] } | null)?.reasons ?? []).map((r) => (
+                          <li key={r}>{r}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {decision?.reasoningSummary && decision.reasoningSummary !== s.description ? (
                       <p className="mt-1 text-sm text-muted">
                         {decision.reasoningSummary}
                         {decision.confidence !== undefined ? ` (confidence ${Math.round(decision.confidence * 100)}%)` : ""}

@@ -17,6 +17,7 @@
   "devDependencies": {
     "@types/node": "^22.20.4",
     "supabase": "^2.118.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9",
     "vitest": "^5.0.2"
   }

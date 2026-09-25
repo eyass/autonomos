@@ -64,6 +64,7 @@ function IntegrationCard({ i, canManage, compact }: { i: IntegrationView; canMan
           ) : null}
         </div>
       )}
+      {connected && !compact && i.webhook ? <WebhookInfo webhook={i.webhook} /> : null}
       {canManage ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {connected ? (
@@ -103,5 +104,35 @@ function IntegrationCard({ i, canManage, compact }: { i: IntegrationView; canMan
         </div>
       ) : null}
     </Card>
+  );
+}
+
+function WebhookInfo({ webhook }: { webhook: { url: string; secret: string } }) {
+  const [show, setShow] = useState(false);
+  return (
+    <details className="mt-3 text-xs">
+      <summary className="cursor-pointer text-muted">Event webhook</summary>
+      <div className="mt-2 space-y-1 rounded-md bg-surface-muted p-3">
+        <div>
+          POST <code className="break-all">{webhook.url}</code>
+        </div>
+        <div>
+          Body <code>{`{"event":"zendesk.ticket.created","data":{"ticket_id":"123"}}`}</code>
+        </div>
+        <div>
+          Header <code>X-AutonomOS-Signature: sha256=HMAC_SHA256(body, secret)</code>
+        </div>
+        <div>
+          Secret{" "}
+          {show ? (
+            <code className="break-all">{webhook.secret}</code>
+          ) : (
+            <button type="button" className="text-accent hover:underline" onClick={() => setShow(true)}>
+              Reveal
+            </button>
+          )}
+        </div>
+      </div>
+    </details>
   );
 }

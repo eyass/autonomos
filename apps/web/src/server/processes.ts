@@ -10,6 +10,7 @@ import { blendScore, deterministicBusinessValue, deterministicDifficulty, determ
 import { DiscoveredProcessSchema, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
+import { sandboxStore } from "@autonomos/db";
 import { adminDb, HttpError, type Session } from "@/lib/session";
 
 export async function companyContext(session: Session): Promise<CompanyContext> {
@@ -338,4 +339,49 @@ export async function importDocument(session: Session, input: z.infer<typeof Doc
   const processes = await extractProcessesFromDocument({ company: await companyContext(session), title: input.title, content, onUsage: usageSink(session) });
   const ids = await saveDiscoveredProcesses(session, processes, "document", { documentId: doc.id });
   return { documentId: doc.id, processIds: ids };
+}
+
+// ---------------------------------------------------------------------------
+// Integration-assisted discovery (PRD section 18). Supporting evidence only:
+// samples metadata from connected systems, never claims comprehensive mining.
+// ---------------------------------------------------------------------------
+
+export async function discoverFromIntegrations(session: Session) {
+  const db = adminDb();
+  const { data: connections } = await db
+    .from("integration_connections")
+    .select("integration_key, provider")
+    .eq("organization_id", session.org.id)
+    .eq("status", "connected");
+  const sandbox = sandboxStore(db, session.org.id);
+  const evidence: string[] = [];
+  for (const c of connections ?? []) {
+    if (c.provider !== "sandbox") {
+      evidence.push(`${c.integration_key} is connected (live account). Detailed sampling for live accounts is not enabled yet.`);
+      continue;
+    }
+    if (c.integration_key === "zendesk") {
+      const tickets = await sandbox.list("zendesk", "ticket");
+      const tags = new Map<string, number>();
+      for (const t of tickets) for (const tag of (t.tags as string[]) ?? []) tags.set(tag, (tags.get(tag) ?? 0) + 1);
+      evidence.push(
+        `Zendesk: ${tickets.length} tickets sampled. Tags: ${[...tags.entries()].map(([k, v]) => `${k} (${v})`).join(", ") || "none"}. ` +
+          `Example subjects: ${tickets.slice(-5).map((t) => `"${String(t.subject)}"`).join("; ") || "none"}. Support handles refund requests from customers.`,
+      );
+    }
+    if (c.integration_key === "stripe") {
+      const [refunds, payments] = await Promise.all([sandbox.list("stripe", "refund"), sandbox.list("stripe", "payment")]);
+      evidence.push(`Stripe: ${payments.length} recent payments and ${refunds.length} refunds. Refunds are issued manually after checking the payment.`);
+    }
+    if (c.integration_key === "slack") evidence.push("Slack is connected: teams post updates and weekly reports to channels.");
+  }
+  if (!evidence.length) throw new HttpError(409, "Connect at least one integration first");
+  await track(session, "process_discovery_started", { method: "integration" });
+  const processes = await extractProcessesFromDocument({
+    company: await companyContext(session),
+    title: "Evidence from connected systems",
+    content: `The following is sampled metadata from connected systems. Infer only recurring work that it clearly supports.\n\n${evidence.join("\n")}`,
+    onUsage: usageSink(session),
+  });
+  return saveDiscoveredProcesses(session, processes, "integration");
 }

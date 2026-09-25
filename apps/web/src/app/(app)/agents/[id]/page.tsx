@@ -194,10 +194,10 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 <div className="mb-1 text-xs font-medium text-muted">Needs your approval when</div>
                 <ul className="list-inside list-disc">
                   {config.autonomyLevel <= 3 ? <li>Any action (L{config.autonomyLevel})</li> : null}
-                  {config.policy.approvalRequiredFor.map((t) => (
+                  {(config.autonomyLevel >= 4 ? config.policy.approvalRequiredFor : []).map((t) => (
                     <li key={t}>{getTool(t)?.label ?? t}</li>
                   ))}
-                  {config.policy.amountThresholds.map((t) => (
+                  {(config.autonomyLevel >= 4 ? config.policy.amountThresholds : []).map((t) => (
                     <li key={t.tool}>
                       {getTool(t.tool)?.label ?? t.tool} above {money(t.maxWithoutApproval, session.org.currency)}
                     </li>

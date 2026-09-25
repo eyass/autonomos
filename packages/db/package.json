@@ -8,7 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "gen:types": "supabase gen types typescript --local > src/database.types.ts"
+    "gen:types": "supabase gen types typescript --local > src/database.types.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "INTEGRATION=1 node --env-file-if-exists=../../.env.local ../../node_modules/vitest/vitest.mjs run"
   },
   "dependencies": {
     "@autonomos/agents": "workspace:*",
@@ -17,5 +19,8 @@
     "@autonomos/schemas": "workspace:*",
     "@supabase/supabase-js": "^2.117.2",
     "resend": "^6.30.0"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.2"
   }
 }

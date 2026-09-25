@@ -109,7 +109,7 @@ export function AutonomyControl({ agentId, level, hasMoney, threshold, canChange
   if (!canChange) return <p className="text-sm text-muted">Only admins can change autonomy.</p>;
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3">
         <Field label="Autonomy level">
           <Select value={next} onChange={(e) => setNext(Number(e.target.value))}>
             {AUTONOMY_LEVELS.filter((l) => l.level > 1).map((l) => (

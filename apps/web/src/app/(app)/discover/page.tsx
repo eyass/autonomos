@@ -1,7 +1,9 @@
 import { DEPARTMENTS } from "@autonomos/schemas";
 import Link from "next/link";
-import { Card, CardBody, PageHeader } from "@/components/ui";
+import { ActionButton } from "@/components/action-button";
+import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui";
 import { requireSession } from "@/lib/session";
+import { discoverFromIntegrationsAction } from "./actions";
 import { DocumentImport } from "./document-import";
 import { Interview } from "./interview";
 
@@ -45,11 +47,30 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
         <Link href="/discover?tab=document" className={`-mb-px border-b-2 px-1 pb-2 ${tab === "document" ? "border-accent font-medium" : "border-transparent text-muted"}`}>
           Import a document
         </Link>
+        <Link href="/discover?tab=integrations" className={`-mb-px border-b-2 px-1 pb-2 ${tab === "integrations" ? "border-accent font-medium" : "border-transparent text-muted"}`}>
+          From connected systems
+        </Link>
         <Link href="/processes/new" className="-mb-px border-b-2 border-transparent px-1 pb-2 text-muted">
           Add manually
         </Link>
       </div>
-      {tab === "document" ? <DocumentImport /> : <Interview departments={departments} />}
+      {tab === "document" ? (
+        <DocumentImport />
+      ) : tab === "integrations" ? (
+        <Card>
+          <CardHeader
+            title="Discover from connected systems"
+            description="Samples ticket categories, representative tickets and refund activity from connected systems as supporting evidence. It does not observe everything your company does."
+          />
+          <CardBody>
+            <ActionButton action={discoverFromIntegrationsAction} pendingLabel="Analysing…">
+              Analyse connected systems
+            </ActionButton>
+          </CardBody>
+        </Card>
+      ) : (
+        <Interview departments={departments} />
+      )}
     </>
   );
 }

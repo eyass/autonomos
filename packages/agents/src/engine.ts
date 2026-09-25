@@ -246,7 +246,7 @@ export async function executeRun(runId: string, store: RunStore, opts: { now?: (
           state.pending = { actionId: action.id, tool: toolKey, args, idempotencyKey, approvalId: approval.id, decision };
           await step({
             type: "approval_requested",
-            description: `Requested approval: ${evaluation.reasons.join("; ")}`,
+            description: "Requested human approval",
             tool: toolKey,
             input: args,
             output: evaluation,
