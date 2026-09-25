@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f5;
+  --surface: #ffffff;
+  --surface-muted: #f1f1ee;
+  --foreground: #1b1b1a;
+  --muted: #6b6a66;
+  --border: #e4e3de;
+  --accent: #2f5d50;
+  --accent-soft: #e5eeea;
+  --accent-foreground: #ffffff;
+  --warn: #9a5b00;
+  --warn-soft: #fbf0dd;
+  --danger: #a33a2c;
+  --danger-soft: #f8e5e1;
+  --ok: #2d6a3e;
+  --ok-soft: #e4f1e7;
+  --info-soft: #e8edf6;
+  --info: #34507f;
+  --level-1: #b8b6af;
+  --level-2: #9fb7ae;
+  --level-3: #6f9a8a;
+  --level-4: #447b68;
+  --level-5: #2f5d50;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+}

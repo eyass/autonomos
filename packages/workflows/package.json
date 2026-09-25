@@ -1,0 +1,23 @@
+{
+  "name": "@autonomos/workflows",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "trigger dev",
+    "deploy": "trigger deploy"
+  },
+  "dependencies": {
+    "@autonomos/agents": "workspace:*",
+    "@autonomos/db": "workspace:*",
+    "@trigger.dev/sdk": "^4.6.4",
+    "resend": "^6.30.0"
+  },
+  "devDependencies": {
+    "trigger.dev": "^4.6.4"
+  }
+}

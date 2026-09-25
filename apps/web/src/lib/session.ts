@@ -1,0 +1,123 @@
+import "server-only";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { cache } from "react";
+import { createServiceClient } from "@autonomos/db";
+import { createClient } from "./supabase/server";
+
+export const ORG_COOKIE = "aos_org";
+
+export type Role = "owner" | "admin" | "member";
+
+export type Session = {
+  user: { id: string; email: string; firstName: string; lastName: string };
+  org: {
+    id: string;
+    name: string;
+    industry: string | null;
+    website: string | null;
+    employeeCount: string | null;
+    country: string | null;
+    description: string | null;
+    companySummary: string | null;
+    improvementAreas: string[];
+    currency: string;
+    defaultHourlyCost: number;
+    agentsPaused: boolean;
+    onboardingStep: string;
+    onboardingCompletedAt: string | null;
+  };
+  role: Role;
+  canApprove: boolean;
+};
+
+export const getUser = cache(async () => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+});
+
+// Resolves the signed-in user and their current organisation. Membership is read with the
+// user's own client, so RLS guarantees the user belongs to the organisation.
+export const getSession = cache(async (): Promise<Session | null> => {
+  const user = await getUser();
+  if (!user) return null;
+  const supabase = await createClient();
+  const { data: memberships } = await supabase
+    .from("organization_members")
+    .select("organization_id, role, can_approve, created_at")
+    .eq("user_id", user.id)
+    .order("created_at");
+  let rows = memberships ?? [];
+  if (!rows.length) {
+    // First sign-in of an invited user: claim pending invites, then look again.
+    const { data: accepted } = await supabase.rpc("accept_pending_invites");
+    if (accepted) {
+      const again = await supabase.from("organization_members").select("organization_id, role, can_approve, created_at").eq("user_id", user.id).order("created_at");
+      rows = again.data ?? [];
+    }
+  }
+  if (!rows.length) return null;
+  const preferred = (await cookies()).get(ORG_COOKIE)?.value;
+  const membership = rows.find((m) => m.organization_id === preferred) ?? rows[0]!;
+  const [{ data: org }, { data: profile }] = await Promise.all([
+    supabase.from("organizations").select("*").eq("id", membership.organization_id).single(),
+    supabase.from("users").select("first_name, last_name, email").eq("id", user.id).single(),
+  ]);
+  if (!org) return null;
+  return {
+    user: { id: user.id, email: profile?.email ?? user.email ?? "", firstName: profile?.first_name ?? "", lastName: profile?.last_name ?? "" },
+    org: {
+      id: org.id,
+      name: org.name,
+      industry: org.industry,
+      website: org.website,
+      employeeCount: org.employee_count,
+      country: org.country,
+      description: org.description,
+      companySummary: org.company_summary,
+      improvementAreas: org.improvement_areas,
+      currency: org.currency,
+      defaultHourlyCost: Number(org.default_hourly_cost),
+      agentsPaused: org.agents_paused,
+      onboardingStep: org.onboarding_step,
+      onboardingCompletedAt: org.onboarding_completed_at,
+    },
+    role: membership.role,
+    canApprove: membership.can_approve,
+  };
+});
+
+export async function requireSession(): Promise<Session> {
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const session = await getSession();
+  if (!session) redirect("/onboarding/company");
+  return session;
+}
+
+export class HttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+// For server actions and route handlers: throws instead of redirecting.
+export async function requireSessionOrThrow(): Promise<Session> {
+  const session = await getSession();
+  if (!session) throw new HttpError(401, "Not signed in or no organisation");
+  return session;
+}
+
+export function requireRole(session: Session, roles: Role[]) {
+  if (!roles.includes(session.role)) throw new HttpError(403, "You do not have permission to do this");
+}
+
+export const isAdmin = (s: Session) => s.role === "owner" || s.role === "admin";
+
+// Service client for runtime writes after the caller's membership has been verified.
+export function adminDb() {
+  return createServiceClient();
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@autonomos/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "gen:types": "supabase gen types typescript --local > src/database.types.ts"
+  },
+  "dependencies": {
+    "@autonomos/agents": "workspace:*",
+    "@autonomos/ai": "workspace:*",
+    "@autonomos/integrations": "workspace:*",
+    "@autonomos/schemas": "workspace:*",
+    "@supabase/supabase-js": "^2.117.2",
+    "resend": "^6.30.0"
+  }
+}
