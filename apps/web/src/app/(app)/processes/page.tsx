@@ -1,10 +1,18 @@
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FilterBar } from "@/components/filter-bar";
 import { LevelChange, Scores, StatusBadge } from "@/components/domain";
-import { ButtonLink, Card, EmptyState, Input, PageHeader, Select, Table, Td, Th } from "@/components/ui";
 import { FREQUENCY_LABEL, hours } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import { ButtonLink } from "@/components/app/button-link";
+import { EmptyState } from "@/components/app/empty-state";
+import { PageHeader } from "@/components/app/page-header";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const metadata = { title: "Processes" };
 
@@ -23,7 +31,9 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     supabase.from("departments").select("id, name").eq("organization_id", session.org.id).is("archived_at", null).order("name"),
     supabase
       .from("processes")
-      .select("id, title, status, frequency, department_id, estimated_occurrences_per_month, estimated_minutes_per_occurrence, current_autonomy_level, potential_autonomy_level, business_value, automation_difficulty, risk_level, confidence, departments(name)")
+      .select(
+        "id, title, status, frequency, department_id, estimated_occurrences_per_month, estimated_minutes_per_occurrence, current_autonomy_level, potential_autonomy_level, business_value, automation_difficulty, risk_level, confidence, departments(name)",
+      )
       .eq("organization_id", session.org.id),
     supabase.from("agents").select("process_id, autonomy_level").eq("organization_id", session.org.id).eq("status", "active"),
   ]);
@@ -50,7 +60,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
 
   const actions = (
     <>
-      <ButtonLink href="/discover" variant="secondary">
+      <ButtonLink href="/discover" variant="outline">
         Discover processes
       </ButtonLink>
       <ButtonLink href="/processes/new">Add process</ButtonLink>
@@ -61,7 +71,11 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     return (
       <>
         <PageHeader title="Processes" description="The recurring work your teams do today." actions={actions} />
-        <EmptyState title="No processes yet." description="Describe how your team works and AutonomOS turns it into a structured inventory you can review." action={<ButtonLink href="/discover">Start AI discovery</ButtonLink>} />
+        <EmptyState
+          title="No processes yet."
+          description="Describe how your team works and AutonomOS turns it into a structured inventory you can review."
+          action={<ButtonLink href="/discover">Start AI discovery</ButtonLink>}
+        />
       </>
     );
   }
@@ -70,113 +84,121 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Processes" description="The recurring work your teams do today, and how autonomous it could become." actions={actions} />
+      {q.drafted ? (
+        <Alert variant="success" className="mb-4">
+          <Sparkles />
+          <AlertTitle>
+            AutonomOS drafted {q.drafted} process{q.drafted === "1" ? "" : "es"} for you
+          </AlertTitle>
+          <AlertDescription>From your website and connected systems. Open each one, correct anything that is off, and approve it. Approving finds its automation opportunities.</AlertDescription>
+        </Alert>
+      ) : null}
       <FilterBar
         className="mb-4"
         activeCount={active}
         clearHref="/processes"
         more={
           <>
-            <Select name="sort" defaultValue={sort} aria-label="Sort" className="col-span-2 sm:col-span-1">
+            <NativeSelect name="sort" defaultValue={sort} aria-label="Sort" className="col-span-2 sm:col-span-1">
               {Object.entries(SORTS).map(([k, v]) => (
-                <option key={k} value={k}>
+                <NativeSelectOption key={k} value={k}>
                   {v}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-            <Select name="department" defaultValue={q.department ?? ""} aria-label="Department">
-              <option value="">All departments</option>
+            </NativeSelect>
+            <NativeSelect name="department" defaultValue={q.department ?? ""} aria-label="Department">
+              <NativeSelectOption value="">All departments</NativeSelectOption>
               {(departments ?? []).map((d) => (
-                <option key={d.id} value={d.id}>
+                <NativeSelectOption key={d.id} value={d.id}>
                   {d.name}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-            <Select name="status" defaultValue={q.status ?? ""} aria-label="Status">
-              <option value="">Any status</option>
+            </NativeSelect>
+            <NativeSelect name="status" defaultValue={q.status ?? ""} aria-label="Status">
+              <NativeSelectOption value="">Any status</NativeSelectOption>
               {["draft", "reviewed", "active", "archived"].map((s) => (
-                <option key={s} value={s}>
+                <NativeSelectOption key={s} value={s}>
                   {s[0]!.toUpperCase() + s.slice(1)}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-            <Select name="autonomy" defaultValue={q.autonomy ?? ""} aria-label="Autonomy">
-              <option value="">Any autonomy</option>
+            </NativeSelect>
+            <NativeSelect name="autonomy" defaultValue={q.autonomy ?? ""} aria-label="Autonomy">
+              <NativeSelectOption value="">Any autonomy</NativeSelectOption>
               {[1, 2, 3, 4, 5].map((l) => (
-                <option key={l} value={l}>
+                <NativeSelectOption key={l} value={l}>
                   L{l}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-            <Select name="risk" defaultValue={q.risk ?? ""} aria-label="Risk">
-              <option value="">Any risk</option>
-              <option value="low">Low risk</option>
-              <option value="medium">Medium risk</option>
-              <option value="high">High risk</option>
-            </Select>
-            <Select name="value" defaultValue={q.value ?? ""} aria-label="Business value">
-              <option value="">Any value</option>
-              <option value="high">High value</option>
-              <option value="low">Lower value</option>
-            </Select>
+            </NativeSelect>
+            <NativeSelect name="risk" defaultValue={q.risk ?? ""} aria-label="Risk">
+              <NativeSelectOption value="">Any risk</NativeSelectOption>
+              <NativeSelectOption value="low">Low risk</NativeSelectOption>
+              <NativeSelectOption value="medium">Medium risk</NativeSelectOption>
+              <NativeSelectOption value="high">High risk</NativeSelectOption>
+            </NativeSelect>
+            <NativeSelect name="value" defaultValue={q.value ?? ""} aria-label="Business value">
+              <NativeSelectOption value="">Any value</NativeSelectOption>
+              <NativeSelectOption value="high">High value</NativeSelectOption>
+              <NativeSelectOption value="low">Lower value</NativeSelectOption>
+            </NativeSelect>
           </>
         }
       >
         <Input name="q" placeholder="Search processes" defaultValue={q.q} aria-label="Search processes" className="flex-1 sm:max-w-72" />
       </FilterBar>
-      <Card>
-        <Table>
-          <thead>
-            <tr>
-              <Th>Process</Th>
-              <Th className="hidden lg:table-cell">Department</Th>
-              <Th className="hidden md:table-cell">Monthly time</Th>
-              <Th className="hidden md:table-cell">Autonomy</Th>
-              <Th className="hidden lg:table-cell">Scores</Th>
-              <Th className="text-right sm:text-left">Status</Th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card className="gap-0 overflow-hidden py-0 sm:py-0">
+        <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 sm:[&_td:first-child]:pl-6 sm:[&_th:first-child]:pl-6">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Process</TableHead>
+              <TableHead className="hidden lg:table-cell">Department</TableHead>
+              <TableHead className="hidden md:table-cell">Monthly time</TableHead>
+              <TableHead className="hidden md:table-cell">Autonomy</TableHead>
+              <TableHead className="hidden lg:table-cell">Scores</TableHead>
+              <TableHead className="text-right sm:text-left">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {list.map((p) => {
               const dept = (p.departments as unknown as { name: string } | null)?.name;
               return (
-                <tr key={p.id} className="hover:bg-surface-muted/50">
-                  <Td>
+                <TableRow key={p.id} className="hover:bg-muted/50">
+                  <TableCell>
                     <Link href={`/processes/${p.id}`} className="font-medium hover:underline">
                       {p.title}
                     </Link>
-                    <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted md:hidden">
-                      {dept ? <span>{dept}</span> : null}
+                    <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground md:hidden">
                       <span>{hours(monthly(p))} / month</span>
                       <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
                     </div>
-                    <div className="hidden text-xs text-muted md:block lg:hidden">{dept}</div>
-                    {p.confidence !== null && Number(p.confidence) < 0.6 ? <div className="text-xs text-warn">Low confidence, needs review</div> : null}
-                  </Td>
-                  <Td className="hidden text-muted lg:table-cell">{dept ?? "–"}</Td>
-                  <Td className="hidden tabular-nums md:table-cell">
+                    <div className="hidden text-xs text-muted-foreground md:block lg:hidden">{dept}</div>
+                    {p.confidence !== null && Number(p.confidence) < 0.6 ? <div className="text-xs text-warning">Low confidence, needs review</div> : null}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground lg:table-cell">{dept ?? "–"}</TableCell>
+                  <TableCell className="hidden tabular-nums md:table-cell">
                     {hours(monthly(p))}
-                    <div className="text-xs text-muted">{FREQUENCY_LABEL[p.frequency]}</div>
-                  </Td>
-                  <Td className="hidden md:table-cell">
+                    <div className="text-xs text-muted-foreground">{FREQUENCY_LABEL[p.frequency]}</div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
-                  </Td>
-                  <Td className="hidden lg:table-cell">
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />
-                  </Td>
-                  <Td className="text-right sm:text-left">
+                  </TableCell>
+                  <TableCell className="text-right sm:text-left">
                     <StatusBadge status={p.status} />
-                  </Td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
             {!list.length ? (
-              <tr>
-                <Td colSpan={6} className="py-8 text-center text-muted">
+              <TableRow>
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   No processes match these filters.
-                </Td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : null}
-          </tbody>
+          </TableBody>
         </Table>
       </Card>
     </>

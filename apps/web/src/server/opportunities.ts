@@ -1,11 +1,13 @@
 import "server-only";
+import { policyForTools } from "@autonomos/agents";
+import type { AgentConfig } from "@autonomos/schemas";
 import { generateAgentDraft, generateOpportunities, type ProcessForAnalysis } from "@autonomos/ai";
 import { blendScore, opportunityScore } from "@autonomos/agents";
 import { toolsForIntegrations } from "@autonomos/integrations";
 import type { AutonomyLevel } from "@autonomos/schemas";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
-import { companyContext } from "./processes";
+import { companyContext, connectedSystemEvidence } from "./processes";
 
 export async function loadProcessForAnalysis(session: Session, processId: string) {
   const db = adminDb();
@@ -50,6 +52,7 @@ export async function generateOpportunitiesForProcess(session: Session, processI
     company: await companyContext(session),
     process: analysis,
     hourlyCost,
+    systemEvidence: await connectedSystemEvidence(session),
     onUsage: (u) => recordUsage(session.org.id, u),
   });
   const db = adminDb();
@@ -89,6 +92,7 @@ export async function generateOpportunitiesForProcess(session: Session, processI
         human_involvement: o.humanInvolvement,
         major_risks: o.majorRisks,
         rationale: o.rationale,
+        evidence: (o.evidence ?? []) as never,
         recommended_next_step: "Review the proposed agent",
         template_key: /refund/i.test(analysis.title) ? "refund_handling" : null,
         created_by: session.user.id,
@@ -104,18 +108,25 @@ export async function generateOpportunitiesForProcess(session: Session, processI
   return ids;
 }
 
-export async function setOpportunityStatus(session: Session, id: string, status: "reviewing" | "approved" | "rejected" | "archived" | "suggested") {
-  const { data, error } = await adminDb()
-    .from("automation_opportunities")
-    .update({ status })
-    .eq("organization_id", session.org.id)
-    .eq("id", id)
-    .select("id, title")
-    .single();
+export type OpportunityStatus = "suggested" | "reviewing" | "approved" | "building" | "live" | "rejected" | "archived";
+
+export async function setOpportunityStatus(session: Session, id: string, status: OpportunityStatus) {
+  const { data, error } = await adminDb().from("automation_opportunities").update({ status }).eq("organization_id", session.org.id).eq("id", id).select("id, title").single();
   if (error || !data) throw new HttpError(404, "Opportunity not found");
   await audit(session, { action: `opportunity.${status}`, input: { id } });
+  await activity(session, { actionType: `opportunity_${status}`, title: `${data.title}: ${OPPORTUNITY_STATUS_WORDS[status]}` });
   if (status === "approved") await track(session, "opportunity_approved", { opportunity_id: id });
 }
+
+const OPPORTUNITY_STATUS_WORDS: Record<OpportunityStatus, string> = {
+  suggested: "reopened",
+  reviewing: "put on hold",
+  approved: "approved",
+  building: "back to building",
+  live: "live",
+  rejected: "rejected",
+  archived: "marked done",
+};
 
 export async function connectedIntegrationKeys(session: Session) {
   const { data } = await adminDb().from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected");
@@ -137,4 +148,24 @@ export async function draftAgentForOpportunity(session: Session, opportunityId: 
     onUsage: (u) => recordUsage(session.org.id, u),
   });
   return { opportunity: o, draft, connected };
+}
+
+// The agent configuration AutonomOS proposes for an opportunity. The wizard starts from it,
+// and "Build and test agent" uses it as-is (every write is still simulated in the test).
+export async function defaultAgentConfig(session: Session, opportunityId: string) {
+  const { opportunity: o, draft, connected } = await draftAgentForOpportunity(session, opportunityId);
+  // Start one level below the target for anything involving money; the user can raise it.
+  const level = Math.max(2, Math.min(o.target_autonomy_level, draft.suggestedTools.includes("stripe.create_refund") ? 3 : o.target_autonomy_level, 4)) as AgentConfig["autonomyLevel"];
+  const config: AgentConfig = {
+    name: draft.name,
+    description: o.description,
+    autonomyLevel: level,
+    instructions: draft.instructions,
+    trigger: draft.suggestedTrigger,
+    tools: draft.suggestedTools,
+    policy: policyForTools(draft.suggestedTools, level),
+    successCriteria: draft.successCriteria,
+    modelConfig: { modelClass: "AGENT_MODEL" },
+  };
+  return { opportunity: o, config, connected };
 }

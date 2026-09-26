@@ -3,7 +3,34 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, Field, Input, Notice } from "@/components/ui";
+import { FormField } from "@/components/app/form-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldDescription, FieldGroup, FieldSeparator } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { Input } from "@/components/ui/input";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Turns Supabase auth errors into messages a person can act on.
+function friendly(message: string) {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login credentials")) return "The email or password is incorrect.";
+  if (m.includes("email not confirmed")) return "Confirm your email address first. Check your inbox for the link.";
+  if (m.includes("already registered") || m.includes("already been registered")) return "An account with this email already exists. Sign in instead.";
+  if (m.includes("rate limit") || m.includes("too many")) return "Too many attempts. Wait a minute and try again.";
+  if (m.includes("password should be")) return "Choose a longer password: at least 8 characters.";
+  return message;
+}
+
+// "eve.tester@acme.com" -> Eve / Tester. Only a starting point; the fields stay editable.
+function namesFromEmail(email: string) {
+  const local = email.split("@")[0] ?? "";
+  const parts = local.split(/[._-]+/).filter((p) => /^[a-z\u00c0-\u024f]{2,}$/i.test(p));
+  const cap = (w?: string) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : "");
+  return parts.length >= 2 ? { first: cap(parts[0]), last: cap(parts.slice(1).join(" ")) } : { first: cap(parts[0]), last: "" };
+}
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -13,6 +40,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [usePassword, setUsePassword] = useState(true);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [namesEdited, setNamesEdited] = useState(false);
   const callback = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
   async function submit(form: FormData) {
@@ -23,10 +53,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     try {
+      if (!email) throw new Error("Enter your work email.");
+      if (!EMAIL_PATTERN.test(email)) throw new Error("Enter a valid email address, like name@company.com.");
+      if (mode === "signup" || usePassword) {
+        if (!password) throw new Error("Enter your password.");
+        if (mode === "signup" && password.length < 8) throw new Error("Your password needs at least 8 characters.");
+      }
       if (mode === "signup") {
         const firstName = String(form.get("firstName") ?? "").trim();
         const lastName = String(form.get("lastName") ?? "").trim();
-        if (!firstName || !lastName) throw new Error("First and last name are required");
+        if (!firstName || !lastName) throw new Error("Enter your first and last name.");
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -53,7 +89,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       router.push(next);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? friendly(e.message) : "Something went wrong. Try again.");
     } finally {
       setPending(false);
     }
@@ -66,55 +102,100 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   }
 
   return (
-    <Card className="p-6">
-      <h1 className="mb-4 text-base font-semibold">{mode === "signup" ? "Create your account" : "Sign in"}</h1>
-      <Button type="button" variant="secondary" className="w-full" onClick={google}>
-        Continue with Google
-      </Button>
-      <div className="my-4 flex items-center gap-3 text-xs text-muted">
-        <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
-      </div>
-      <form action={submit} className="space-y-3">
-        {mode === "signup" ? (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="First name" htmlFor="firstName">
-              <Input id="firstName" name="firstName" required autoComplete="given-name" />
+    <Card>
+      <CardHeader className="text-center">
+        <CardTitle className="text-xl">{mode === "signup" ? "Create your account" : "Welcome back"}</CardTitle>
+        <CardDescription>{mode === "signup" ? "Start mapping what your company can automate" : "Sign in with Google or your work email"}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form action={submit} noValidate>
+          <FieldGroup>
+            <Field>
+              <Button type="button" variant="outline" className="w-full" onClick={google}>
+                Continue with Google
+              </Button>
             </Field>
-            <Field label="Last name" htmlFor="lastName">
-              <Input id="lastName" name="lastName" required autoComplete="family-name" />
+            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">Or continue with email</FieldSeparator>
+            <FormField label="Work email" htmlFor="email">
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@company.com"
+                onChange={(e) => {
+                  if (mode !== "signup" || namesEdited) return;
+                  const guess = namesFromEmail(e.target.value);
+                  setFirstName(guess.first);
+                  setLastName(guess.last);
+                }}
+              />
+            </FormField>
+            {mode === "signup" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="First name" htmlFor="firstName">
+                  <Input id="firstName" name="firstName" required autoComplete="given-name" value={firstName} onChange={(e) => (setNamesEdited(true), setFirstName(e.target.value))} />
+                </FormField>
+                <FormField label="Last name" htmlFor="lastName">
+                  <Input id="lastName" name="lastName" required autoComplete="family-name" value={lastName} onChange={(e) => (setNamesEdited(true), setLastName(e.target.value))} />
+                </FormField>
+              </div>
+            ) : null}
+            {mode === "signup" || usePassword ? (
+              <div>
+                <FormField label="Password" htmlFor="password" hint={mode === "signup" ? "At least 8 characters" : undefined}>
+                  <Input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
+                </FormField>
+                {mode === "login" ? (
+                  <div className="mt-1.5 text-right">
+                    <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {error ? (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+            {info ? (
+              <Alert variant="success">
+                <AlertDescription>{info}</AlertDescription>
+              </Alert>
+            ) : null}
+            <Field>
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? <Spinner /> : null}
+                {mode === "signup" ? "Create account" : usePassword ? "Sign in" : "Email me a link"}
+              </Button>
+              {mode === "login" ? (
+                <Button type="button" variant="link" size="sm" className="text-muted-foreground" onClick={() => setUsePassword((v) => !v)}>
+                  {usePassword ? "Use a magic link instead" : "Use a password instead"}
+                </Button>
+              ) : null}
+              {mode === "signup" ? (
+                <FieldDescription className="text-center text-xs">
+                  By continuing you agree to the <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy Policy</Link>.
+                </FieldDescription>
+              ) : null}
+              <FieldDescription className="text-center">
+                {mode === "signup" ? (
+                  <>
+                    Already have an account? <Link href="/login">Sign in</Link>
+                  </>
+                ) : (
+                  <>
+                    New to AutonomOS? <Link href="/signup">Create an account</Link>
+                  </>
+                )}
+              </FieldDescription>
             </Field>
-          </div>
-        ) : null}
-        <Field label="Work email" htmlFor="email">
-          <Input id="email" name="email" type="email" required autoComplete="email" />
-        </Field>
-        {mode === "signup" || usePassword ? (
-          <Field label="Password" htmlFor="password" hint={mode === "signup" ? "At least 8 characters" : undefined}>
-            <Input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
-          </Field>
-        ) : null}
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        {info ? <Notice tone="ok">{info}</Notice> : null}
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Please wait…" : mode === "signup" ? "Create account" : usePassword ? "Sign in" : "Email me a link"}
-        </Button>
-      </form>
-      {mode === "login" ? (
-        <button type="button" className="mt-3 w-full text-center text-xs text-muted hover:text-foreground" onClick={() => setUsePassword((v) => !v)}>
-          {usePassword ? "Use a magic link instead" : "Use a password instead"}
-        </button>
-      ) : null}
-      <p className="mt-5 text-center text-sm text-muted">
-        {mode === "signup" ? (
-          <>
-            Already have an account? <Link className="text-accent hover:underline" href="/login">Sign in</Link>
-          </>
-        ) : (
-          <>
-            New to AutonomOS? <Link className="text-accent hover:underline" href="/signup">Create an account</Link>
-          </>
-        )}
-      </p>
+          </FieldGroup>
+        </form>
+      </CardContent>
     </Card>
   );
 }

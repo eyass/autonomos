@@ -5,6 +5,8 @@ const env = {
   TRIGGER_SECRET_KEY: "tr_dev_e2e_stub",
   TRIGGER_API_URL: "http://127.0.0.1:3999",
   NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3100",
+  // The onboarding crawl reads the stub company site on localhost. Never set in production.
+  CRAWL_ALLOW_PRIVATE: "1",
 };
 
 export default defineConfig({

@@ -1,7 +1,8 @@
+import { requireApiSession } from "@/lib/api-auth";
 import { policyForTools } from "@autonomos/agents";
 import { AgentConfigSchema } from "@autonomos/schemas";
 import { handle } from "@/lib/actions";
-import { requireSessionOrThrow } from "@/lib/session";
+
 import { createAgent } from "@/server/agents";
 import { draftAgentForOpportunity } from "@/server/opportunities";
 
@@ -9,7 +10,7 @@ import { draftAgentForOpportunity } from "@/server/opportunities";
 // Body: { config?: AgentConfig }. Without a config the AI-drafted configuration is used, starting at L3.
 export async function POST(request: Request, ctx: RouteContext<"/api/opportunities/[id]/create-agent">) {
   return handle(async () => {
-    const session = await requireSessionOrThrow();
+    const session = await requireApiSession(request);
     const { id } = await ctx.params;
     const body = (await request.json().catch(() => ({}))) as { config?: unknown };
     const { opportunity, draft } = await draftAgentForOpportunity(session, id);

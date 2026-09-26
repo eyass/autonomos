@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { runAction } from "@/lib/actions";
 import { requireSessionOrThrow } from "@/lib/session";
 import { connectSandbox, disconnect, startOAuthConnection } from "@/server/integrations";
+import { rotateWebhookSecret } from "@/server/platform";
 
 export async function connectSandboxAction(key: string) {
   return runAction(async () => connectSandbox(await requireSessionOrThrow(), key));
@@ -16,4 +17,8 @@ export async function connectOAuthAction(key: string) {
 
 export async function disconnectAction(key: string) {
   return runAction(async () => disconnect(await requireSessionOrThrow(), key));
+}
+
+export async function rotateWebhookSecretAction(key: string) {
+  return runAction(async () => rotateWebhookSecret(await requireSessionOrThrow(), key));
 }

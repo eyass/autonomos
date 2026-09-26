@@ -1,7 +1,18 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Badge, Button, Card, Input, Notice, Textarea } from "@/components/ui";
+import { ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { FormField } from "@/components/app/form-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { FieldGroup } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { pct } from "@/lib/format";
 import { approveAction, modifyAction, rejectAction } from "./actions";
 
@@ -25,7 +36,6 @@ export type ApprovalView = {
 
 export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: boolean }) {
   const [mode, setMode] = useState<"idle" | "modify" | "reject">("idle");
-  const [open, setOpen] = useState(false);
   const [changes, setChanges] = useState<Record<string, string>>(Object.fromEntries(a.modifiableFields.map((f) => [f, String(a.proposed[f] ?? "")])));
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,122 +57,135 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
   const approvalReasons = a.checks.filter((c) => c.effect === "require_approval");
 
   return (
-    <Card className="p-4 sm:p-5" data-testid="approval-card">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-base font-semibold">{a.title}</div>
-          <div className="mt-0.5 text-sm text-muted">
-            Agent: <a className="hover:underline" href={`/agents/${a.agentId}`}>{a.agentName}</a>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {a.confidence !== null ? <Badge tone={a.confidence >= 0.9 ? "ok" : "warn"}>Confidence {pct(a.confidence)}</Badge> : null}
-          {a.risk ? <Badge tone={a.risk >= 4 ? "danger" : "neutral"}>Risk {a.risk}/5</Badge> : null}
-        </div>
-      </div>
-      {a.reason ? (
-        <p className="mt-3 text-sm">
-          <span className="font-medium">Reason: </span>
-          {a.reason}
-        </p>
-      ) : null}
-      {approvalReasons.length ? (
-        <p className="mt-2 text-xs text-muted">Needs approval because: {approvalReasons.map((c) => c.detail ?? c.rule).join("; ")}</p>
-      ) : null}
-
-      {mode === "modify" ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {a.modifiableFields.map((f) => (
-            <label key={f} className="text-sm">
-              <span className="mb-1 block font-medium capitalize">{f.replaceAll("_", " ")}</span>
-              {typeof a.proposed[f] === "string" && String(a.proposed[f]).length > 60 ? (
-                <Textarea value={changes[f]} onChange={(e) => setChanges({ ...changes, [f]: e.target.value })} rows={4} />
-              ) : (
-                <Input type={typeof a.proposed[f] === "number" ? "number" : "text"} value={changes[f]} onChange={(e) => setChanges({ ...changes, [f]: e.target.value })} />
-              )}
-            </label>
-          ))}
-        </div>
-      ) : null}
-      {mode !== "idle" ? <Textarea className="mt-3" rows={2} placeholder="Comment for the audit log (optional)" value={comment} onChange={(e) => setComment(e.target.value)} /> : null}
-      {error ? <Notice tone="danger" className="mt-3">{error}</Notice> : null}
-
-      {canApprove ? (
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {mode === "idle" ? (
-            <>
-              <Button className="col-span-2 h-10 sm:h-9" disabled={pending} onClick={() => act(() => approveAction(a.id))}>
-                Approve
-              </Button>
-              <Button variant="secondary" disabled={pending} onClick={() => setMode("reject")}>
-                Reject
-              </Button>
-              {a.modifiableFields.length ? (
-                <Button variant="secondary" disabled={pending} onClick={() => setMode("modify")}>
-                  Modify
-                </Button>
-              ) : null}
-            </>
-          ) : mode === "modify" ? (
-            <>
-              <Button disabled={pending || Object.keys(typed()).length === 0} onClick={() => act(() => modifyAction(a.id, typed(), comment || undefined))}>
-                Approve with changes
-              </Button>
-              <Button variant="ghost" onClick={() => setMode("idle")}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="danger" disabled={pending} onClick={() => act(() => rejectAction(a.id, comment || undefined))}>
-                Reject
-              </Button>
-              <Button variant="ghost" onClick={() => setMode("idle")}>
-                Cancel
-              </Button>
-            </>
-          )}
-        </div>
-      ) : (
-        <p className="mt-4 text-xs text-muted">You do not have approval permission.</p>
-      )}
-
-      <button type="button" className="mt-4 text-xs font-medium text-accent hover:underline" onClick={() => setOpen((v) => !v)}>
-        {open ? "Hide details" : "Evidence, policy and tool data"}
-      </button>
-      {open ? (
-        <div className="mt-3 grid gap-4 text-sm md:grid-cols-2 [&>*]:min-w-0">
+    <Card data-testid="approval-card">
+      <CardHeader>
+        <CardTitle className="text-base">{a.title}</CardTitle>
+        <CardDescription>
+          Agent:{" "}
+          <Link className="hover:underline" href={`/agents/${a.agentId}`}>
+            {a.agentName}
+          </Link>
+        </CardDescription>
+        <CardAction className="flex flex-wrap justify-end gap-1.5">
+          {a.confidence !== null ? <Badge variant={a.confidence >= 0.9 ? "success" : "warning"}>Confidence {pct(a.confidence)}</Badge> : null}
+          {a.risk ? <Badge variant={a.risk >= 4 ? "danger" : "secondary"}>Risk {a.risk}/5</Badge> : null}
+        </CardAction>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {a.reason ? (
           <div>
-            <div className="mb-1 text-xs font-medium text-muted">Evidence</div>
-            <ul className="space-y-1">
-              {a.evidence.map((e, i) => (
+            <div className="text-xs font-medium text-muted-foreground">Why the agent wants to do this</div>
+            <p className="mt-0.5">{a.reason}</p>
+          </div>
+        ) : null}
+        {a.evidence.length ? (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground">Based on</div>
+            <ul className="mt-0.5 space-y-0.5">
+              {a.evidence.slice(0, 3).map((e, i) => (
                 <li key={i}>
-                  <Badge>{e.source}</Badge> {e.description}
-                </li>
-              ))}
-              {!a.evidence.length ? <li className="text-muted">None provided</li> : null}
-            </ul>
-            <div className="mb-1 mt-3 text-xs font-medium text-muted">Agent reasoning</div>
-            <p className="text-muted">{a.reason ?? "–"}</p>
-          </div>
-          <div>
-            <div className="mb-1 text-xs font-medium text-muted">Policy checks</div>
-            <ul className="space-y-0.5 text-xs">
-              {a.checks.map((c, i) => (
-                <li key={i} className={c.passed ? "text-ok" : c.effect === "deny" ? "text-danger" : "text-warn"}>
-                  {c.passed ? "✓" : "•"} {c.rule}
-                  {c.detail ? <span className="text-muted"> ({c.detail})</span> : null}
+                  <Badge variant="secondary">{e.source}</Badge> {e.description}
                 </li>
               ))}
             </ul>
-            <div className="mb-1 mt-3 text-xs font-medium text-muted">Proposed action</div>
-            <pre className="max-w-full overflow-x-auto rounded-md bg-surface-muted p-2 text-xs">{JSON.stringify(a.proposed, null, 2)}</pre>
-            <a href={`/activity/${a.runId}`} className="mt-2 inline-block text-xs text-accent hover:underline">
-              Full run history and tool data
-            </a>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+        {approvalReasons.length ? <p className="text-xs text-muted-foreground">Needs approval because: {approvalReasons.map((c) => c.detail ?? c.rule).join("; ")}</p> : null}
+        {mode === "modify" ? (
+          <FieldGroup className="grid gap-3 sm:grid-cols-2">
+            {a.modifiableFields.map((f) => (
+              <FormField key={f} label={f.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase())}>
+                {typeof a.proposed[f] === "string" && String(a.proposed[f]).length > 60 ? (
+                  <Textarea value={changes[f]} onChange={(e) => setChanges({ ...changes, [f]: e.target.value })} rows={4} />
+                ) : (
+                  <Input type={typeof a.proposed[f] === "number" ? "number" : "text"} value={changes[f]} onChange={(e) => setChanges({ ...changes, [f]: e.target.value })} />
+                )}
+              </FormField>
+            ))}
+          </FieldGroup>
+        ) : null}
+        {mode !== "idle" ? <Textarea rows={2} placeholder="Comment for the audit log (optional)" aria-label="Comment" value={comment} onChange={(e) => setComment(e.target.value)} /> : null}
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button variant="link" size="sm" className="group h-auto px-0 text-xs">
+              Evidence, policy and tool data
+              <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Evidence</div>
+              <ul className="space-y-1">
+                {a.evidence.map((e, i) => (
+                  <li key={i}>
+                    <Badge variant="secondary">{e.source}</Badge> {e.description}
+                  </li>
+                ))}
+                {!a.evidence.length ? <li className="text-muted-foreground">None provided</li> : null}
+              </ul>
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Policy checks</div>
+              <ul className="space-y-0.5 text-xs">
+                {a.checks.map((c, i) => (
+                  <li key={i} className={c.passed ? "text-success" : c.effect === "deny" ? "text-destructive" : "text-warning"}>
+                    {c.passed ? "✓" : "•"} {c.rule}
+                    {c.detail ? <span className="text-muted-foreground"> ({c.detail})</span> : null}
+                  </li>
+                ))}
+              </ul>
+              <div className="mb-1 mt-3 text-xs font-medium text-muted-foreground">Proposed action</div>
+              <pre className="max-w-full overflow-x-auto rounded-md bg-muted p-2 text-xs">{JSON.stringify(a.proposed, null, 2)}</pre>
+              <Link href={`/activity/${a.runId}`} className="mt-2 inline-block text-xs text-primary hover:underline">
+                Full run history and tool data
+              </Link>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </CardContent>
+      <CardFooter className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        {!canApprove ? (
+          <p className="col-span-2 text-xs text-muted-foreground">You do not have approval permission.</p>
+        ) : mode === "idle" ? (
+          <>
+            <Button className="col-span-2" disabled={pending} onClick={() => act(() => approveAction(a.id))}>
+              {pending ? <Spinner /> : null}
+              Approve
+            </Button>
+            <Button variant="outline" disabled={pending} onClick={() => setMode("reject")}>
+              Reject
+            </Button>
+            {a.modifiableFields.length ? (
+              <Button variant="outline" disabled={pending} onClick={() => setMode("modify")}>
+                Modify
+              </Button>
+            ) : null}
+          </>
+        ) : mode === "modify" ? (
+          <>
+            <Button disabled={pending || Object.keys(typed()).length === 0} onClick={() => act(() => modifyAction(a.id, typed(), comment || undefined))}>
+              Approve with changes
+            </Button>
+            <Button variant="ghost" onClick={() => setMode("idle")}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="destructive" disabled={pending} onClick={() => act(() => rejectAction(a.id, comment || undefined))}>
+              Reject
+            </Button>
+            <Button variant="ghost" onClick={() => setMode("idle")}>
+              Cancel
+            </Button>
+          </>
+        )}
+      </CardFooter>
     </Card>
   );
 }

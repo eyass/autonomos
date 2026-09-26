@@ -1,6 +1,7 @@
+import { requireApiSession } from "@/lib/api-auth";
 import { z } from "zod";
 import { handle } from "@/lib/actions";
-import { HttpError, requireSessionOrThrow } from "@/lib/session";
+import { HttpError } from "@/lib/session";
 import { activateAgent, pauseAgent, startProductionRun, startTestRun } from "@/server/agents";
 
 const Input = z.object({ input: z.record(z.string(), z.unknown()).default({}) });
@@ -8,7 +9,7 @@ const Input = z.object({ input: z.record(z.string(), z.unknown()).default({}) })
 // POST /api/agents/:id/test | activate | pause | run
 export async function POST(request: Request, ctx: RouteContext<"/api/agents/[id]/[action]">) {
   return handle(async () => {
-    const session = await requireSessionOrThrow();
+    const session = await requireApiSession(request);
     const { id, action } = await ctx.params;
     switch (action) {
       case "test":

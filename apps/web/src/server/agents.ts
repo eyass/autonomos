@@ -3,11 +3,13 @@ import { policyForTools } from "@autonomos/agents";
 import { createRun, RunNotAllowedError } from "@autonomos/db";
 import { buildSandboxTicket, getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
 import { AgentConfigSchema, PolicyConfigSchema, type AgentConfig, type PolicyConfig } from "@autonomos/schemas";
-import { deactivateAgentSchedule, enqueueRun, TriggerNotConfiguredError, upsertAgentSchedule } from "@autonomos/workflows";
+import { deactivateAgentSchedule, TriggerNotConfiguredError, upsertAgentSchedule } from "@autonomos/workflows";
 import { sandboxStore } from "@autonomos/db";
 import { activity, audit, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
 import { connectedIntegrationKeys } from "./opportunities";
+import { agentReadiness, enqueueOrFail } from "./readiness";
+import { assertAgentAllowance } from "@/server/platform";
 
 function mapRunError(error: unknown): never {
   if (error instanceof RunNotAllowedError) throw new HttpError(409, error.message);
@@ -44,9 +46,7 @@ async function insertVersion(session: Session, agentId: string, version: number,
     .select("id")
     .single();
   if (error || !data) throw new Error(`version: ${error?.message}`);
-  const { error: toolError } = await db
-    .from("agent_tools")
-    .insert([...new Set(config.tools)].map((tool_key) => ({ organization_id: session.org.id, agent_version_id: data.id, tool_key })));
+  const { error: toolError } = await db.from("agent_tools").insert([...new Set(config.tools)].map((tool_key) => ({ organization_id: session.org.id, agent_version_id: data.id, tool_key })));
   if (toolError) throw new Error(`tools: ${toolError.message}`);
   return data.id;
 }
@@ -161,7 +161,8 @@ export async function startTestRun(session: Session, agentId: string, input: Rec
   if (agent.status === "draft") await db.from("agents").update({ status: "testing" }).eq("organization_id", session.org.id).eq("id", agentId);
   try {
     const { runId } = await createRun(db, { organizationId: session.org.id, agentId, mode: "test", trigger: { type: "manual", test: true }, input, startedBy: session.user.id });
-    await enqueueRun(runId);
+    // A test that cannot start is recorded as failed, so it shows on its run page and in Activity.
+    await enqueueOrFail(session.org.id, runId);
     await track(session, "agent_test_started", { agent_id: agentId, run_id: runId });
     return runId;
   } catch (e) {
@@ -180,8 +181,15 @@ export async function startTestRunWithSample(session: Session, agentId: string, 
 
 export async function startProductionRun(session: Session, agentId: string, input: Record<string, unknown>) {
   try {
-    const { runId } = await createRun(adminDb(), { organizationId: session.org.id, agentId, mode: "production", trigger: { type: "manual", userId: session.user.id }, input, startedBy: session.user.id });
-    await enqueueRun(runId);
+    const { runId } = await createRun(adminDb(), {
+      organizationId: session.org.id,
+      agentId,
+      mode: "production",
+      trigger: { type: "manual", userId: session.user.id },
+      input,
+      startedBy: session.user.id,
+    });
+    await enqueueOrFail(session.org.id, runId);
     await track(session, "agent_run_started", { agent_id: agentId, run_id: runId });
     return runId;
   } catch (e) {
@@ -194,15 +202,11 @@ export async function activateAgent(session: Session, agentId: string) {
   const db = adminDb();
   const { agent, version, config } = await loadAgentConfig(session, agentId);
   if (config.autonomyLevel < 2) throw new HttpError(409, "An L1 agent cannot be activated; L1 means humans do the work");
-  const { count } = await db
-    .from("agent_runs")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", session.org.id)
-    .eq("agent_id", agentId)
-    .eq("mode", "test")
-    .eq("status", "completed");
-  if (!count) throw new HttpError(409, "Run at least one test before activating the agent");
+  const readiness = await agentReadiness(session, agentId, config.tools, "activate");
+  const blocking = readiness.checks.filter((c) => c.blocking && !c.ok);
+  if (blocking.length) throw new HttpError(409, `Not ready to go live: ${blocking.map((c) => `${c.label}: ${c.detail}`).join(" ")}`);
   await assertToolsAllowed(session, config.tools);
+  if (agent.status !== "active") await assertAgentAllowance(session);
   try {
     await syncSchedule(session, agentId, config, agent.trigger_schedule_id);
   } catch (e) {
@@ -219,6 +223,8 @@ export async function pauseAgent(session: Session, agentId: string) {
   const db = adminDb();
   const { agent } = await loadAgentConfig(session, agentId);
   await db.from("agents").update({ status: "paused" }).eq("organization_id", session.org.id).eq("id", agentId);
+  // A paused agent means the opportunity is no longer live.
+  if (agent.opportunity_id) await db.from("automation_opportunities").update({ status: "building" }).eq("organization_id", session.org.id).eq("id", agent.opportunity_id).eq("status", "live");
   if (agent.trigger_schedule_id) {
     try {
       await deactivateAgentSchedule(agent.trigger_schedule_id);
@@ -247,7 +253,7 @@ export async function dispatchIntegrationEvent(organizationId: string, event: st
   const runIds: string[] = [];
   for (const a of listening) {
     const { runId } = await createRun(db, { organizationId, agentId: a.id, mode: "production", trigger: { type: "integration_event", event }, input: payload });
-    await enqueueRun(runId);
+    await enqueueOrFail(organizationId, runId);
     runIds.push(runId);
   }
   return runIds;
@@ -258,13 +264,7 @@ export async function simulateSandboxTicket(session: Session, sampleKey: string)
   const sample = SAMPLE_TICKETS.find((t) => t.key === sampleKey);
   if (!sample) throw new HttpError(400, "Unknown sample ticket");
   const db = adminDb();
-  const { data: conn } = await db
-    .from("integration_connections")
-    .select("provider")
-    .eq("organization_id", session.org.id)
-    .eq("integration_key", "zendesk")
-    .eq("status", "connected")
-    .maybeSingle();
+  const { data: conn } = await db.from("integration_connections").select("provider").eq("organization_id", session.org.id).eq("integration_key", "zendesk").eq("status", "connected").maybeSingle();
   if (conn?.provider !== "sandbox") throw new HttpError(409, "Connect Zendesk in sandbox mode to simulate tickets");
   const ticket = buildSandboxTicket(sample);
   await sandboxStore(db, session.org.id).put("zendesk", "ticket", ticket);

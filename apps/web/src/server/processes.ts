@@ -1,24 +1,14 @@
 import "server-only";
-import {
-  extractProcessesFromDocument,
-  generateWorkflow,
-  runDiscoveryTurn,
-  type CompanyContext,
-  type InterviewMessage,
-} from "@autonomos/ai";
+import { draftProcessInventory, extractProcessesFromDocument, generateWorkflow, runDiscoveryTurn, suggestInterviewAnswers, type CompanyContext, type InterviewMessage } from "@autonomos/ai";
 import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk } from "@autonomos/agents";
-import { DiscoveredProcessSchema, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
+import { DEPARTMENTS, DiscoveredProcessSchema, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { sandboxStore } from "@autonomos/db";
 import { adminDb, HttpError, type Session } from "@/lib/session";
 
 export async function companyContext(session: Session): Promise<CompanyContext> {
-  const { data } = await adminDb()
-    .from("integration_connections")
-    .select("integration_key, integrations(name)")
-    .eq("organization_id", session.org.id)
-    .eq("status", "connected");
+  const { data } = await adminDb().from("integration_connections").select("integration_key, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected");
   return {
     name: session.org.name,
     industry: session.org.industry,
@@ -33,12 +23,7 @@ const usageSink = (session: Session) => (u: Parameters<typeof recordUsage>[1]) =
 export async function ensureDepartment(session: Session, name: string): Promise<string> {
   const db = adminDb();
   const clean = name.trim() || "Other";
-  const { data: existing } = await db
-    .from("departments")
-    .select("id")
-    .eq("organization_id", session.org.id)
-    .ilike("name", clean)
-    .maybeSingle();
+  const { data: existing } = await db.from("departments").select("id").eq("organization_id", session.org.id).ilike("name", clean).maybeSingle();
   if (existing) return existing.id;
   const { data, error } = await db.from("departments").insert({ organization_id: session.org.id, name: clean }).select("id").single();
   if (error || !data) throw new Error(`department: ${error?.message}`);
@@ -95,13 +80,20 @@ async function replaceChildren(processId: string, orgId: string, steps: Discover
 export async function saveDiscoveredProcesses(
   session: Session,
   processes: DiscoveredProcess[],
-  source: "interview" | "document" | "integration" | "manual",
+  source: "interview" | "document" | "integration" | "manual" | "website",
   links: { discoverySessionId?: string; documentId?: string } = {},
 ): Promise<string[]> {
   const db = adminDb();
   const ids: string[] = [];
+  // Discovery runs from several sources (website, interview, documents, systems). The same
+  // process found twice is kept once: the first version stays, for the team to refine.
+  const { data: existing } = await db.from("processes").select("title").eq("organization_id", session.org.id).neq("status", "archived");
+  const known = new Set((existing ?? []).map((e) => e.title.trim().toLowerCase()));
   for (const raw of processes) {
     const p = DiscoveredProcessSchema.parse(raw);
+    const key = p.title.trim().toLowerCase();
+    if (known.has(key)) continue;
+    known.add(key);
     const departmentId = await ensureDepartment(session, p.department);
     const signals = signalsFrom(p, session.org.defaultHourlyCost);
     const { data, error } = await db
@@ -185,9 +177,19 @@ export async function createManualProcess(session: Session, input: z.infer<typeo
     base.systems = wf.systems;
     base.roles = wf.roles;
     base.trigger = wf.trigger;
+    if (input.department === "Detect") base.department = wf.department ?? "Operations";
+    base.frequency = wf.frequency;
+    base.estimatedOccurrencesPerMonth = wf.estimatedOccurrencesPerMonth;
+    base.estimatedMinutesPerOccurrence = wf.estimatedMinutesPerOccurrence;
+    if (wf.estimatedOccurrencesPerMonth && wf.estimatedMinutesPerOccurrence) base.missingInformation = ["Confirm the estimated volume and time per occurrence"];
   }
+  if (base.department === "Detect") base.department = "Operations";
   const [id] = await saveDiscoveredProcesses(session, [base], "manual");
-  return id!;
+  if (id) return id;
+  // Already in the inventory under this name: open that one instead of creating a duplicate.
+  const { data: existing } = await adminDb().from("processes").select("id").eq("organization_id", session.org.id).ilike("title", input.title.trim()).neq("status", "archived").limit(1).maybeSingle();
+  if (!existing) throw new HttpError(409, "Could not create the process");
+  return existing.id;
 }
 
 export const ProcessUpdateSchema = z.object({
@@ -278,7 +280,23 @@ export async function startInterview(session: Session, department: string) {
     .single();
   if (error || !data) throw new Error(`interview: ${error?.message}`);
   await track(session, "process_discovery_started", { method: "interview", department });
-  return data.id;
+  return { id: data.id, suggestions: await interviewSuggestions(session, department, [{ role: "assistant", content: openingQuestion(department) }]) };
+}
+
+// One-tap answers for the interview, grounded in the company profile. Never blocks the interview.
+async function interviewSuggestions(session: Session, department: string, messages: InterviewMessage[]): Promise<string[]> {
+  try {
+    return await suggestInterviewAnswers({
+      company: await companyContext(session),
+      department,
+      messages,
+      likelyProcesses: session.org.websiteProfile?.likelyProcesses ?? [],
+      onUsage: usageSink(session),
+    });
+  } catch (e) {
+    console.error("interview suggestions failed", e);
+    return [];
+  }
 }
 
 export async function answerInterview(session: Session, sessionId: string, answer: string) {
@@ -301,7 +319,8 @@ export async function answerInterview(session: Session, sessionId: string, answe
     .update({ messages: updated as never, extracted: turn.processes as never })
     .eq("organization_id", session.org.id)
     .eq("id", sessionId);
-  return { messages: updated, processes: turn.processes, done: turn.done };
+  const suggestions = await interviewSuggestions(session, s.department_name ?? "Operations", updated);
+  return { messages: updated, processes: turn.processes, done: turn.done, suggestions };
 }
 
 export async function finishInterview(session: Session, sessionId: string, selectedTitles?: string[]) {
@@ -346,13 +365,9 @@ export async function importDocument(session: Session, input: z.infer<typeof Doc
 // samples metadata from connected systems, never claims comprehensive mining.
 // ---------------------------------------------------------------------------
 
-export async function discoverFromIntegrations(session: Session) {
+export async function connectedSystemEvidence(session: Session): Promise<string[]> {
   const db = adminDb();
-  const { data: connections } = await db
-    .from("integration_connections")
-    .select("integration_key, provider")
-    .eq("organization_id", session.org.id)
-    .eq("status", "connected");
+  const { data: connections } = await db.from("integration_connections").select("integration_key, provider").eq("organization_id", session.org.id).eq("status", "connected");
   const sandbox = sandboxStore(db, session.org.id);
   const evidence: string[] = [];
   for (const c of connections ?? []) {
@@ -366,7 +381,12 @@ export async function discoverFromIntegrations(session: Session) {
       for (const t of tickets) for (const tag of (t.tags as string[]) ?? []) tags.set(tag, (tags.get(tag) ?? 0) + 1);
       evidence.push(
         `Zendesk: ${tickets.length} tickets sampled. Tags: ${[...tags.entries()].map(([k, v]) => `${k} (${v})`).join(", ") || "none"}. ` +
-          `Example subjects: ${tickets.slice(-5).map((t) => `"${String(t.subject)}"`).join("; ") || "none"}. Support handles refund requests from customers.`,
+          `Example subjects: ${
+            tickets
+              .slice(-5)
+              .map((t) => `"${String(t.subject)}"`)
+              .join("; ") || "none"
+          }. Support handles refund requests from customers.`,
       );
     }
     if (c.integration_key === "stripe") {
@@ -375,6 +395,11 @@ export async function discoverFromIntegrations(session: Session) {
     }
     if (c.integration_key === "slack") evidence.push("Slack is connected: teams post updates and weekly reports to channels.");
   }
+  return evidence;
+}
+
+export async function discoverFromIntegrations(session: Session) {
+  const evidence = await connectedSystemEvidence(session);
   if (!evidence.length) throw new HttpError(409, "Connect at least one integration first");
   await track(session, "process_discovery_started", { method: "integration" });
   const processes = await extractProcessesFromDocument({
@@ -384,4 +409,29 @@ export async function discoverFromIntegrations(session: Session) {
     onUsage: usageSink(session),
   });
   return saveDiscoveredProcesses(session, processes, "integration");
+}
+
+// ---------------------------------------------------------------------------
+// First inventory, drafted without asking: from the website profile and whatever
+// systems were connected during onboarding. Everything lands as a draft to review.
+// ---------------------------------------------------------------------------
+
+export async function draftInitialInventory(session: Session): Promise<string[]> {
+  const profile = session.org.websiteProfile;
+  const evidence = await connectedSystemEvidence(session);
+  const areas = (session.org.improvementAreas.length ? session.org.improvementAreas : ["Operations"]) as Array<(typeof DEPARTMENTS)[number]>;
+  const processes = await draftProcessInventory({
+    company: await companyContext(session),
+    profile: profile ?? {
+      summary: session.org.companySummary ?? session.org.description ?? session.org.name,
+      industry: (session.org.industry ?? "Other") as CompanyProfile["industry"],
+      customers: null,
+      improvementAreas: areas,
+      likelyProcesses: [],
+    },
+    evidence,
+    onUsage: usageSink(session),
+  });
+  await track(session, "process_discovery_started", { method: "website" });
+  return saveDiscoveredProcesses(session, processes, profile ? "website" : "integration");
 }

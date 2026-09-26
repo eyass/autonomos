@@ -14,14 +14,15 @@ export default async function ConnectPage() {
   const integrations = await loadIntegrations(session);
   return (
     <>
-      <Steps current={2} />
+      <Steps current={1} />
       <h1 className="mb-1 text-xl font-semibold">Connect systems</h1>
-      <p className="mb-6 text-sm text-muted">
-        Connect what you use. Nothing is required for process discovery; agents only get access to the specific actions you allow later.
-      </p>
-      <IntegrationGrid integrations={integrations} canManage={session.role !== "member"} compact />
+      <p className="mb-6 text-sm text-muted-foreground">Connect what you use. Nothing is required for process discovery; agents only get access to the specific actions you allow later.</p>
+      <IntegrationGrid integrations={integrations} canManage={session.role !== "member"} compact highlight={session.org.detectedTools} />
       <div className="mt-6">
-        <ActionButton action={finishOnboardingAction}>Continue</ActionButton>
+        <ActionButton action={finishOnboardingAction} pendingLabel="Mapping your processes…">
+          Continue
+        </ActionButton>
+        <p className="mt-2 text-xs text-muted-foreground">Next, AutonomOS drafts your first process inventory from your website and connected systems.</p>
       </div>
     </>
   );

@@ -34,27 +34,10 @@ export const AgentStatus = z.enum(["draft", "testing", "active", "paused", "erro
 export const RunStatus = z.enum(["queued", "running", "waiting_for_approval", "completed", "failed", "cancelled"]);
 export const RunMode = z.enum(["test", "production"]);
 export const ApprovalStatus = z.enum(["pending", "approved", "rejected", "modified", "expired"]);
-export const InterventionType = z.enum([
-  "approval",
-  "exception",
-  "correction",
-  "manual_completion",
-  "override",
-  "information_request",
-]);
+export const InterventionType = z.enum(["approval", "exception", "correction", "manual_completion", "override", "information_request"]);
 export const MemberRole = z.enum(["owner", "admin", "member"]);
 
-export const DEPARTMENTS = [
-  "Customer Support",
-  "Sales",
-  "Finance",
-  "Marketing",
-  "Operations",
-  "Product",
-  "Engineering",
-  "HR",
-  "Other",
-] as const;
+export const DEPARTMENTS = ["Customer Support", "Sales", "Finance", "Marketing", "Operations", "Product", "Engineering", "HR", "Other"] as const;
 
 export const EMPLOYEE_COUNTS = ["1–19", "20–49", "50–99", "100–249", "250–499", "500+"] as const;
 
@@ -71,6 +54,42 @@ export const INDUSTRIES = [
   "Insurance intermediary",
   "Other",
 ] as const;
+
+export const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "DKK", "NOK", "PLN", "CAD", "AUD"] as const;
+
+// ---------------------------------------------------------------------------
+// Company profile, drafted from the company website during onboarding
+// ---------------------------------------------------------------------------
+
+export const LikelyProcessSchema = z.object({
+  title: z.string().min(1).describe("Name of the recurring work, in plain business language, for example Refund request handling"),
+  department: z.enum(DEPARTMENTS),
+  description: z.string().describe("One sentence on what the work involves"),
+  evidence: z.string().describe("What on the website or in the detected tools suggests this work exists"),
+});
+
+export const CompanyProfileSchema = z.object({
+  name: z.string().min(1).describe("The company's trading name, without legal suffixes like BV or Ltd unless that is how it presents itself"),
+  summary: z.string().min(10).describe("Two to four plain sentences: what the company sells, to whom, and how it operates day to day"),
+  industry: z.enum(INDUSTRIES),
+  employeeCount: z.enum(EMPLOYEE_COUNTS).nullable().describe("Only when the site states or clearly implies the headcount; otherwise null"),
+  country: z.string().nullable().describe("Country of the head office, in English, for example Netherlands"),
+  currency: z.enum(CURRENCIES),
+  hourlyCostEstimate: z.number().positive().max(2000).describe("Typical fully loaded hourly labour cost of operational staff in that country, in the currency"),
+  improvementAreas: z.array(z.enum(DEPARTMENTS)).min(1).max(4).describe("Departments where recurring work is most likely, most promising first"),
+  customers: z.string().nullable().describe("Who the customers are, for example consumers buying second-hand furniture"),
+  likelyProcesses: z.array(LikelyProcessSchema).max(8),
+  evidence: z
+    .array(z.object({ field: z.string(), source: z.string() }))
+    .max(12)
+    .describe("Where each important field came from, for example industry: homepage headline"),
+  confidence: z.number().min(0).max(1),
+});
+export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
+
+export const InterviewSuggestionsSchema = z.object({
+  suggestions: z.array(z.string().min(1).max(300)).max(3).describe("Short answers the user can send as-is"),
+});
 
 // ---------------------------------------------------------------------------
 // Process discovery (PRD section 103)
@@ -131,6 +150,11 @@ export const GeneratedWorkflowSchema = z.object({
   steps: z.array(DiscoveredStepSchema).min(1),
   systems: z.array(z.string()),
   roles: z.array(z.string()),
+  // Filled so a manually added process needs only a name and a sentence.
+  department: z.enum(DEPARTMENTS).optional().describe("The department that owns this work"),
+  frequency: ProcessFrequency.optional(),
+  estimatedOccurrencesPerMonth: z.number().nonnegative().optional(),
+  estimatedMinutesPerOccurrence: z.number().nonnegative().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -165,6 +189,10 @@ export const GeneratedOpportunitySchema = z.object({
   humanInvolvement: z.array(z.string()),
   majorRisks: z.array(z.string()),
   rationale: z.string(),
+  evidence: z
+    .array(z.object({ source: z.string().describe("Where the fact comes from, for example Process inventory, Zendesk or Stripe"), detail: z.string() }))
+    .max(6)
+    .describe("Concrete facts from the process data and connected systems that justify this opportunity. Never invent numbers."),
 });
 export type GeneratedOpportunity = z.infer<typeof GeneratedOpportunitySchema>;
 
@@ -197,7 +225,6 @@ export const TriggerConfigSchema = z.discriminatedUnion("type", [
   }),
 ]);
 export type TriggerConfig = z.infer<typeof TriggerConfigSchema>;
-
 
 export const InstructionsSchema = z.object({
   objective: z.string().min(1),
@@ -275,16 +302,16 @@ export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 
 export const AgentDecisionSchema = z.object({
   summary: z.string().describe("One sentence describing this step for the activity log."),
-  decision: z.enum(["continue", "execute", "request_approval", "escalate", "stop"]).describe(
-    "continue: call a read tool to gather information. execute: perform a write action. request_approval: perform a write action you believe needs a human. escalate: hand to a human, you cannot proceed. stop: the task is finished.",
-  ),
+  decision: z
+    .enum(["continue", "execute", "request_approval", "escalate", "stop"])
+    .describe(
+      "continue: call a read tool to gather information. execute: perform a write action. request_approval: perform a write action you believe needs a human. escalate: hand to a human, you cannot proceed. stop: the task is finished.",
+    ),
   confidence: z.number().min(0).max(1).optional(),
   reasoningSummary: z.string(),
   proposedTool: z.string().optional(),
   proposedArguments: z.record(z.string(), z.unknown()).optional(),
-  evidence: z
-    .array(z.object({ source: z.string(), description: z.string() }))
-    .optional(),
+  evidence: z.array(z.object({ source: z.string(), description: z.string() })).optional(),
   policyChecks: z.array(z.object({ rule: z.string(), passed: z.boolean() })),
   outcome: z
     .object({
@@ -352,3 +379,15 @@ export const ANALYTICS_EVENTS = [
   "autonomy_changed",
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
+
+// Plan limits. Runs above the monthly allowance keep working and are billed as overage;
+// active agents above the limit cannot be activated until one is paused or the plan changes.
+export const PLANS = {
+  design_partner: { name: "Design partner", activeAgents: 5, runsPerMonth: 2000, overagePerRun: 0.05, price: null },
+  starter: { name: "Starter", activeAgents: 3, runsPerMonth: 1000, overagePerRun: 0.08, price: 490 },
+  growth: { name: "Growth", activeAgents: 15, runsPerMonth: 10000, overagePerRun: 0.05, price: 1900 },
+} as const;
+export type PlanKey = keyof typeof PLANS;
+export function planFor(key: string | null | undefined) {
+  return PLANS[(key ?? "design_partner") as PlanKey] ?? PLANS.design_partner;
+}

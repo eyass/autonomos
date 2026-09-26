@@ -1,19 +1,27 @@
 import { getTool } from "@autonomos/integrations";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
 import { OutcomeBadge, StatusBadge } from "@/components/domain";
-import { Badge, ButtonLink, Card, CardBody, CardHeader, DefinitionList, Notice, PageHeader } from "@/components/ui";
 import { dateTime, hours, time, usd } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { Feedback } from "./feedback";
 import { LiveRefresh } from "./live";
+import { ButtonLink } from "@/components/app/button-link";
+import { DefinitionList } from "@/components/app/definition-list";
+import { PageHeader } from "@/components/app/page-header";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const STEP_TONE: Record<string, string> = { succeeded: "bg-ok", failed: "bg-danger", waiting: "bg-warn", simulated: "bg-info", skipped: "bg-muted" };
+const STEP_TONE: Record<string, string> = { succeeded: "bg-success", failed: "bg-destructive", waiting: "bg-warning", simulated: "bg-info", skipped: "bg-muted-foreground" };
 
-export default async function RunPage({ params }: { params: Promise<{ runId: string }> }) {
+export default async function RunPage({ params, searchParams }: { params: Promise<{ runId: string }>; searchParams: Promise<{ built?: string }> }) {
   const { runId } = await params;
+  const { built } = await searchParams;
   const session = await requireSession();
   const supabase = await createClient();
   const { data: run } = await supabase
@@ -57,33 +65,44 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
           </span>
         }
         actions={
-          <ButtonLink href={`/agents/${agent.id}`} variant="secondary">
+          <ButtonLink href={`/agents/${agent.id}`} variant="outline">
             Open agent
           </ButtonLink>
         }
       />
+      {built ? (
+        <Alert variant="success" className="mb-4">
+          <AlertDescription>
+            AutonomOS built {agent.name} and started a test run. Actions that would change something are simulated, never executed. When the result looks right, open the agent to activate it.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {run.status === "queued" ? (
-        <Notice tone="info" className="mb-4">
-          Queued on the durable runtime. If this stays queued, check that the Trigger.dev worker is running.
-        </Notice>
+        <Alert variant="info" className="mb-4">
+          <AlertDescription>Queued on the durable runtime. If this stays queued, check that the Trigger.dev worker is running.</AlertDescription>
+        </Alert>
       ) : null}
       {pending ? (
-        <Notice tone="warn" className="mb-4">
-          Waiting for approval: {pending.title}{" "}
-          <Link href="/approvals" className="font-medium underline">
-            Review it
-          </Link>
-        </Notice>
+        <Alert variant="warning" className="mb-4">
+          <AlertDescription>
+            Waiting for approval: {pending.title}{" "}
+            <Link href="/approvals" className="font-medium underline">
+              Review it
+            </Link>
+          </AlertDescription>
+        </Alert>
       ) : null}
       {run.error ? (
-        <Notice tone="danger" className="mb-4">
-          {run.error_retryable ? "Temporary error, retrying: " : "Error: "}
-          {run.error}
-        </Notice>
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>
+            {run.error_retryable ? "Temporary error, retrying: " : "Error: "}
+            {run.error}
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       <Card className="mb-6">
-        <CardBody className="space-y-4">
+        <CardContent className="space-y-4">
           <p className="text-sm">{run.summary ?? "In progress"}</p>
           <DefinitionList
             className="sm:grid-cols-4"
@@ -94,89 +113,109 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
               { label: "Duration", value: duration === null ? "–" : `${duration.toFixed(1)} s` },
             ]}
           />
-        </CardBody>
+        </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="min-w-0 lg:col-span-2">
-          <CardHeader title="What happened" description="Every material step, in order." />
-          <CardBody>
+          <CardHeader>
+            <CardTitle>What happened</CardTitle>
+            <CardDescription>Every material step, in order.</CardDescription>
+          </CardHeader>
+          <CardContent>
             <ol className="relative ml-1 space-y-4 border-l border-border pl-5">
               {(steps ?? []).map((s) => {
                 const decision = s.type === "decision" ? (s.output as { reasoningSummary?: string; confidence?: number; proposedTool?: string }) : null;
                 return (
                   <li key={s.id} className="relative">
-                    <span className={cn("absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full", STEP_TONE[s.status] ?? "bg-muted")} />
+                    <span className={cn("absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full", STEP_TONE[s.status] ?? "bg-muted-foreground")} />
                     <div className="flex flex-wrap items-baseline gap-2 text-sm">
-                      <span className="tabular-nums text-xs text-muted">{time(s.created_at)}</span>
+                      <span className="tabular-nums text-xs text-muted-foreground">{time(s.created_at)}</span>
                       <span className="min-w-0 font-medium break-words">{s.description}</span>
-                      {s.tool && (getTool(s.tool)?.label ?? s.tool) !== s.description ? <Badge>{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
-                      {s.status === "simulated" ? <Badge tone="info">simulated</Badge> : null}
+                      {s.tool && (getTool(s.tool)?.label ?? s.tool) !== s.description ? <Badge variant="secondary">{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
+                      {s.status === "simulated" ? <Badge variant="info">simulated</Badge> : null}
                     </div>
                     {s.type === "approval_requested" ? (
-                      <ul className="mt-1 list-inside list-disc text-xs text-muted">
+                      <ul className="mt-1 list-inside list-disc text-xs text-muted-foreground">
                         {((s.output as { reasons?: string[] } | null)?.reasons ?? []).map((r) => (
                           <li key={r}>{r}</li>
                         ))}
                       </ul>
                     ) : null}
                     {decision?.reasoningSummary && decision.reasoningSummary !== s.description ? (
-                      <p className="mt-1 text-sm text-muted">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         {decision.reasoningSummary}
                         {decision.confidence !== undefined ? ` (confidence ${Math.round(decision.confidence * 100)}%)` : ""}
                       </p>
                     ) : null}
                     {s.type !== "decision" && (s.input || s.output) ? (
-                      <details className="mt-1 text-xs">
-                        <summary className="cursor-pointer text-muted">Data</summary>
-                        <div className="mt-1 grid gap-2 md:grid-cols-2 [&>*]:min-w-0">
-                          {s.input ? <pre className="overflow-x-auto rounded bg-surface-muted p-2">{JSON.stringify(s.input, null, 2)}</pre> : null}
-                          {s.output ? <pre className="overflow-x-auto rounded bg-surface-muted p-2">{JSON.stringify(s.output, null, 2)}</pre> : null}
-                        </div>
-                      </details>
+                      <Collapsible className="mt-1 text-xs">
+                        <CollapsibleTrigger className="group inline-flex items-center gap-1 text-muted-foreground">
+                          Data
+                          <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="mt-1 grid gap-2 md:grid-cols-2 [&>*]:min-w-0">
+                            {s.input ? <pre className="overflow-x-auto rounded bg-muted p-2">{JSON.stringify(s.input, null, 2)}</pre> : null}
+                            {s.output ? <pre className="overflow-x-auto rounded bg-muted p-2">{JSON.stringify(s.output, null, 2)}</pre> : null}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     ) : null}
                   </li>
                 );
               })}
-              {active ? <li className="text-sm text-muted">Working…</li> : null}
+              {active ? <li className="text-sm text-muted-foreground">Working…</li> : null}
             </ol>
-          </CardBody>
+          </CardContent>
         </Card>
         <div className="space-y-6">
           {run.mode === "test" && output.wouldRequireApproval?.length ? (
             <Card>
-              <CardHeader title="Approvals needed in production" />
-              <CardBody className="space-y-2 text-sm">
+              <CardHeader>
+                <CardTitle>Approvals needed in production</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
                 {output.wouldRequireApproval.map((w, i) => (
                   <div key={i}>
                     <div className="font-medium">{getTool(w.tool)?.label ?? w.tool}</div>
-                    <div className="text-xs text-muted">{w.reasons.join("; ")}</div>
+                    <div className="text-xs text-muted-foreground">{w.reasons.join("; ")}</div>
                   </div>
                 ))}
-              </CardBody>
+              </CardContent>
             </Card>
           ) : null}
           <Card>
-            <CardHeader title="Human involvement" />
-            <CardBody className="space-y-2 text-sm">
+            <CardHeader>
+              <CardTitle>Human involvement</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
               {(interventions ?? []).map((i, n) => (
                 <div key={n}>
-                  <Badge tone="warn">{i.type.replaceAll("_", " ")}</Badge> {i.description}
+                  <Badge variant="warning">{i.type.replaceAll("_", " ")}</Badge> {i.description}
                 </div>
               ))}
-              {!interventions?.length ? <p className="text-muted">None</p> : null}
-              <details className="pt-2 text-xs">
-                <summary className="cursor-pointer text-muted hover:text-foreground">Run input</summary>
-                <pre className="mt-2 overflow-x-auto rounded bg-surface-muted p-2">{JSON.stringify(run.input, null, 2)}</pre>
-              </details>
-            </CardBody>
+              {!interventions?.length ? <p className="text-muted-foreground">None</p> : null}
+              <Collapsible className="pt-2 text-xs">
+                <CollapsibleTrigger className="group inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                  Run input
+                  <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <pre className="mt-2 overflow-x-auto rounded bg-muted p-2">{JSON.stringify(run.input, null, 2)}</pre>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
           </Card>
           {lastDecision && !active ? (
             <Card>
-              <CardHeader title="Was this right?" description="Feedback is stored for evaluating the agent." />
-              <CardBody>
+              <CardHeader>
+                <CardTitle>Was this right?</CardTitle>
+                <CardDescription>Feedback is stored for evaluating the agent.</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Feedback runId={runId} current={feedback?.verdict ?? null} />
-              </CardBody>
+              </CardContent>
             </Card>
           ) : null}
         </div>

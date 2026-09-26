@@ -1,6 +1,6 @@
 import "server-only";
 import { applyApprovalChanges, INTERVENTION_MINUTES } from "@autonomos/agents";
-import { ToolError } from "@autonomos/integrations";
+import { getTool, ToolError } from "@autonomos/integrations";
 import { ApprovalDecisionSchema, type ApprovalDecision } from "@autonomos/schemas";
 import { enqueueRun, TriggerNotConfiguredError } from "@autonomos/workflows";
 import { activity, audit, track } from "@/lib/audit";
@@ -12,12 +12,7 @@ export async function resolveApproval(session: Session, approvalId: string, raw:
   if (!session.canApprove) throw new HttpError(403, "You are not allowed to approve agent actions");
   const decision = ApprovalDecisionSchema.parse(raw);
   const db = adminDb();
-  const { data: approval } = await db
-    .from("approval_requests")
-    .select("*, agents(name, process_id)")
-    .eq("organization_id", session.org.id)
-    .eq("id", approvalId)
-    .maybeSingle();
+  const { data: approval } = await db.from("approval_requests").select("*, agents(name, process_id)").eq("organization_id", session.org.id).eq("id", approvalId).maybeSingle();
   if (!approval) throw new HttpError(404, "Approval not found");
   if (approval.status !== "pending") throw new HttpError(409, `This approval was already ${approval.status}`);
 
@@ -28,6 +23,15 @@ export async function resolveApproval(session: Session, approvalId: string, raw:
       changes = Object.fromEntries(Object.keys(decision.changes).map((k) => [k, merged[k]]));
     } catch (e) {
       throw new HttpError(400, e instanceof ToolError ? e.message : "Invalid modification");
+    }
+  }
+
+  // Approval limits: a member may only approve amounts up to their personal limit.
+  if (decision.decision !== "reject" && session.approvalLimit !== null) {
+    const field = getTool(approval.tool)?.amountField;
+    const amount = field ? Number({ ...(approval.proposed_action as Record<string, unknown>), ...(changes ?? {}) }[field]) : NaN;
+    if (Number.isFinite(amount) && amount > session.approvalLimit) {
+      throw new HttpError(403, `This is above your approval limit of ${session.approvalLimit} ${session.org.currency}. Ask someone with a higher limit, or reduce the amount.`);
     }
   }
 
@@ -84,7 +88,15 @@ export async function resolveApproval(session: Session, approvalId: string, raw:
   try {
     await enqueueRun(approval.agent_run_id, `resume-${approvalId}`);
   } catch (e) {
-    if (e instanceof TriggerNotConfiguredError) throw new HttpError(503, `${e.message} The decision was saved; the run resumes once the worker is available.`);
+    // The decision is saved either way; say so, and leave a trace in Activity.
+    await activity(session, {
+      actionType: "run_resume_failed",
+      title: `Decision saved, but the run could not resume: ${e instanceof Error ? e.message : String(e)}`,
+      agentId: approval.agent_id,
+      agentRunId: approval.agent_run_id,
+      status: "error",
+    });
+    if (e instanceof TriggerNotConfiguredError) throw new HttpError(503, `${e.message} The decision was saved; the run resumes once the agent runtime is connected.`);
     throw e;
   }
   return { status };

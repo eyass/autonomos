@@ -1,7 +1,8 @@
+import { requireApiSession } from "@/lib/api-auth";
 import { z } from "zod";
 import { handle } from "@/lib/actions";
 import { rateLimit } from "@/lib/rate-limit";
-import { requireSessionOrThrow } from "@/lib/session";
+
 import { answerInterview, DocumentImportSchema, finishInterview, importDocument, startInterview } from "@/server/processes";
 
 const Body = z.discriminatedUnion("method", [
@@ -14,7 +15,7 @@ const Body = z.discriminatedUnion("method", [
 // POST /api/processes/discover
 export async function POST(request: Request) {
   return handle(async () => {
-    const session = await requireSessionOrThrow();
+    const session = await requireApiSession(request);
     rateLimit(`ai:${session.user.id}`, 30, 60_000);
     const body = Body.parse(await request.json());
     switch (body.method) {

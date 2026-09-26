@@ -1,8 +1,13 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, CardHeader, Field, Input, Notice, Textarea } from "@/components/ui";
 import { importDocumentAction } from "./actions";
+import { FormField } from "@/components/app/form-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export function DocumentImport() {
   const [title, setTitle] = useState("");
@@ -26,16 +31,25 @@ export function DocumentImport() {
 
   return (
     <Card>
-      <CardHeader title="Import a document" description="SOPs, process documentation, handbooks or team descriptions. PDF, DOCX, TXT or MD, or paste the text." />
-      <CardBody className="space-y-4">
-        <input type="file" accept=".pdf,.docx,.txt,.md" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} className="w-full text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-sm" />
-        <Field label="Title">
+      <CardHeader>
+        <CardTitle>Import a document</CardTitle>
+        <CardDescription>SOPs, process documentation, handbooks or team descriptions. PDF, DOCX, TXT or MD, or paste the text.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FormField label="Upload a file" hint="PDF, DOCX, TXT or MD">
+          <Input type="file" accept=".pdf,.docx,.txt,.md" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+        </FormField>
+        <FormField label="Title">
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Support team handbook" />
-        </Field>
-        <Field label="Content">
+        </FormField>
+        <FormField label="Content">
           <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} placeholder="Paste the document text" />
-        </Field>
-        {error ? <Notice tone="danger">{error}</Notice> : null}
+        </FormField>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
         <Button
           disabled={pending || !title.trim() || content.trim().length < 40}
           onClick={() =>
@@ -49,7 +63,7 @@ export function DocumentImport() {
         >
           {pending ? "Extracting processes…" : "Extract processes"}
         </Button>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

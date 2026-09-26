@@ -13,6 +13,11 @@ export class RunNotAllowedError extends Error {
   }
 }
 
+// The emergency stop can be time-boxed: a pause with a passed "until" is no longer in force.
+export function isPaused(org: { agents_paused: boolean; agents_paused_until?: string | null }, now = new Date()) {
+  return org.agents_paused && (!org.agents_paused_until || new Date(org.agents_paused_until) > now);
+}
+
 export async function createRun(
   db: DbClient,
   input: {
@@ -32,9 +37,9 @@ export async function createRun(
     .single();
   if (error || !agent) throw new RunNotAllowedError("Agent not found");
 
-  const { data: org } = await db.from("organizations").select("agents_paused").eq("id", input.organizationId).single();
+  const { data: org } = await db.from("organizations").select("agents_paused, agents_paused_until").eq("id", input.organizationId).single();
   if (input.mode === "production") {
-    if (org?.agents_paused) throw new RunNotAllowedError("All agents are paused for this organisation");
+    if (org && isPaused(org)) throw new RunNotAllowedError("All agents are paused for this organisation");
     if (agent.status !== "active") throw new RunNotAllowedError(`Only active agents run in production (this agent is ${agent.status})`);
   }
   if (agent.autonomy_level === 1) throw new RunNotAllowedError("L1 is human only; raise autonomy to L2 or higher to run the agent");
@@ -42,14 +47,7 @@ export async function createRun(
   // Test runs use the newest version so edits can be tested before activation.
   let versionId = agent.active_version_id;
   if (input.mode === "test" || !versionId) {
-    const { data: latest } = await db
-      .from("agent_versions")
-      .select("id")
-      .eq("organization_id", input.organizationId)
-      .eq("agent_id", agent.id)
-      .order("version", { ascending: false })
-      .limit(1)
-      .single();
+    const { data: latest } = await db.from("agent_versions").select("id").eq("organization_id", input.organizationId).eq("agent_id", agent.id).order("version", { ascending: false }).limit(1).single();
     versionId = latest?.id ?? null;
   }
   if (!versionId) throw new RunNotAllowedError("Agent has no configuration version");
@@ -96,7 +94,7 @@ export async function computeOrgMetrics(db: DbClient, organizationId: string, si
       .gte("queued_at", monthStart.toISOString()),
     db.from("human_interventions").select("agent_run_id, type, minutes_spent").eq("organization_id", organizationId).gte("created_at", monthStart.toISOString()),
     db.from("approval_requests").select("agent_id, status").eq("organization_id", organizationId),
-    db.from("model_usage").select("estimated_cost").eq("organization_id", organizationId).gte("created_at", monthStart.toISOString()),
+    db.from("model_usage").select("estimated_cost, agent_run_id").eq("organization_id", organizationId).gte("created_at", monthStart.toISOString()),
     db.from("automation_opportunities").select("id, status").eq("organization_id", organizationId).not("status", "in", "(rejected,archived)"),
   ]);
 
@@ -127,6 +125,14 @@ export async function computeOrgMetrics(db: DbClient, organizationId: string, si
     return s + (Number(r.estimated_minutes_saved ?? 0) / 60) * rate;
   }, 0);
   const aiCost = (usage.data ?? []).reduce((s, u) => s + Number(u.estimated_cost), 0);
+  // Cost by source: setup work (discovery, profiles, opportunity and agent drafting) has no
+  // run; test and production runs are split by mode. ROI only compares like with like.
+  const runMode = new Map((runs.data ?? []).map((r) => [r.id, r.mode]));
+  const aiCostBySource = { setup: 0, test: 0, production: 0 };
+  for (const u of usage.data ?? []) {
+    const mode = u.agent_run_id ? runMode.get(u.agent_run_id) : undefined;
+    aiCostBySource[mode === "production" ? "production" : mode === "test" ? "test" : "setup"] += Number(u.estimated_cost);
+  }
   const tasksExecuted = prodRuns.filter((r) => r.status === "completed" && r.success).length;
 
   const interventionRuns = new Set((interventions.data ?? []).map((i) => i.agent_run_id).filter(Boolean) as string[]);
@@ -169,7 +175,10 @@ export async function computeOrgMetrics(db: DbClient, organizationId: string, si
     minutesSaved,
     valueCreated,
     aiCost,
-    roi: aiCost > 0 ? valueCreated / aiCost : null,
+    aiCostBySource,
+    productionRuns: prodRuns.length,
+    // Value from production work over the AI cost of that work. Null until there is both.
+    roi: tasksExecuted > 0 && aiCostBySource.production > 0 ? valueCreated / aiCostBySource.production : null,
     perAgent,
   };
 }
@@ -184,12 +193,10 @@ export async function snapshotMetrics(db: DbClient, organizationId: string) {
     { metric: "ai_cost_mtd", dimension: "", value: m.aiCost },
     ...m.departmentAutonomy.map((d) => ({ metric: "department_autonomy", dimension: d.departmentId ?? "none", value: d.score ?? 0 })),
   ];
-  const { error } = await db
-    .from("metrics")
-    .upsert(
-      rows.map((r) => ({ organization_id: organizationId, period, computed_at: new Date().toISOString(), ...r })),
-      { onConflict: "organization_id,metric,period,dimension" },
-    );
+  const { error } = await db.from("metrics").upsert(
+    rows.map((r) => ({ organization_id: organizationId, period, computed_at: new Date().toISOString(), ...r })),
+    { onConflict: "organization_id,metric,period,dimension" },
+  );
   if (error) throw new Error(`snapshot metrics: ${error.message}`);
   return m;
 }

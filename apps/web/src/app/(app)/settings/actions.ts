@@ -1,8 +1,25 @@
 "use server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runAction } from "@/lib/actions";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireSessionOrThrow } from "@/lib/session";
-import { archiveDepartment, CompanySettingsSchema, inviteMember, removeMember, setAgentsPaused, setMemberApproval, updateCompany, upsertDepartment } from "@/server/org";
+import { refreshWebsiteProfile } from "@/server/company-profile";
+import {
+  archiveDepartment,
+  CompanySettingsSchema,
+  inviteMember,
+  ProfileSchema,
+  removeMember,
+  revokeInvite,
+  setAgentsPaused,
+  setMemberApproval,
+  setMemberRole,
+  updateCompany,
+  updateProfile,
+  upsertDepartment,
+} from "@/server/org";
+import { createApiKey, revokeApiKey, setApprovalLimit } from "@/server/platform";
 
 export async function updateCompanyAction(_: unknown, form: FormData) {
   return runAction(async () =>
@@ -13,6 +30,7 @@ export async function updateCompanyAction(_: unknown, form: FormData) {
         industry: form.get("industry") ?? "",
         website: form.get("website") ?? "",
         employeeCount: form.get("employeeCount") ?? "",
+        summary: form.get("summary") ?? undefined,
         defaultHourlyCost: Number(form.get("defaultHourlyCost")),
       }),
     ),
@@ -46,6 +64,68 @@ export async function setApprovalAction(userId: string, canApprove: boolean) {
   return runAction(async () => setMemberApproval(await requireSessionOrThrow(), userId, canApprove));
 }
 
-export async function setPausedAction(paused: boolean) {
-  return runAction(async () => setAgentsPaused(await requireSessionOrThrow(), paused));
+export async function setPausedAction(paused: boolean, hours?: number | null) {
+  return runAction(async () => {
+    const h =
+      hours === undefined || hours === null
+        ? null
+        : z
+            .number()
+            .positive()
+            .max(24 * 14)
+            .parse(hours);
+    return setAgentsPaused(await requireSessionOrThrow(), paused, h ? new Date(Date.now() + h * 3_600_000).toISOString() : null);
+  });
+}
+
+export async function revokeInviteAction(email: string) {
+  return runAction(async () => revokeInvite(await requireSessionOrThrow(), email));
+}
+
+export async function setMemberRoleAction(userId: string, role: "admin" | "member") {
+  return runAction(async () => setMemberRole(await requireSessionOrThrow(), userId, z.enum(["admin", "member"]).parse(role)));
+}
+
+export async function updateProfileAction(_: unknown, form: FormData) {
+  return runAction(async () =>
+    updateProfile(
+      await requireSessionOrThrow(),
+      ProfileSchema.parse({
+        firstName: form.get("firstName"),
+        lastName: form.get("lastName"),
+        approvals: form.get("approvals") === "on",
+        failures: form.get("failures") === "on",
+        weeklySummary: form.get("weeklySummary") === "on",
+      }),
+    ),
+  );
+}
+
+export async function refreshProfileAction() {
+  return runAction(async () => {
+    const session = await requireSessionOrThrow();
+    rateLimit(`website:${session.user.id}`, 6, 60_000);
+    const analysis = await refreshWebsiteProfile(session);
+    return { pages: analysis.pagesRead.length, tools: analysis.detectedTools.map((t) => t.name) };
+  });
+}
+
+export async function createApiKeyAction(_: unknown, form: FormData) {
+  return runAction(async () => {
+    const created = await createApiKey(await requireSessionOrThrow(), String(form.get("name") ?? ""));
+    revalidatePath("/settings");
+    return created;
+  });
+}
+
+export async function revokeApiKeyAction(id: string) {
+  return runAction(async () => revokeApiKey(await requireSessionOrThrow(), id));
+}
+
+export async function setApprovalLimitAction(_: unknown, form: FormData) {
+  return runAction(async () => {
+    const raw = String(form.get("limit") ?? "").trim();
+    await setApprovalLimit(await requireSessionOrThrow(), String(form.get("userId")), raw === "" ? null : Number(raw));
+    revalidatePath("/settings");
+  });
 }

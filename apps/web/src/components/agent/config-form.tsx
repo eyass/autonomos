@@ -2,19 +2,36 @@
 import { AUTONOMY_LEVELS, INTEGRATION_EVENTS, type AgentConfig, type ConditionRule } from "@autonomos/schemas";
 import { useState, useTransition } from "react";
 import { AutonomyLadder } from "@/components/domain";
-import { Badge, Button, Card, CardBody, CardHeader, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldTitle } from "@/components/ui/field";
+import { Progress } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+import { FormField } from "@/components/app/form-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 
 export type ToolOption = { key: string; label: string; description: string; access: "read" | "write"; integration: string; highRisk: boolean };
 
 const STEPS = ["Objective", "Trigger", "Instructions", "What the agent can do", "Autonomy and controls", "Review"] as const;
 
-const lines = (v: string) => v.split("\n").map((s) => s.trim()).filter(Boolean);
+const lines = (v: string) =>
+  v
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 function ListField({ label, hint, value, onChange }: { label: string; hint?: string; value: string[]; onChange: (v: string[]) => void }) {
   const [text, setText] = useState(value.join("\n"));
   return (
-    <Field label={label} hint={hint ?? "One per line"}>
+    <FormField label={label} hint={hint ?? "One per line"}>
       <Textarea
         rows={Math.max(3, value.length + 1)}
         value={text}
@@ -23,8 +40,14 @@ function ListField({ label, hint, value, onChange }: { label: string; hint?: str
           onChange(lines(e.target.value));
         }}
       />
-    </Field>
+    </FormField>
   );
+}
+
+function triggerLabel(t: AgentConfig["trigger"]) {
+  if (t.type === "manual") return "run manually";
+  if (t.type === "schedule") return `on a schedule (${t.cron}, ${t.timezone})`;
+  return `when ${INTEGRATION_EVENTS.find((e) => e.key === t.event)?.label ?? t.event}`;
 }
 
 export function AgentConfigForm({
@@ -33,12 +56,15 @@ export function AgentConfigForm({
   submitLabel,
   onSubmit,
   showNote,
+  origin = "opportunity",
 }: {
   initial: AgentConfig;
   tools: ToolOption[];
   submitLabel: string;
   onSubmit: (config: AgentConfig, note: string) => Promise<{ ok: false; error: string } | { ok: true; data?: unknown } | undefined>;
   showNote?: boolean;
+  // Where the starting configuration came from, for the "this differs" callouts on Review.
+  origin?: "opportunity" | "current version";
 }) {
   const [step, setStep] = useState(0);
   const [c, setC] = useState<AgentConfig>(initial);
@@ -62,110 +88,137 @@ export function AgentConfigForm({
   return (
     <div className="grid gap-4 lg:grid-cols-4 lg:gap-6">
       <div className="lg:hidden">
-        <div className="mb-1.5 flex items-center justify-between text-xs text-muted">
+        <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
           <span>
             Step {step + 1} of {STEPS.length}
           </span>
           {step < STEPS.length - 1 ? <span>Next: {STEPS[step + 1]}</span> : null}
         </div>
-        <div className="flex gap-1">
-          {STEPS.map((s, i) => (
-            <button key={s} type="button" aria-label={`Step ${i + 1}: ${s}`} onClick={() => setStep(i)} className={cn("h-1.5 flex-1 rounded-full", i <= step ? "bg-accent" : "bg-border")} />
-          ))}
-        </div>
+        <Progress value={((step + 1) / STEPS.length) * 100} aria-label={`Step ${step + 1} of ${STEPS.length}`} />
       </div>
       <ol className="hidden space-y-1 text-sm lg:block">
         {STEPS.map((s, i) => (
           <li key={s}>
-            <button type="button" onClick={() => setStep(i)} className={cn("w-full rounded-md px-3 py-2 text-left", i === step ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-surface-muted")}>
+            <Button type="button" variant="ghost" onClick={() => setStep(i)} className={cn("w-full justify-start", i === step ? "bg-accent font-medium text-primary" : "text-muted-foreground")}>
               {i + 1}. {s}
-            </button>
+            </Button>
           </li>
         ))}
       </ol>
       <Card className="min-w-0 lg:col-span-3">
-        <CardHeader title={STEPS[step]} />
-        <CardBody className="space-y-4">
+        <CardHeader>
+          <CardTitle>{STEPS[step]}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
           {step === 0 ? (
             <>
-              <Field label="Agent name" hint="Name it after the work, for example Refund handling">
+              <FormField label="Agent name" hint="Name it after the work, for example Refund handling">
                 <Input value={c.name} onChange={(e) => set("name", e.target.value)} />
-              </Field>
-              <Field label="Objective" hint="The outcome to achieve">
+              </FormField>
+              <FormField label="Objective" hint="The outcome to achieve">
                 <Textarea value={c.instructions.objective} onChange={(e) => setInstr("objective", e.target.value)} rows={2} />
-              </Field>
+              </FormField>
               <ListField label="Success criteria" value={c.successCriteria} onChange={(v) => set("successCriteria", v)} />
             </>
           ) : null}
           {step === 1 ? (
             <>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <RadioGroup
+                className="grid gap-2 sm:grid-cols-3"
+                value={c.trigger.type}
+                onValueChange={(t) =>
+                  set(
+                    "trigger",
+                    t === "manual"
+                      ? { type: "manual" }
+                      : t === "schedule"
+                        ? { type: "schedule", cron: "0 9 * * 1-5", timezone: "Europe/Amsterdam" }
+                        : { type: "integration_event", event: "zendesk.ticket.created" },
+                  )
+                }
+              >
                 {(["manual", "schedule", "integration_event"] as const).map((t) => (
-                  <button
-                    type="button"
-                    key={t}
-                    onClick={() => set("trigger", t === "manual" ? { type: "manual" } : t === "schedule" ? { type: "schedule", cron: "0 9 * * 1-5", timezone: "Europe/Amsterdam" } : { type: "integration_event", event: "zendesk.ticket.created" })}
-                    className={cn("rounded-md border px-3 py-3 text-left text-sm", c.trigger.type === t ? "border-accent bg-accent-soft" : "border-border hover:bg-surface-muted")}
-                  >
-                    <div className="font-medium">{t === "manual" ? "Manual" : t === "schedule" ? "Schedule" : "When something happens"}</div>
-                    <div className="text-xs text-muted">{t === "manual" ? "Run it yourself" : t === "schedule" ? "For example every weekday at 09:00" : "An event in a connected system"}</div>
-                  </button>
+                  <FieldLabel key={t} htmlFor={`trigger-${t}`}>
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldTitle>{t === "manual" ? "Manual" : t === "schedule" ? "Schedule" : "When something happens"}</FieldTitle>
+                        <FieldDescription>{t === "manual" ? "Run it yourself" : t === "schedule" ? "For example every weekday at 09:00" : "An event in a connected system"}</FieldDescription>
+                      </FieldContent>
+                      <RadioGroupItem value={t} id={`trigger-${t}`} />
+                    </Field>
+                  </FieldLabel>
                 ))}
-              </div>
+              </RadioGroup>
               {c.trigger.type === "schedule" ? (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Cron schedule" hint="0 9 * * 1-5 is every weekday at 09:00">
+                  <FormField label="Cron schedule" hint="0 9 * * 1-5 is every weekday at 09:00">
                     <Input value={c.trigger.cron} onChange={(e) => set("trigger", { ...c.trigger, type: "schedule", cron: e.target.value } as AgentConfig["trigger"])} />
-                  </Field>
-                  <Field label="Time zone">
+                  </FormField>
+                  <FormField label="Time zone">
                     <Input value={c.trigger.timezone} onChange={(e) => set("trigger", { ...c.trigger, type: "schedule", timezone: e.target.value } as AgentConfig["trigger"])} />
-                  </Field>
+                  </FormField>
                 </div>
               ) : null}
               {c.trigger.type === "integration_event" ? (
-                <Field label="Event">
-                  <Select value={c.trigger.event} onChange={(e) => set("trigger", { type: "integration_event", event: e.target.value })}>
+                <FormField label="Event">
+                  <NativeSelect value={c.trigger.event} onChange={(e) => set("trigger", { type: "integration_event", event: e.target.value })}>
                     {INTEGRATION_EVENTS.map((e) => (
-                      <option key={e.key} value={e.key}>
+                      <NativeSelectOption key={e.key} value={e.key}>
                         {e.label}
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </Select>
-                </Field>
+                  </NativeSelect>
+                </FormField>
               ) : null}
             </>
           ) : null}
           {step === 2 ? (
             <>
-              <Field label="Context" hint="Business and process context the agent needs">
+              <FormField label="Context" hint="Business and process context the agent needs">
                 <Textarea value={c.instructions.context} onChange={(e) => setInstr("context", e.target.value)} rows={3} />
-              </Field>
+              </FormField>
               <ListField label="Rules" hint="Must-follow constraints, one per line" value={c.instructions.rules} onChange={(v) => setInstr("rules", v)} />
               <ListField label="Steps" hint="Expected operating procedure" value={c.instructions.steps} onChange={(v) => setInstr("steps", v)} />
               <ListField label="When to hand to a human" value={c.instructions.escalationConditions} onChange={(v) => setInstr("escalationConditions", v)} />
               <ListField label="How completion is determined" value={c.instructions.successConditions} onChange={(v) => setInstr("successConditions", v)} />
-              <Notice tone="info">Instructions guide the agent. Money limits, approvals and allowed actions below are enforced by the platform regardless of what the instructions say.</Notice>
+              <Alert variant="info">
+                <AlertDescription>
+                  Instructions guide the agent. Money limits, approvals and allowed actions below are enforced by the platform regardless of what the instructions say.
+                </AlertDescription>
+              </Alert>
             </>
           ) : null}
           {step === 3 ? (
             <>
-              <p className="text-sm text-muted">The agent can only use what you tick here. Actions from other connected systems stay unavailable to it.</p>
-              {tools.length === 0 ? <Notice tone="warn">Connect an integration first.</Notice> : null}
+              <p className="text-sm text-muted-foreground">The agent can only use what you tick here. Actions from other connected systems stay unavailable to it.</p>
+              {tools.length === 0 ? (
+                <Alert variant="warning">
+                  <AlertDescription>Connect an integration first.</AlertDescription>
+                </Alert>
+              ) : null}
               <div className="space-y-2">
                 {tools.map((t) => (
-                  <label key={t.key} className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-md border border-border px-3 py-2 text-sm has-[:checked]:border-accent/50 has-[:checked]:bg-accent-soft/40">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={c.tools.includes(t.key)}
-                      onChange={(e) => set("tools", e.target.checked ? [...c.tools, t.key] : c.tools.filter((x) => x !== t.key))}
-                    />
-                    <span className="min-w-0 flex-1 basis-48">
-                      <span className="font-medium">{t.label}</span> <span className="text-muted">· {t.integration}</span>
-                      <span className="block text-xs text-muted">{t.description}</span>
-                    </span>
-                    {t.access === "write" ? <Badge tone={t.highRisk ? "warn" : "info"} className="ml-7 sm:ml-0">{t.highRisk ? "takes action, approval by default" : "takes action"}</Badge> : <Badge className="ml-7 sm:ml-0">read only</Badge>}
-                  </label>
+                  <FieldLabel key={t.key} htmlFor={`tool-${t.key}`}>
+                    <Field orientation="horizontal" className="items-start">
+                      <Checkbox
+                        id={`tool-${t.key}`}
+                        className="mt-0.5"
+                        checked={c.tools.includes(t.key)}
+                        onCheckedChange={(v) => set("tools", v === true ? [...c.tools, t.key] : c.tools.filter((x) => x !== t.key))}
+                      />
+                      <FieldContent>
+                        <FieldTitle className="flex-wrap">
+                          {t.label} <span className="font-normal text-muted-foreground">· {t.integration}</span>
+                        </FieldTitle>
+                        <FieldDescription>{t.description}</FieldDescription>
+                        {t.access === "write" ? (
+                          <Badge variant={t.highRisk ? "warning" : "info"}>{t.highRisk ? "takes action, approval by default" : "takes action"}</Badge>
+                        ) : (
+                          <Badge variant="secondary">read only</Badge>
+                        )}
+                      </FieldContent>
+                    </Field>
+                  </FieldLabel>
                 ))}
               </div>
             </>
@@ -174,37 +227,44 @@ export function AgentConfigForm({
             <>
               <div>
                 <div className="mb-2 text-sm font-medium">Autonomy level</div>
-                <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  className="w-full"
+                  value={String(c.autonomyLevel)}
+                  onValueChange={(v) => v && set("autonomyLevel", Number(v) as AgentConfig["autonomyLevel"])}
+                >
                   {AUTONOMY_LEVELS.map((l) => (
-                    <button
-                      type="button"
+                    <ToggleGroupItem
                       key={l.level}
+                      value={String(l.level)}
                       disabled={l.level === 1}
-                      onClick={() => set("autonomyLevel", l.level)}
-                      className={cn("rounded-md border px-2 py-2 text-left text-xs disabled:opacity-40", c.autonomyLevel === l.level ? "border-accent bg-accent-soft" : "border-border hover:bg-surface-muted")}
+                      className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                      aria-label={`${l.code} ${l.name}`}
                     >
-                      <div className="font-semibold">{l.code}</div>
-                      <div className="hidden truncate sm:block">{l.name}</div>
-                    </button>
+                      {l.code}
+                    </ToggleGroupItem>
                   ))}
-                </div>
-                <p className="mt-2 text-xs text-muted">
-                  <span className="font-medium text-foreground">{AUTONOMY_LEVELS[c.autonomyLevel - 1]?.name}:</span> {AUTONOMY_LEVELS[c.autonomyLevel - 1]?.short}. Start at L3 for anything involving money or customers.</p>
+                </ToggleGroup>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{AUTONOMY_LEVELS[c.autonomyLevel - 1]?.name}:</span> {AUTONOMY_LEVELS[c.autonomyLevel - 1]?.short}. Start at L3 for anything involving
+                  money or customers.
+                </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="Minimum confidence to act alone" hint="Below this, a human approves">
+                <FormField label="Minimum confidence to act alone" hint="Below this, a human approves">
                   <Input type="number" step={0.05} min={0} max={1} value={c.policy.confidenceThreshold} onChange={(e) => setPolicy("confidenceThreshold", Number(e.target.value))} />
-                </Field>
-                <Field label="Maximum actions per run">
+                </FormField>
+                <FormField label="Maximum actions per run">
                   <Input type="number" min={1} value={c.policy.maxActionsPerRun} onChange={(e) => setPolicy("maxActionsPerRun", Number(e.target.value))} />
-                </Field>
-                <Field label="Maximum actions per day">
+                </FormField>
+                <FormField label="Maximum actions per day">
                   <Input type="number" min={1} value={c.policy.maxActionsPerDay} onChange={(e) => setPolicy("maxActionsPerDay", Number(e.target.value))} />
-                </Field>
+                </FormField>
               </div>
               {moneyTools.length ? (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Maximum refund without approval" hint={c.autonomyLevel <= 3 ? "At L3 every refund needs approval" : "Refunds above this need a human"}>
+                  <FormField label="Maximum refund without approval" hint={c.autonomyLevel <= 3 ? "At L3 every refund needs approval" : "Refunds above this need a human"}>
                     <Input
                       type="number"
                       min={0}
@@ -216,8 +276,8 @@ export function AgentConfigForm({
                         ])
                       }
                     />
-                  </Field>
-                  <Field label="Hard limit per refund" hint="Never refunded, even with approval">
+                  </FormField>
+                  <FormField label="Hard limit per refund" hint="Never refunded, even with approval">
                     <Input
                       type="number"
                       min={0}
@@ -229,7 +289,7 @@ export function AgentConfigForm({
                         ])
                       }
                     />
-                  </Field>
+                  </FormField>
                 </div>
               ) : null}
               <div>
@@ -238,14 +298,16 @@ export function AgentConfigForm({
                   {selectedTools
                     .filter((t) => t.access === "write")
                     .map((t) => (
-                      <label key={t.key} className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-xs">
-                        <input
-                          type="checkbox"
+                      <Field key={t.key} orientation="horizontal" className="w-auto rounded-md border px-3 py-2">
+                        <Checkbox
+                          id={`ask-${t.key}`}
                           checked={c.policy.approvalRequiredFor.includes(t.key)}
-                          onChange={(e) => setPolicy("approvalRequiredFor", e.target.checked ? [...c.policy.approvalRequiredFor, t.key] : c.policy.approvalRequiredFor.filter((x) => x !== t.key))}
+                          onCheckedChange={(v) => setPolicy("approvalRequiredFor", v === true ? [...c.policy.approvalRequiredFor, t.key] : c.policy.approvalRequiredFor.filter((x) => x !== t.key))}
                         />
-                        {t.label}
-                      </label>
+                        <FieldLabel htmlFor={`ask-${t.key}`} className="font-normal">
+                          {t.label}
+                        </FieldLabel>
+                      </Field>
                     ))}
                 </div>
               </div>
@@ -254,13 +316,24 @@ export function AgentConfigForm({
                   <div className="mb-2 text-sm font-medium">Extra rules</div>
                   <ul className="space-y-1 text-sm">
                     {c.policy.conditions.map((r: ConditionRule, i) => (
-                      <li key={i} className="flex items-center justify-between gap-2 rounded-md bg-surface-muted px-3 py-1.5">
+                      <li key={i} className="flex items-center justify-between gap-2 rounded-md bg-muted px-3 py-1.5">
                         <span>
-                          {r.label} <Badge tone={r.effect === "deny" ? "danger" : "warn"}>{r.effect === "deny" ? "blocks" : "needs approval"}</Badge>
+                          {r.label} <Badge variant={r.effect === "deny" ? "danger" : "warning"}>{r.effect === "deny" ? "blocks" : "needs approval"}</Badge>
                         </span>
-                        <button type="button" className="text-xs text-muted hover:text-danger" onClick={() => setPolicy("conditions", c.policy.conditions.filter((_, j) => j !== i))}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setPolicy(
+                              "conditions",
+                              c.policy.conditions.filter((_, j) => j !== i),
+                            )
+                          }
+                        >
                           Remove
-                        </button>
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -270,23 +343,38 @@ export function AgentConfigForm({
           ) : null}
           {step === 5 ? (
             <div className="space-y-4 text-sm">
+              {triggerLabel(c.trigger) !== triggerLabel(initial.trigger) ? (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    The trigger differs from the {origin === "opportunity" ? "opportunity's suggestion" : "current version"}: {triggerLabel(initial.trigger)} → {triggerLabel(c.trigger)}. Check that
+                    the agent still does the work {origin === "opportunity" ? "the opportunity describes" : "it was set up for"}.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {c.autonomyLevel > initial.autonomyLevel ? (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    Autonomy is higher than {origin === "opportunity" ? "suggested" : "before"}: L{initial.autonomyLevel} → L{c.autonomyLevel}. The agent will act without approval more often.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-base font-semibold">{c.name}</div>
                 <AutonomyLadder current={c.autonomyLevel} />
               </div>
               <p>{c.instructions.objective}</p>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">What the agent can do</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">What the agent can do</div>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedTools.map((t) => (
-                    <Badge key={t.key} tone={t.access === "write" ? "info" : "neutral"}>
+                    <Badge key={t.key} variant={t.access === "write" ? "info" : "secondary"}>
                       {t.label}
                     </Badge>
                   ))}
                 </div>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Where humans stay responsible</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Where humans stay responsible</div>
                 <ul className="list-inside list-disc">
                   {c.autonomyLevel <= 3 ? <li>Approve every action before it happens</li> : null}
                   {c.policy.amountThresholds.map((t) => (
@@ -302,13 +390,17 @@ export function AgentConfigForm({
                 </ul>
               </div>
               {showNote ? (
-                <Field label="What changed?" hint="Saved with the new version">
+                <FormField label="What changed?" hint="Saved with the new version">
                   <Input value={note} onChange={(e) => setNote(e.target.value)} />
-                </Field>
+                </FormField>
               ) : null}
             </div>
           ) : null}
-          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
           <div className="flex justify-between pt-2">
             <Button variant="ghost" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>
               Back
@@ -321,7 +413,7 @@ export function AgentConfigForm({
               </Button>
             )}
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   );

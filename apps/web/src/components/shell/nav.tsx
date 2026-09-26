@@ -1,11 +1,26 @@
 "use client";
-import { Activity, Bot, CheckCircle2, LayoutDashboard, Lightbulb, Menu, Plug, Settings, Workflow, X } from "lucide-react";
+import { Activity, Bot, Check, CheckCircle2, ChevronsUpDown, FlaskConical, Plus, LayoutDashboard, LifeBuoy, Lightbulb, LogOut, Plug, Settings, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { useTransition } from "react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar";
 
-const ITEMS = [
+const MAIN = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/approvals", label: "Approvals", icon: CheckCircle2 },
   { href: "/processes", label: "Processes", icon: Workflow },
@@ -13,9 +28,10 @@ const ITEMS = [
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/activity", label: "Activity", icon: Activity },
 ];
-const SECONDARY = [
+const ADMIN = [
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/docs", label: "Help", icon: LifeBuoy },
 ];
 
 function isActive(path: string, href: string) {
@@ -23,86 +39,142 @@ function isActive(path: string, href: string) {
   return path === href || path.startsWith(`${href}/`) || (href === "/processes" && path.startsWith("/discover"));
 }
 
-export function Nav({ pendingApprovals }: { pendingApprovals: number }) {
-  const path = usePathname();
-  const link = ({ href, label, icon: Icon }: (typeof ITEMS)[number]) => (
-    <Link
-      key={href}
-      href={href}
-      className={cn(
-        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm",
-        isActive(path, href) ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-surface-muted hover:text-foreground",
-      )}
-    >
-      <Icon size={16} />
-      <span className="flex-1">{label}</span>
-      {href === "/approvals" && pendingApprovals > 0 ? (
-        <span className="rounded-full bg-warn px-1.5 text-[11px] font-semibold text-white tabular-nums">{pendingApprovals}</span>
-      ) : null}
-    </Link>
-  );
-  return (
-    <nav className="space-y-4">
-      <div className="space-y-0.5">{ITEMS.map(link)}</div>
-      <div className="space-y-0.5 border-t border-border pt-4">{SECONDARY.map(link)}</div>
-    </nav>
-  );
-}
+// The application sidebar, following the shadcn sidebar-07 block: collapses to icons on
+// desktop and becomes a Sheet on phones.
+type Workspace = { id: string; name: string; is_demo: boolean };
 
-// Phones and small tablets: a menu button that opens the same navigation in a drawer.
-export function MobileNav({ pendingApprovals, orgName, email }: { pendingApprovals: number; orgName: string; email: string }) {
+export function AppSidebar({
+  pendingApprovals,
+  orgName,
+  orgId,
+  email,
+  name,
+  workspaces,
+  switchWorkspace,
+  createSample,
+}: {
+  pendingApprovals: number;
+  orgName: string;
+  orgId: string;
+  email: string;
+  name: string;
+  workspaces: Workspace[];
+  switchWorkspace: (id: string) => Promise<unknown>;
+  createSample: () => Promise<unknown>;
+}) {
   const path = usePathname();
-  // Remember which page the menu was opened on, so navigating anywhere closes it.
-  const [openOn, setOpenOn] = useState<string | null>(null);
-  const open = openOn === path;
-  const setOpen = (v: boolean) => setOpenOn(v ? path : null);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenOn(null);
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-  return (
-    <>
-      <button type="button" aria-label="Open menu" className="relative -ml-2 rounded-md p-2 text-foreground hover:bg-surface-muted md:hidden" onClick={() => setOpen(true)}>
-        <Menu size={20} />
-        {pendingApprovals > 0 ? <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-warn" /> : null}
-      </button>
-      {open ? (
-        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="absolute inset-0 bg-foreground/30" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-surface px-3 py-4 shadow-xl">
-            <div className="mb-4 flex items-center justify-between px-3">
-              <span className="text-sm font-semibold tracking-tight">AutonomOS</span>
-              <button type="button" aria-label="Close menu" className="-mr-2 rounded-md p-2 text-muted hover:bg-surface-muted" onClick={() => setOpen(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <Nav pendingApprovals={pendingApprovals} />
-            </div>
-            <ShellFooter orgName={orgName} email={email} />
-          </div>
-        </div>
-      ) : null}
-    </>
+  const [pending, start] = useTransition();
+  const { setOpenMobile } = useSidebar();
+  const group = (items: typeof MAIN) => (
+    <SidebarGroup>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map(({ href, label, icon: Icon }) => (
+            <SidebarMenuItem key={href}>
+              <SidebarMenuButton asChild isActive={isActive(path, href)} tooltip={label}>
+                <Link href={href} onClick={() => setOpenMobile(false)}>
+                  <Icon />
+                  <span>{label}</span>
+                </Link>
+              </SidebarMenuButton>
+              {href === "/approvals" && pendingApprovals > 0 ? (
+                <SidebarMenuBadge className="bg-warning text-white peer-data-[active=true]/menu-button:text-white">{pendingApprovals}</SidebarMenuBadge>
+              ) : null}
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
-}
-
-export function ShellFooter({ orgName, email }: { orgName: string; email: string }) {
+  const initials = (name || email)
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   return (
-    <div className="mt-4 border-t border-border px-3 pt-4 text-xs text-muted">
-      <div className="truncate font-medium text-foreground">{orgName}</div>
-      <div className="truncate">{email}</div>
-      <form action="/auth/signout" method="post" className="mt-2">
-        <button className="hover:text-foreground" type="submit">
-          Sign out
-        </button>
-      </form>
-    </div>
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/" onClick={() => setOpenMobile(false)}>
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">A</div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">AutonomOS</span>
+                  <span className="truncate text-xs text-muted-foreground">{orgName}</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        {group(MAIN)}
+        <div className="mt-auto">{group(ADMIN)}</div>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+                  <Avatar className="size-8 rounded-lg">
+                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{name || email}</span>
+                    <span className="truncate text-xs text-muted-foreground">{email}</span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg" side="top" align="end" sideOffset={4}>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="truncate text-sm font-medium">{orgName}</div>
+                  <div className="truncate text-xs text-muted-foreground">{email}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Workspaces</DropdownMenuLabel>
+                {workspaces.map((w) => (
+                  <DropdownMenuItem key={w.id} disabled={pending} onSelect={() => w.id !== orgId && start(async () => void (await switchWorkspace(w.id)))}>
+                    {w.id === orgId ? <Check /> : <span className="size-4" />}
+                    <span className="truncate">{w.name}</span>
+                  </DropdownMenuItem>
+                ))}
+                {workspaces.some((w) => w.is_demo) ? null : (
+                  <DropdownMenuItem disabled={pending} onSelect={() => start(async () => void (await createSample()))}>
+                    <FlaskConical />
+                    {pending ? "Setting up…" : "Explore a sample workspace"}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link href="/onboarding/company?new=1" onClick={() => setOpenMobile(false)}>
+                    <Plus />
+                    New workspace
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" onClick={() => setOpenMobile(false)}>
+                    <Settings />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <form action="/auth/signout" method="post">
+                  <DropdownMenuItem asChild>
+                    <button type="submit" className="w-full">
+                      <LogOut />
+                      Sign out
+                    </button>
+                  </DropdownMenuItem>
+                </form>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   );
 }

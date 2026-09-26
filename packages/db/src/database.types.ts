@@ -313,6 +313,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"api_keys": {
+                  Row: {
+                    "created_at": string,"created_by": string,"id": string,"key_hash": string,"last_used_at": string | null,"name": string,"organization_id": string,"prefix": string,"revoked_at": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by": string,"id"?: string,"key_hash": string,"last_used_at"?: string | null,"name": string,"organization_id": string,"prefix": string,"revoked_at"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string,"id"?: string,"key_hash"?: string,"last_used_at"?: string | null,"name"?: string,"organization_id"?: string,"prefix"?: string,"revoked_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "api_keys_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "api_keys_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"approval_requests": {
                   Row: {
                     "action_type": string,"agent_action_id": string | null,"agent_id": string,"agent_run_id": string,"comment": string | null,"confidence": number | null,"decision": Json | null,"description": string | null,"evidence": NonNullable<Json>,"expires_at": string,"id": string,"modifiable_fields": (string)[],"organization_id": string,"policy_checks": NonNullable<Json>,"proposed_action": NonNullable<Json>,"reasoning_summary": string | null,"requested_at": string,"resolved_at": string | null,"resolved_by": string | null,"risk": number | null,"status": Database["public"]['Enums']["approval_status"],"title": string,"tool": string
@@ -383,13 +408,13 @@ isOneToOne: false
                   ]
                 },"automation_opportunities": {
                   Row: {
-                    "automation_difficulty_score": number,"business_value_score": number,"created_at": string,"created_by": string | null,"current_autonomy_level": number,"department_id": string | null,"description": string,"estimated_build_complexity": string | null,"estimated_cost_saved_monthly": number | null,"estimated_hours_saved_monthly": number | null,"expected_outcome": string | null,"future_state_steps": NonNullable<Json>,"human_involvement": (string)[],"id": string,"major_risks": (string)[],"opportunity_score": number,"organization_id": string,"problem": string,"process_id": string,"proposed_agent": NonNullable<Json>,"proposed_future_state": string,"rationale": string | null,"recommended_next_step": string | null,"required_approvals": (string)[],"required_integrations": (string)[],"required_tools": (string)[],"risk_score": number,"scope": string | null,"status": Database["public"]['Enums']["opportunity_status"],"target_autonomy_level": number,"template_key": string | null,"title": string,"updated_at": string
+                    "automation_difficulty_score": number,"business_value_score": number,"created_at": string,"created_by": string | null,"current_autonomy_level": number,"department_id": string | null,"description": string,"estimated_build_complexity": string | null,"estimated_cost_saved_monthly": number | null,"estimated_hours_saved_monthly": number | null,"evidence": NonNullable<Json>,"expected_outcome": string | null,"future_state_steps": NonNullable<Json>,"human_involvement": (string)[],"id": string,"major_risks": (string)[],"opportunity_score": number,"organization_id": string,"problem": string,"process_id": string,"proposed_agent": NonNullable<Json>,"proposed_future_state": string,"rationale": string | null,"recommended_next_step": string | null,"required_approvals": (string)[],"required_integrations": (string)[],"required_tools": (string)[],"risk_score": number,"scope": string | null,"status": Database["public"]['Enums']["opportunity_status"],"target_autonomy_level": number,"template_key": string | null,"title": string,"updated_at": string
                   }
                   Insert: {
-                    "automation_difficulty_score": number,"business_value_score": number,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level": number,"department_id"?: string | null,"description"?: string,"estimated_build_complexity"?: string | null,"estimated_cost_saved_monthly"?: number | null,"estimated_hours_saved_monthly"?: number | null,"expected_outcome"?: string | null,"future_state_steps"?: NonNullable<Json>,"human_involvement"?: (string)[],"id"?: string,"major_risks"?: (string)[],"opportunity_score"?: number,"organization_id": string,"problem"?: string,"process_id": string,"proposed_agent"?: NonNullable<Json>,"proposed_future_state"?: string,"rationale"?: string | null,"recommended_next_step"?: string | null,"required_approvals"?: (string)[],"required_integrations"?: (string)[],"required_tools"?: (string)[],"risk_score": number,"scope"?: string | null,"status"?: Database["public"]['Enums']["opportunity_status"],"target_autonomy_level": number,"template_key"?: string | null,"title": string,"updated_at"?: string
+                    "automation_difficulty_score": number,"business_value_score": number,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level": number,"department_id"?: string | null,"description"?: string,"estimated_build_complexity"?: string | null,"estimated_cost_saved_monthly"?: number | null,"estimated_hours_saved_monthly"?: number | null,"evidence"?: NonNullable<Json>,"expected_outcome"?: string | null,"future_state_steps"?: NonNullable<Json>,"human_involvement"?: (string)[],"id"?: string,"major_risks"?: (string)[],"opportunity_score"?: number,"organization_id": string,"problem"?: string,"process_id": string,"proposed_agent"?: NonNullable<Json>,"proposed_future_state"?: string,"rationale"?: string | null,"recommended_next_step"?: string | null,"required_approvals"?: (string)[],"required_integrations"?: (string)[],"required_tools"?: (string)[],"risk_score": number,"scope"?: string | null,"status"?: Database["public"]['Enums']["opportunity_status"],"target_autonomy_level": number,"template_key"?: string | null,"title": string,"updated_at"?: string
                   }
                   Update: {
-                    "automation_difficulty_score"?: number,"business_value_score"?: number,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level"?: number,"department_id"?: string | null,"description"?: string,"estimated_build_complexity"?: string | null,"estimated_cost_saved_monthly"?: number | null,"estimated_hours_saved_monthly"?: number | null,"expected_outcome"?: string | null,"future_state_steps"?: NonNullable<Json>,"human_involvement"?: (string)[],"id"?: string,"major_risks"?: (string)[],"opportunity_score"?: number,"organization_id"?: string,"problem"?: string,"process_id"?: string,"proposed_agent"?: NonNullable<Json>,"proposed_future_state"?: string,"rationale"?: string | null,"recommended_next_step"?: string | null,"required_approvals"?: (string)[],"required_integrations"?: (string)[],"required_tools"?: (string)[],"risk_score"?: number,"scope"?: string | null,"status"?: Database["public"]['Enums']["opportunity_status"],"target_autonomy_level"?: number,"template_key"?: string | null,"title"?: string,"updated_at"?: string
+                    "automation_difficulty_score"?: number,"business_value_score"?: number,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level"?: number,"department_id"?: string | null,"description"?: string,"estimated_build_complexity"?: string | null,"estimated_cost_saved_monthly"?: number | null,"estimated_hours_saved_monthly"?: number | null,"evidence"?: NonNullable<Json>,"expected_outcome"?: string | null,"future_state_steps"?: NonNullable<Json>,"human_involvement"?: (string)[],"id"?: string,"major_risks"?: (string)[],"opportunity_score"?: number,"organization_id"?: string,"problem"?: string,"process_id"?: string,"proposed_agent"?: NonNullable<Json>,"proposed_future_state"?: string,"rationale"?: string | null,"recommended_next_step"?: string | null,"required_approvals"?: (string)[],"required_integrations"?: (string)[],"required_tools"?: (string)[],"risk_score"?: number,"scope"?: string | null,"status"?: Database["public"]['Enums']["opportunity_status"],"target_autonomy_level"?: number,"template_key"?: string | null,"title"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -605,6 +630,25 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"invoices": {
+                  Row: {
+                    "amount": number,"currency": string,"id": string,"issued_at": string,"number": string,"organization_id": string,"period_end": string,"period_start": string,"status": string,"url": string | null
+                  }
+                  Insert: {
+                    "amount": number,"currency"?: string,"id"?: string,"issued_at"?: string,"number": string,"organization_id": string,"period_end": string,"period_start": string,"status"?: string,"url"?: string | null
+                  }
+                  Update: {
+                    "amount"?: number,"currency"?: string,"id"?: string,"issued_at"?: string,"number"?: string,"organization_id"?: string,"period_end"?: string,"period_start"?: string,"status"?: string,"url"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoices_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"metrics": {
                   Row: {
                     "computed_at": string,"dimension": string,"id": string,"metric": string,"organization_id": string,"period": string,"value": number
@@ -701,13 +745,13 @@ isOneToOne: false
                   ]
                 },"organization_members": {
                   Row: {
-                    "can_approve": boolean,"created_at": string,"organization_id": string,"role": Database["public"]['Enums']["member_role"],"user_id": string
+                    "approval_limit": number | null,"can_approve": boolean,"created_at": string,"notification_preferences": NonNullable<Json>,"organization_id": string,"role": Database["public"]['Enums']["member_role"],"user_id": string
                   }
                   Insert: {
-                    "can_approve"?: boolean,"created_at"?: string,"organization_id": string,"role"?: Database["public"]['Enums']["member_role"],"user_id": string
+                    "approval_limit"?: number | null,"can_approve"?: boolean,"created_at"?: string,"notification_preferences"?: NonNullable<Json>,"organization_id": string,"role"?: Database["public"]['Enums']["member_role"],"user_id": string
                   }
                   Update: {
-                    "can_approve"?: boolean,"created_at"?: string,"organization_id"?: string,"role"?: Database["public"]['Enums']["member_role"],"user_id"?: string
+                    "approval_limit"?: number | null,"can_approve"?: boolean,"created_at"?: string,"notification_preferences"?: NonNullable<Json>,"organization_id"?: string,"role"?: Database["public"]['Enums']["member_role"],"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -726,13 +770,13 @@ isOneToOne: false
                   ]
                 },"organizations": {
                   Row: {
-                    "agents_paused": boolean,"agents_paused_at": string | null,"agents_paused_by": string | null,"billing_customer_id": string | null,"company_summary": string | null,"country": string | null,"created_at": string,"created_by": string | null,"currency": string,"default_hourly_cost": number,"description": string | null,"employee_count": string | null,"id": string,"improvement_areas": (string)[],"industry": string | null,"name": string,"onboarding_completed_at": string | null,"onboarding_step": string,"plan": string,"subscription_status": string,"updated_at": string,"website": string | null
+                    "agents_paused": boolean,"agents_paused_at": string | null,"agents_paused_by": string | null,"agents_paused_until": string | null,"billing_customer_id": string | null,"company_summary": string | null,"country": string | null,"created_at": string,"created_by": string | null,"currency": string,"default_hourly_cost": number,"description": string | null,"detected_tools": (string)[],"employee_count": string | null,"id": string,"improvement_areas": (string)[],"industry": string | null,"is_demo": boolean,"name": string,"onboarding_completed_at": string | null,"onboarding_step": string,"plan": string,"subscription_status": string,"updated_at": string,"website": string | null,"website_profile": Json | null,"website_profiled_at": string | null
                   }
                   Insert: {
-                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"billing_customer_id"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"name": string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null
+                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"agents_paused_until"?: string | null,"billing_customer_id"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"detected_tools"?: (string)[],"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"is_demo"?: boolean,"name": string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null,"website_profile"?: Json | null,"website_profiled_at"?: string | null
                   }
                   Update: {
-                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"billing_customer_id"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"name"?: string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null
+                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"agents_paused_until"?: string | null,"billing_customer_id"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"detected_tools"?: (string)[],"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"is_demo"?: boolean,"name"?: string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null,"website_profile"?: Json | null,"website_profiled_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -925,7 +969,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "action_status": "pending"|"succeeded"|"failed"|"simulated"|"skipped","agent_status": "draft"|"testing"|"active"|"paused"|"error"|"archived","approval_status": "pending"|"approved"|"rejected"|"modified"|"expired","connection_status": "connected"|"error"|"disconnected","discovery_source": "interview"|"document"|"integration"|"manual","integration_provider": "sandbox"|"composio","intervention_type": "approval"|"exception"|"correction"|"manual_completion"|"override"|"information_request","member_role": "owner"|"admin"|"member","opportunity_status": "suggested"|"reviewing"|"approved"|"building"|"live"|"rejected"|"archived","process_frequency": "ad_hoc"|"daily"|"weekly"|"monthly"|"event_driven","process_status": "draft"|"reviewed"|"active"|"archived","run_mode": "test"|"production","run_status": "queued"|"running"|"waiting_for_approval"|"completed"|"failed"|"cancelled"
+            "action_status": "pending"|"succeeded"|"failed"|"simulated"|"skipped","agent_status": "draft"|"testing"|"active"|"paused"|"error"|"archived","approval_status": "pending"|"approved"|"rejected"|"modified"|"expired","connection_status": "connected"|"error"|"disconnected","discovery_source": "interview"|"document"|"integration"|"manual"|"website","integration_provider": "sandbox"|"composio","intervention_type": "approval"|"exception"|"correction"|"manual_completion"|"override"|"information_request","member_role": "owner"|"admin"|"member","opportunity_status": "suggested"|"reviewing"|"approved"|"building"|"live"|"rejected"|"archived","process_frequency": "ad_hoc"|"daily"|"weekly"|"monthly"|"event_driven","process_status": "draft"|"reviewed"|"active"|"archived","run_mode": "test"|"production","run_status": "queued"|"running"|"waiting_for_approval"|"completed"|"failed"|"cancelled"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1045,7 +1089,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "action_status": ["pending", "succeeded", "failed", "simulated", "skipped"],"agent_status": ["draft", "testing", "active", "paused", "error", "archived"],"approval_status": ["pending", "approved", "rejected", "modified", "expired"],"connection_status": ["connected", "error", "disconnected"],"discovery_source": ["interview", "document", "integration", "manual"],"integration_provider": ["sandbox", "composio"],"intervention_type": ["approval", "exception", "correction", "manual_completion", "override", "information_request"],"member_role": ["owner", "admin", "member"],"opportunity_status": ["suggested", "reviewing", "approved", "building", "live", "rejected", "archived"],"process_frequency": ["ad_hoc", "daily", "weekly", "monthly", "event_driven"],"process_status": ["draft", "reviewed", "active", "archived"],"run_mode": ["test", "production"],"run_status": ["queued", "running", "waiting_for_approval", "completed", "failed", "cancelled"]
+            "action_status": ["pending", "succeeded", "failed", "simulated", "skipped"],"agent_status": ["draft", "testing", "active", "paused", "error", "archived"],"approval_status": ["pending", "approved", "rejected", "modified", "expired"],"connection_status": ["connected", "error", "disconnected"],"discovery_source": ["interview", "document", "integration", "manual", "website"],"integration_provider": ["sandbox", "composio"],"intervention_type": ["approval", "exception", "correction", "manual_completion", "override", "information_request"],"member_role": ["owner", "admin", "member"],"opportunity_status": ["suggested", "reviewing", "approved", "building", "live", "rejected", "archived"],"process_frequency": ["ad_hoc", "daily", "weekly", "monthly", "event_driven"],"process_status": ["draft", "reviewed", "active", "archived"],"run_mode": ["test", "production"],"run_status": ["queued", "running", "waiting_for_approval", "completed", "failed", "cancelled"]
           }
         }
 } as const

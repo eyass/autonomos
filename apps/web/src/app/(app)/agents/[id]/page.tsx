@@ -2,17 +2,38 @@ import { autonomyRecommendation } from "@autonomos/agents";
 import { computeOrgMetrics } from "@autonomos/db";
 import { getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
 import { INTEGRATION_EVENTS } from "@autonomos/schemas";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { AutonomyLadder, OutcomeBadge, StatusBadge } from "@/components/domain";
-import { Badge, ButtonLink, Card, CardBody, CardHeader, Notice, PageHeader, RowLink, Stat } from "@/components/ui";
 import { dateTime, hours, money, pct, relative, usd } from "@/lib/format";
 import { adminDb, HttpError, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { loadAgentConfig } from "@/server/agents";
+import { agentReadiness } from "@/server/readiness";
+import { diffVersions, type VersionSnapshot } from "@/lib/version-diff";
+import { ReadinessChecklist } from "@/components/app/readiness-checklist";
 import { activateAction, pauseAction } from "../actions";
 import { AutonomyControl, LivePanel, TestPanel } from "./controls";
+import { ButtonLink } from "@/components/app/button-link";
+import { PageHeader } from "@/components/app/page-header";
+import { RowLink } from "@/components/app/row-link";
+import { StatCard } from "@/components/app/stat-card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+function snapshot(v: { autonomy_level: number; instructions: unknown; trigger_config: unknown; policy_config: unknown; agent_tools: unknown }): VersionSnapshot {
+  return {
+    autonomy_level: v.autonomy_level,
+    instructions: v.instructions as VersionSnapshot["instructions"],
+    trigger_config: v.trigger_config as VersionSnapshot["trigger_config"],
+    policy_config: v.policy_config as VersionSnapshot["policy_config"],
+    tools: ((v.agent_tools as Array<{ tool_key: string }> | null) ?? []).map((t) => t.tool_key).sort(),
+  };
+}
 
 export default async function AgentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   const { id } = await params;
@@ -36,11 +57,18 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
       .eq("agent_id", id)
       .order("queued_at", { ascending: false })
       .limit(15),
-    supabase.from("agent_versions").select("id, version, autonomy_level, change_note, created_at, users:created_by(first_name, last_name)").eq("organization_id", session.org.id).eq("agent_id", id).order("version", { ascending: false }),
+    supabase
+      .from("agent_versions")
+      .select("id, version, autonomy_level, change_note, created_at, instructions, trigger_config, policy_config, agent_tools(tool_key), users:created_by(first_name, last_name)")
+      .eq("organization_id", session.org.id)
+      .eq("agent_id", id)
+      .order("version", { ascending: false }),
     supabase.from("integration_connections").select("provider").eq("organization_id", session.org.id).eq("integration_key", "zendesk").eq("status", "connected").maybeSingle(),
     computeOrgMetrics(adminDb(), session.org.id, new Date(0)),
   ]);
   const stats = metrics.perAgent.get(id);
+  const readiness = await agentReadiness(session, id, config.tools, agent.status === "active" ? "test" : "activate");
+  const runtimeReady = readiness.checks.find((c) => c.key === "runtime")?.ok ?? false;
   const recommendation = stats ? autonomyRecommendation(agent.autonomy_level, stats, agent.name) : null;
   const ticketDriven = config.tools.includes("zendesk.read_ticket");
   const samples = SAMPLE_TICKETS.map((s) => ({ key: s.key, label: s.label }));
@@ -72,63 +100,87 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
         }
         actions={
           <>
-            <ButtonLink href={`/agents/${id}/edit`} variant="secondary">
+            <ButtonLink href={`/agents/${id}/edit`} variant="outline">
               Edit
             </ButtonLink>
             {agent.status === "active" ? (
-              <ActionButton variant="secondary" action={pauseAction.bind(null, id)}>
+              <ActionButton variant="outline" action={pauseAction.bind(null, id)}>
                 Pause
               </ActionButton>
             ) : isAdmin(session) ? (
-              <ActionButton action={activateAction.bind(null, id)}>Activate agent</ActionButton>
+              <ActionButton action={activateAction.bind(null, id)} disabled={!readiness.ready}>
+                Activate agent
+              </ActionButton>
             ) : null}
           </>
         }
       />
 
       {created ? (
-        <Notice tone="ok" className="mb-4">
-          Agent created in draft. Run a test to see exactly what it would do, then activate it.
-        </Notice>
+        <Alert variant="success" className="mb-4">
+          <AlertDescription>Agent created in draft. Run a test to see exactly what it would do, then activate it.</AlertDescription>
+        </Alert>
       ) : agent.status !== "active" && !hasCompletedTest ? (
-        <Notice tone="info" className="mb-4">
-          This agent is not live. Run at least one test before activating it.
-        </Notice>
+        <Alert variant="info" className="mb-4">
+          <AlertDescription>This agent is not live. Run at least one test before activating it.</AlertDescription>
+        </Alert>
       ) : null}
       {recommendation ? (
-        <Notice tone={recommendation.direction === "increase" ? "ok" : "warn"} className="mb-4">
-          <div className="font-medium">{recommendation.message}</div>
-          <div className="mt-1 text-xs">{recommendation.evidence.join(" · ")}</div>
-          <a href="#autonomy" className="mt-2 inline-block text-xs font-medium underline">
-            Review autonomy
-          </a>
-        </Notice>
+        <Alert variant={recommendation.direction === "increase" ? "success" : "warning"} className="mb-4">
+          <AlertDescription>
+            <div className="font-medium">{recommendation.message}</div>
+            <div className="mt-1 text-xs">{recommendation.evidence.join(" · ")}</div>
+            <a href="#autonomy" className="mt-2 inline-block text-xs font-medium underline">
+              Review autonomy
+            </a>
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Runs" value={stats?.runs ?? 0} hint={stats?.testRuns ? `+ ${stats.testRuns} test` : undefined} />
-        <Stat label="Success rate" value={pct(stats?.successRate)} hint={`${pct(stats?.humanInterventionRate)} needed a human`} />
-        <Stat label="Hours saved" value={hours((stats?.hoursSaved ?? 0) * 60)} hint={`${money(stats?.estimatedValue ?? 0, session.org.currency)} value`} />
-        <Stat label="AI cost" value={usd(stats?.aiCost ?? 0)} />
+        <StatCard label="Runs" value={stats?.runs ?? 0} hint={stats?.testRuns ? `+ ${stats.testRuns} test` : undefined} />
+        <StatCard label="Success rate" value={pct(stats?.successRate)} hint={`${pct(stats?.humanInterventionRate)} needed a human`} />
+        <StatCard label="Hours saved" value={hours((stats?.hoursSaved ?? 0) * 60)} hint={`${money(stats?.estimatedValue ?? 0, session.org.currency)} value`} />
+        <StatCard label="AI cost" value={usd(stats?.aiCost ?? 0)} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-start-3 lg:row-start-1">
-          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} />
+          {agent.status !== "active" || !readiness.ready ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{agent.status === "active" ? "Needs attention" : readiness.ready ? "Ready to go live" : "Before going live"}</CardTitle>
+                <CardDescription>{readiness.ready ? "Everything this agent needs is in place." : "Activate is available once these are done."}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ReadinessChecklist checks={readiness.checks} />
+              </CardContent>
+            </Card>
+          ) : null}
+          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} blockedReason={runtimeReady ? null : "Tests start once the agent runtime is connected."} />
           {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
           <Card id="autonomy">
-            <CardHeader title="Autonomy" />
-            <CardBody>
+            <CardHeader>
+              <CardTitle>Autonomy</CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="mb-4">
                 <AutonomyLadder current={agent.autonomy_level} />
               </div>
               <AutonomyControl agentId={id} level={agent.autonomy_level} hasMoney={config.tools.includes("stripe.create_refund")} threshold={refundThreshold} canChange={isAdmin(session)} />
-            </CardBody>
+            </CardContent>
           </Card>
         </div>
         <div className="min-w-0 space-y-6 lg:col-span-2 lg:col-start-1 lg:row-start-1">
           <Card>
-            <CardHeader title="Recent runs" action={<Link href={`/activity?agent=${id}`} className="text-xs font-medium text-accent hover:underline">All activity</Link>} />
+            <CardHeader>
+              <CardTitle>Recent runs</CardTitle>
+              <CardAction>
+                <ButtonLink href={`/activity?agent=${id}`} variant="ghost" size="sm">
+                  All activity
+                </ButtonLink>
+              </CardAction>
+            </CardHeader>
             {(runs ?? []).length ? (
               <div>
                 {(runs ?? []).map((r) => (
@@ -149,34 +201,37 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 ))}
               </div>
             ) : (
-              <CardBody>
-                <p className="text-sm text-muted">No runs yet.</p>
-              </CardBody>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">No runs yet.</p>
+              </CardContent>
             )}
           </Card>
           <Card>
-            <CardHeader title="How it works" description={`Configuration version ${version.version}`} />
-            <CardBody className="grid gap-5 text-sm md:grid-cols-2">
+            <CardHeader>
+              <CardTitle>How it works</CardTitle>
+              <CardDescription>{`Configuration version ${version.version}`}</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-5 text-sm md:grid-cols-2">
               <div className="md:col-span-2">
-                <div className="mb-1 text-xs font-medium text-muted">Objective</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Objective</div>
                 <p>{config.instructions.objective}</p>
-                <p className="mt-1 text-muted">{triggerLabel}</p>
+                <p className="mt-1 text-muted-foreground">{triggerLabel}</p>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">What the agent can do</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">What the agent can do</div>
                 <ul className="space-y-0.5">
                   {config.tools.map((t) => {
                     const def = getTool(t);
                     return (
                       <li key={t} className="flex flex-wrap items-center gap-x-2">
-                        {def?.label ?? t} {def?.access === "write" ? <Badge tone="info">takes action</Badge> : null}
+                        {def?.label ?? t} {def?.access === "write" ? <Badge variant="info">takes action</Badge> : null}
                       </li>
                     );
                   })}
                 </ul>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Needs your approval when</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Needs your approval when</div>
                 <ul className="list-inside list-disc">
                   {config.autonomyLevel <= 3 ? <li>Any action (L{config.autonomyLevel})</li> : null}
                   {(config.autonomyLevel >= 4 ? config.policy.approvalRequiredFor : []).map((t) => (
@@ -194,7 +249,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 </ul>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Rules</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Rules</div>
                 <ul className="list-inside list-disc">
                   {config.instructions.rules.map((r) => (
                     <li key={r}>{r}</li>
@@ -202,7 +257,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 </ul>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Hands to a human when</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Hands to a human when</div>
                 <ul className="list-inside list-disc">
                   {config.instructions.escalationConditions.map((r) => (
                     <li key={r}>{r}</li>
@@ -214,26 +269,43 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                   ))}
                 </ul>
               </div>
-            </CardBody>
-            <details className="border-t border-border px-4 py-3 text-sm sm:px-5">
-              <summary className="cursor-pointer text-xs font-medium text-muted hover:text-foreground">Version history ({(versions ?? []).length})</summary>
-              <ul className="mt-2 space-y-2">
-                {(versions ?? []).map((v) => {
-                  const by = v.users as unknown as { first_name: string; last_name: string } | null;
-                  return (
-                    <li key={v.id} className="flex gap-3">
-                      <span className="w-8 shrink-0 font-medium">v{v.version}</span>
-                      <div className="min-w-0">
-                        <div>{v.change_note ?? "No note"}</div>
-                        <div className="text-xs text-muted">
-                          L{v.autonomy_level} · {by ? `${by.first_name} ${by.last_name}` : "–"} · {dateTime(v.created_at)}
+            </CardContent>
+            <Collapsible className="border-t border-border px-4 py-3 text-sm sm:px-5">
+              <CollapsibleTrigger className="group inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+                Version history ({(versions ?? []).length})<ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ul className="mt-2 space-y-2">
+                  {(versions ?? []).map((v, i, all) => {
+                    const by = v.users as unknown as { first_name: string; last_name: string } | null;
+                    const prev = all[i + 1];
+                    const changes = prev ? diffVersions(snapshot(prev), snapshot(v)) : [];
+                    return (
+                      <li key={v.id} className="flex gap-3">
+                        <span className="w-8 shrink-0 font-medium">v{v.version}</span>
+                        <div className="min-w-0">
+                          <div>{v.change_note ?? "No note"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            L{v.autonomy_level} · {by ? `${by.first_name} ${by.last_name}` : "–"} · {dateTime(v.created_at)}
+                          </div>
+                          {prev ? (
+                            changes.length ? (
+                              <ul className="mt-1 list-inside list-disc text-xs text-muted-foreground">
+                                {changes.map((c) => (
+                                  <li key={c}>{c}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="mt-1 text-xs text-muted-foreground">No configuration changes from v{prev.version}.</div>
+                            )
+                          ) : null}
                         </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </details>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
         </div>
       </div>
