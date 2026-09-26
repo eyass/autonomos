@@ -78,7 +78,7 @@ export const CompanyProfileSchema = z.object({
   hourlyCostEstimate: z.number().positive().max(2000).describe("Typical fully loaded hourly labour cost of operational staff in that country, in the currency"),
   improvementAreas: z.array(z.enum(DEPARTMENTS)).min(1).max(4).describe("Departments where recurring work is most likely, most promising first"),
   customers: z.string().nullable().describe("Who the customers are, for example consumers buying second-hand furniture"),
-  likelyProcesses: z.array(LikelyProcessSchema).max(8),
+  likelyProcesses: z.array(LikelyProcessSchema).max(15),
   evidence: z
     .array(z.object({ field: z.string(), source: z.string() }))
     .max(12)
@@ -403,6 +403,6 @@ export type SystemProcessProposal = z.infer<typeof SystemProcessProposalSchema>;
 
 export const SystemDiscoverySchema = z.object({
   summary: z.string().describe("Two sentences on what the data shows about how the company works"),
-  processes: z.array(SystemProcessProposalSchema).describe("At most eight processes"),
+  processes: z.array(SystemProcessProposalSchema).describe("Every recurring process found, most evidenced first"),
 });
 export type SystemDiscovery = z.infer<typeof SystemDiscoverySchema>;

@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = { title: "Discover processes" };
+// Reading every system and proposing a full inventory can take a few minutes.
+export const maxDuration = 300;
 
 const FIRST_RUN = [
   "Create or import your first processes",

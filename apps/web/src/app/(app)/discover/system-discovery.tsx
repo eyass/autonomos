@@ -71,8 +71,28 @@ export function SystemDiscovery({ initialRun, autoStart }: { initialRun: Discove
       return n;
     });
 
+  const toggleAll = (items: Array<{ title: string }>, on: boolean) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      for (const i of items) {
+        if (on) n.add(i.title);
+        else n.delete(i.title);
+      }
+      return n;
+    });
+
   const busy = phase === "reading" || phase === "proposing";
   const newProposals = run?.proposals.filter((p) => !p.exists && !run.accepted.includes(p.title)) ?? [];
+  // Processes the data shows, then the ones inferred from the kind of company (confidence 0.45 or lower).
+  const groups = [
+    { key: "seen", label: "Seen in your data", hint: null, items: run?.proposals.filter((p) => p.confidence > 0.45) ?? [] },
+    {
+      key: "likely",
+      label: "Likely for a company like yours",
+      hint: "Not seen in the sample. Tick the ones that happen, and AutonomOS will ask about the details.",
+      items: run?.proposals.filter((p) => p.confidence <= 0.45) ?? [],
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -157,61 +177,83 @@ export function SystemDiscovery({ initialRun, autoStart }: { initialRun: Discove
             {run.summary ? <CardDescription>{run.summary}</CardDescription> : null}
           </CardHeader>
           <CardContent className="space-y-3">
-            {run.proposals.map((p) => {
-              const done = p.exists || run.accepted.includes(p.title);
-              const hoursPerMonth = ((p.estimatedOccurrencesPerMonth ?? 0) * (p.estimatedMinutesPerOccurrence ?? 0)) / 60;
-              return (
-                <div key={p.title} className={`rounded-lg border p-3 ${done ? "opacity-60" : ""}`} data-testid="proposal">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id={`proposal-${p.title}`}
-                      checked={!done && picked.has(p.title)}
-                      disabled={done}
-                      onCheckedChange={(v) => toggle(p.title, v === true)}
-                      aria-label={`Add ${p.title}`}
-                      className="mt-0.5"
-                    />
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <label htmlFor={`proposal-${p.title}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-medium">{p.title}</span>
-                        <Badge variant="outline">{p.department}</Badge>
-                        {done ? <Badge variant="secondary">Already in your inventory</Badge> : null}
-                        {p.confidence < 0.5 ? <Badge variant="warning">Weak evidence</Badge> : null}
-                      </label>
-                      <p className="text-sm text-muted-foreground">{p.description}</p>
-                      <ul className="space-y-0.5 text-xs">
-                        {p.evidence.map((e, i) => (
-                          <li key={i} className="flex gap-1.5">
-                            <span className="shrink-0 font-medium">{e.source}:</span>
-                            <span className="text-muted-foreground">{e.detail}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="text-xs text-muted-foreground">
-                        {p.estimatedOccurrencesPerMonth ? `About ${Math.round(p.estimatedOccurrencesPerMonth)} a month` : "Volume unknown"}
-                        {hoursPerMonth >= 0.5 ? ` · about ${Math.round(hoursPerMonth)} hour${Math.round(hoursPerMonth) === 1 ? "" : "s"} of work a month` : ""}
-                      </div>
-                      {p.steps.length ? (
-                        <Collapsible>
-                          <CollapsibleTrigger asChild>
-                            <Button variant="link" size="sm" className="h-auto px-0 text-xs">
-                              {p.steps.length} steps
-                            </Button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground">
-                              {p.steps.map((st, i) => (
-                                <li key={i}>{st.title}</li>
-                              ))}
-                            </ol>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      ) : null}
-                    </div>
+            {groups.map((g) =>
+              g.items.length ? (
+                <section key={g.key} className="space-y-3" aria-label={g.label}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 pt-1">
+                    <h3 className="text-sm font-semibold">
+                      {g.label} <span className="font-normal text-muted-foreground">· {g.items.length}</span>
+                    </h3>
+                    {g.items.some((p) => !p.exists && !run.accepted.includes(p.title)) ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto px-0 text-xs"
+                        onClick={() => toggleAll(g.items, !g.items.every((p) => p.exists || run.accepted.includes(p.title) || picked.has(p.title)))}
+                      >
+                        {g.items.every((p) => p.exists || run.accepted.includes(p.title) || picked.has(p.title)) ? "Clear all" : "Select all"}
+                      </Button>
+                    ) : null}
                   </div>
-                </div>
-              );
-            })}
+                  {g.hint ? <p className="-mt-2 text-xs text-muted-foreground">{g.hint}</p> : null}
+                  {g.items.map((p) => {
+                    const done = p.exists || run.accepted.includes(p.title);
+                    const hoursPerMonth = ((p.estimatedOccurrencesPerMonth ?? 0) * (p.estimatedMinutesPerOccurrence ?? 0)) / 60;
+                    return (
+                      <div key={p.title} className={`rounded-lg border p-3 ${done ? "opacity-60" : ""}`} data-testid="proposal">
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            id={`proposal-${p.title}`}
+                            checked={!done && picked.has(p.title)}
+                            disabled={done}
+                            onCheckedChange={(v) => toggle(p.title, v === true)}
+                            aria-label={`Add ${p.title}`}
+                            className="mt-0.5"
+                          />
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <label htmlFor={`proposal-${p.title}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-medium">{p.title}</span>
+                              <Badge variant="outline">{p.department}</Badge>
+                              {done ? <Badge variant="secondary">Already in your inventory</Badge> : null}
+                              {p.confidence < 0.5 ? <Badge variant="warning">Weak evidence</Badge> : null}
+                            </label>
+                            <p className="text-sm text-muted-foreground">{p.description}</p>
+                            <ul className="space-y-0.5 text-xs">
+                              {p.evidence.map((e, i) => (
+                                <li key={i} className="flex gap-1.5">
+                                  <span className="shrink-0 font-medium">{e.source}:</span>
+                                  <span className="text-muted-foreground">{e.detail}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="text-xs text-muted-foreground">
+                              {p.estimatedOccurrencesPerMonth ? `About ${Math.round(p.estimatedOccurrencesPerMonth)} a month` : "Volume unknown"}
+                              {hoursPerMonth >= 0.5 ? ` · about ${Math.round(hoursPerMonth)} hour${Math.round(hoursPerMonth) === 1 ? "" : "s"} of work a month` : ""}
+                            </div>
+                            {p.steps.length ? (
+                              <Collapsible>
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="link" size="sm" className="h-auto px-0 text-xs">
+                                    {p.steps.length} steps
+                                  </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground">
+                                    {p.steps.map((st, i) => (
+                                      <li key={i}>{st.title}</li>
+                                    ))}
+                                  </ol>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </section>
+              ) : null,
+            )}
             {!run.proposals.length ? <p className="text-sm text-muted-foreground">Tell AutonomOS about your work in an interview, or add a process by hand.</p> : null}
           </CardContent>
           <CardFooter className="flex-wrap gap-2">

@@ -26,7 +26,7 @@ const PROFILE_RULES = [
   "Never invent headcount, customers or tools. Detected tools come from page scripts and mail (MX) records and are reliable; everything else must come from page text or structured data.",
   "Pick the industry from the allowed list by what the company does, not by the words it uses. A platform where independent sellers and buyers trade is a Marketplace; a brand selling its own goods online is E-commerce.",
   "Write the summary for the company's own operations team: what it sells, to whom, and the kind of recurring work that implies. Plain sentences, no marketing language.",
-  "likelyProcesses are recurring operational tasks a company like this almost certainly does (for example refund requests for a marketplace with Stripe and Zendesk). Name them the way an operations manager would. Only list processes the evidence supports.",
+  "likelyProcesses are recurring operational tasks a company like this almost certainly does (for example refund requests for a marketplace with Stripe and Zendesk). Name them the way an operations manager would. List up to 15, covering every department where the evidence suggests work. Only list processes the evidence supports.",
   "hourlyCostEstimate is a typical fully loaded labour cost for operational staff in the head-office country, in the chosen currency.",
 ];
 
@@ -51,7 +51,7 @@ export async function profileCompany(input: { website: WebsiteEvidence; emailDom
   return {
     ...object,
     improvementAreas: [...new Set(object.improvementAreas)],
-    likelyProcesses: object.likelyProcesses.slice(0, 8),
+    likelyProcesses: object.likelyProcesses.slice(0, 15),
   };
 }
 
@@ -68,14 +68,14 @@ export async function draftProcessInventory(input: {
     schemaName: "ProcessInventoryDraft",
     systemRules: [
       "You are AutonomOS, a business process analyst drafting a first process inventory so the user can review instead of describing everything from scratch.",
-      "Draft the recurring processes this company most likely runs, from its profile and the evidence from connected systems. Prefer the likely processes in the profile; add others only when the evidence clearly supports them.",
+      "Draft a thorough inventory of the recurring processes this company most likely runs, from its profile and the evidence from connected systems. Start with the likely processes in the profile, then go department by department (Customer Support, Sales, Finance, Marketing, Operations, Product, Engineering, HR) and add the recurring work a company of this kind and size runs there. Skip departments that do not fit this company.",
       "Every process is inferred, so confidence must be 0.6 or lower unless connected-system evidence confirms it, and missingInformation must list what a person should confirm (volume, minutes per occurrence, who does it).",
       "Steps describe how the work is typically done by hand today. Estimate frequency and minutes conservatively.",
       "Autonomy levels: 1 human only, 2 agent assists, 3 agent proposes and a human approves, 4 agent executes with exceptions, 5 autonomous. Current level is usually 1.",
       "Scores are 1 to 5. businessValue: frequency, time, labour cost, customer and revenue impact. automationDifficulty: systems, steps, unstructured data, judgement, API availability. riskLevel: financial, customer and legal consequence, reversibility, data sensitivity.",
     ],
     sections: [section("company_context", input.company), section("company_profile", input.profile), section("connected_system_evidence", input.evidence.length ? input.evidence : "none yet")],
-    task: "Draft the process inventory for this company, at most eight processes.",
+    task: "Draft the process inventory for this company: 12 to 25 processes, most likely first.",
     mock: () => ({
       processes: input.profile.likelyProcesses.flatMap((p) =>
         mockProcessesFromText(p.title, p.department, "document")
@@ -89,7 +89,7 @@ export async function draftProcessInventory(input: {
     }),
     onUsage: input.onUsage,
   });
-  return object.processes.slice(0, 8);
+  return object.processes.slice(0, 25);
 }
 
 export async function suggestInterviewAnswers(input: {
