@@ -4,3 +4,4 @@ export * from "./providers";
 export * from "./sandbox-seed";
 export * from "./sandbox-history";
 export * from "./scan";
+export * from "./directory";

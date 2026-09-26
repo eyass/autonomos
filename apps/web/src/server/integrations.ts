@@ -1,5 +1,5 @@
 import "server-only";
-import { COMPOSIO_TOOLKITS, composioConfigured, getComposio, sandboxSeed, startComposioConnection } from "@autonomos/integrations";
+import { composioConfigured, getComposio, getToolkit, integrationKeyFor, sandboxSeed, searchDirectory, startComposioConnection } from "@autonomos/integrations";
 import { sandboxStore } from "@autonomos/db";
 import { audit, activity, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
@@ -7,8 +7,78 @@ import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
 // Integrations implemented end to end in the sandbox (tools exist for them).
 export const SANDBOX_INTEGRATIONS = ["zendesk", "stripe", "slack", "gmail"];
 
-export function canUseComposio(key: string) {
-  return composioConfigured() && Boolean(COMPOSIO_TOOLKITS[key]);
+// Every catalogue row can be connected through Composio once the API key is set.
+export function canUseComposio() {
+  return composioConfigured();
+}
+
+// ---------------------------------------------------------------------------
+// The Composio directory: search every toolkit, connect any of them.
+// ---------------------------------------------------------------------------
+
+export type DirectoryEntry = { slug: string; key: string; name: string; description: string; logo: string | null; category: string; managedAuth: boolean; connected: boolean };
+
+export async function searchIntegrationDirectory(session: Session, query: string): Promise<DirectoryEntry[]> {
+  if (!composioConfigured()) return [];
+  const [results, { data: conns }] = await Promise.all([
+    searchDirectory(query.slice(0, 80)),
+    adminDb().from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected"),
+  ]);
+  const connected = new Set((conns ?? []).map((c) => c.integration_key));
+  const custom = new Set(Object.keys(safeAuthConfigs()));
+  return results.map((t) => {
+    const key = integrationKeyFor(t.slug);
+    return {
+      slug: t.slug,
+      key,
+      name: t.name,
+      description: t.description.slice(0, 160),
+      logo: t.logo,
+      category: t.category,
+      managedAuth: t.managedAuth || custom.has(key),
+      connected: connected.has(key),
+    };
+  });
+}
+
+function safeAuthConfigs(): Record<string, string> {
+  try {
+    return JSON.parse(process.env.COMPOSIO_AUTH_CONFIGS ?? "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+// Adds a directory toolkit to the catalogue (once), then starts its sign-in.
+export async function connectFromDirectory(session: Session, slug: string, appUrl: string) {
+  if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
+  if (!composioConfigured()) throw new HttpError(400, "Composio is not configured");
+  const toolkit = await getToolkit(slug);
+  if (!toolkit) throw new HttpError(404, "That system is not in the Composio directory");
+  const key = integrationKeyFor(toolkit.slug);
+  if (!toolkit.managedAuth && !safeAuthConfigs()[key]) {
+    throw new HttpError(
+      409,
+      `${toolkit.name} needs its own sign-in app in Composio before it can be connected. An admin adds it once in the Composio dashboard (Auth configs) and sets COMPOSIO_AUTH_CONFIGS.`,
+    );
+  }
+  const db = adminDb();
+  await db.from("integrations").upsert(
+    {
+      key,
+      name: toolkit.name,
+      category: toolkit.category,
+      description: toolkit.description.slice(0, 300) || `${toolkit.name} through Composio.`,
+      permissions: [`Read ${toolkit.name} data for process discovery`, `Act in ${toolkit.name} only through actions you allow an agent`],
+      priority: 99,
+      sort_order: 1000,
+      logo: toolkit.logo,
+      composio_toolkit: toolkit.slug,
+      source: "directory",
+    },
+    { onConflict: "key", ignoreDuplicates: true },
+  );
+  return startOAuthConnection(session, key, appUrl);
 }
 
 async function permissionsFor(key: string) {
@@ -55,7 +125,7 @@ export async function connectSandbox(session: Session, key: string) {
 
 export async function startOAuthConnection(session: Session, key: string, appUrl: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
-  if (!canUseComposio(key)) throw new HttpError(400, "Composio is not configured for this integration");
+  if (!canUseComposio()) throw new HttpError(400, "Composio is not configured for this integration");
   await permissionsFor(key);
   const callback = `${appUrl}/api/integrations/callback?integration=${encodeURIComponent(key)}`;
   const { redirectUrl } = await startComposioConnection(session.org.id, key, callback);

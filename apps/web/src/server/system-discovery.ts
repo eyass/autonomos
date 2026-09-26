@@ -48,6 +48,9 @@ async function connections(session: Session) {
   }));
 }
 
+// Live accounts can always be read (dedicated or general reader); sandboxes only when they hold data.
+const readable = (c: { key: string; provider: string }) => c.provider === "composio" || SCANNABLE.includes(c.key);
+
 async function existingTitles(session: Session) {
   const { data } = await adminDb().from("processes").select("title").eq("organization_id", session.org.id).neq("status", "archived");
   return (data ?? []).map((p) => p.title);
@@ -91,8 +94,8 @@ export async function startDiscoveryRun(session: Session): Promise<DiscoveryRunV
     key: c.key,
     name: c.name,
     provider: c.provider,
-    state: SCANNABLE.includes(c.key) ? "pending" : "skipped",
-    line: SCANNABLE.includes(c.key) ? undefined : "Reading this system is not supported yet.",
+    state: readable(c) ? "pending" : "skipped",
+    line: readable(c) ? undefined : "This sandbox has no data to read.",
   }));
   const { data, error } = await adminDb()
     .from("discovery_runs")
@@ -131,7 +134,7 @@ export async function scanRunSystem(session: Session, runId: string, key: string
     updated = scan.unsupported
       ? { ...target, state: "skipped", line: scan.unsupported }
       : { ...target, state: "done", sampled: scan.sampled, itemKind: scan.itemKind, periodDays: scan.periodDays, line: describeScan(scan, conn.name) };
-    if (!scan.unsupported && scan.sampled) sample = { system: conn.name, summary: describeScan(scan, conn.name), periodDays: scan.periodDays, items: scan.items };
+    if (!scan.unsupported && scan.sampled) sample = { system: conn.name, summary: describeScan(scan, conn.name), periodDays: scan.periodDays, items: scan.items.slice(0, 100) };
   } catch (e) {
     console.error("system scan failed", key, e);
     updated = { ...target, state: "failed", line: `Could not read ${target.name}: ${e instanceof Error ? e.message.slice(0, 160) : "unknown error"}` };
@@ -217,7 +220,7 @@ export async function acceptProposals(session: Session, runId: string, titles: s
 export async function readConnectedSystems(session: Session): Promise<string[]> {
   const lines: string[] = [];
   for (const c of await connections(session)) {
-    if (!SCANNABLE.includes(c.key)) {
+    if (!readable(c)) {
       lines.push(`${c.name} is connected.`);
       continue;
     }

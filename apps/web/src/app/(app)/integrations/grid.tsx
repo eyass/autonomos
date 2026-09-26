@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { connectOAuthAction, connectSandboxAction, disconnectAction, rotateWebhookSecretAction } from "./actions";
+import { SystemLogo } from "./add-systems";
 import type { IntegrationView } from "./data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,10 @@ import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader,
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export function IntegrationGrid({ integrations, canManage, compact, highlight = [] }: { integrations: IntegrationView[]; canManage: boolean; compact?: boolean; highlight?: string[] }) {
-  // Tools detected on the company website come first, so connecting them is one step.
-  const found = integrations.filter((i) => highlight.includes(i.key));
-  const rest = integrations.filter((i) => !highlight.includes(i.key));
+  // Connected systems first, then tools detected on the company website, then the rest.
+  const connected = integrations.filter((i) => i.status === "connected");
+  const found = integrations.filter((i) => i.status !== "connected" && highlight.includes(i.key));
+  const rest = integrations.filter((i) => i.status !== "connected" && !highlight.includes(i.key));
   const categories = [...new Set(rest.map((i) => i.category))];
   const section = (title: string, items: IntegrationView[], note?: string) => (
     <section key={title}>
@@ -27,10 +29,11 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
   );
   return (
     <div className="space-y-6">
+      {connected.length ? section("Connected", connected) : null}
       {found.length ? section("Found on your website", found, "Detected from your website and email setup.") : null}
       {categories.map((cat) =>
         section(
-          found.length ? `Other ${cat.toLowerCase()} tools` : cat,
+          found.length || connected.length ? `Other ${cat.toLowerCase()} tools` : cat,
           rest.filter((i) => i.category === cat),
         ),
       )}
@@ -45,8 +48,11 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
   return (
     <Card data-testid={`integration-${i.key}`} className="min-w-0 gap-3 sm:gap-4">
       <CardHeader>
-        <CardTitle>{i.name}</CardTitle>
-        <CardDescription>{i.description}</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <SystemLogo src={i.logo} name={i.name} className="size-6" />
+          {i.name}
+        </CardTitle>
+        <CardDescription className="line-clamp-2">{i.description}</CardDescription>
         <CardAction>
           {connected ? (
             <Badge variant="success">Connected{i.provider === "sandbox" ? " · sandbox" : ""}</Badge>

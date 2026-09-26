@@ -10,6 +10,9 @@ export type IntegrationView = {
   name: string;
   category: string;
   description: string;
+  logo: string | null;
+  // Curated systems have agent actions; directory systems are read for discovery.
+  source: "curated" | "directory";
   permissions: string[];
   // What an agent can be allowed to do with this system (each agent gets an explicit subset).
   agentReads: string[];
@@ -51,30 +54,36 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
       if (!lastUsed.has(key)) lastUsed.set(key, a.created_at);
     }
   }
-  return (catalog ?? []).map((i) => {
-    const c = connections?.find((x) => x.integration_key === i.key);
-    const by = c?.users as unknown as { first_name: string; last_name: string; email: string } | null;
-    return {
-      key: i.key,
-      name: i.name,
-      category: i.category,
-      description: i.description,
-      permissions: (i.permissions as string[]) ?? [],
-      agentReads: toolsForIntegrations([i.key])
-        .filter((t) => t.integration === i.key && t.access === "read")
-        .map((t) => t.label),
-      agentActs: toolsForIntegrations([i.key])
-        .filter((t) => t.integration === i.key && t.access === "write")
-        .map((t) => t.label),
-      status: (c?.status ?? "not_connected") as IntegrationView["status"],
-      provider: c?.provider ?? null,
-      accountLabel: c?.account_label ?? null,
-      connectedBy: by ? `${by.first_name} ${by.last_name}`.trim() || by.email : null,
-      connectedAtLabel: c?.connected_at ? dateTime(c.connected_at) : null,
-      lastUsedLabel: lastUsed.get(i.key) ? relative(lastUsed.get(i.key)!) : null,
-      sandboxAvailable: SANDBOX_INTEGRATIONS.includes(i.key),
-      oauthAvailable: canUseComposio(i.key),
-      webhook: c && c.status === "connected" && secrets.get(c.id) ? { url: `${appUrl}/api/webhooks/${c.id}`, secret: secrets.get(c.id)! } : null,
-    };
-  });
+  // Directory systems appear once an organisation has connected them.
+  const connectedKeys = new Set((connections ?? []).map((c) => c.integration_key));
+  return (catalog ?? [])
+    .filter((i) => i.source !== "directory" || connectedKeys.has(i.key))
+    .map((i) => {
+      const c = connections?.find((x) => x.integration_key === i.key);
+      const by = c?.users as unknown as { first_name: string; last_name: string; email: string } | null;
+      return {
+        key: i.key,
+        name: i.name,
+        category: i.category,
+        description: i.description,
+        logo: i.logo ?? null,
+        source: (i.source as "curated" | "directory") ?? "curated",
+        permissions: (i.permissions as string[]) ?? [],
+        agentReads: toolsForIntegrations([i.key])
+          .filter((t) => t.integration === i.key && t.access === "read")
+          .map((t) => t.label),
+        agentActs: toolsForIntegrations([i.key])
+          .filter((t) => t.integration === i.key && t.access === "write")
+          .map((t) => t.label),
+        status: (c?.status ?? "not_connected") as IntegrationView["status"],
+        provider: c?.provider ?? null,
+        accountLabel: c?.account_label ?? null,
+        connectedBy: by ? `${by.first_name} ${by.last_name}`.trim() || by.email : null,
+        connectedAtLabel: c?.connected_at ? dateTime(c.connected_at) : null,
+        lastUsedLabel: lastUsed.get(i.key) ? relative(lastUsed.get(i.key)!) : null,
+        sandboxAvailable: SANDBOX_INTEGRATIONS.includes(i.key),
+        oauthAvailable: canUseComposio(),
+        webhook: c && c.status === "connected" && secrets.get(c.id) ? { url: `${appUrl}/api/webhooks/${c.id}`, secret: secrets.get(c.id)! } : null,
+      };
+    });
 }
