@@ -39,6 +39,18 @@ describe("Composio directory", () => {
     expect(POPULAR_TOOLKITS).toHaveLength(20);
     expect(POPULAR_TOOLKITS).toEqual(expect.arrayContaining(["gmail", "googlecalendar", "outlook", "facebook", "stripe"]));
   });
+  it("replaces connected popular systems with the next most common ones", async () => {
+    const { searchDirectory, POPULAR_BACKFILL } = await withDirectory();
+    const slugs = [...POPULAR_TOOLKITS, ...POPULAR_BACKFILL];
+    toolkits.splice(0, toolkits.length, ...slugs.map((slug) => ({ slug, name: slug, composio_managed_auth_schemes: ["OAUTH2"], meta: { description: "", categories: [{ name: "x" }] } })));
+    const all = await searchDirectory("");
+    expect(all.map((t) => t.slug)).toEqual([...POPULAR_TOOLKITS]);
+    const rest = await searchDirectory("", 30, new Set(["gmail", "stripe"]));
+    expect(rest).toHaveLength(20);
+    expect(rest.map((t) => t.slug)).not.toContain("gmail");
+    expect(rest.map((t) => t.slug)).not.toContain("stripe");
+    expect(rest.slice(-2).map((t) => t.slug)).toEqual([POPULAR_BACKFILL[0], POPULAR_BACKFILL[1]]);
+  });
   it("maps toolkit slugs to integration keys both ways", () => {
     expect(integrationKeyFor("googledrive")).toBe("google_drive");
     expect(toolkitFor("google_drive")).toBe("googledrive");

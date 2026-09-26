@@ -1,5 +1,5 @@
 import "server-only";
-import { composioConfigured, getComposio, getToolkit, integrationKeyFor, sandboxSeed, searchDirectory, startComposioConnection } from "@autonomos/integrations";
+import { composioConfigured, getComposio, getToolkit, integrationKeyFor, sandboxSeed, searchDirectory, startComposioConnection, toolkitFor } from "@autonomos/integrations";
 import { sandboxStore } from "@autonomos/db";
 import { audit, activity, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
@@ -20,11 +20,10 @@ export type DirectoryEntry = { slug: string; key: string; name: string; descript
 
 export async function searchIntegrationDirectory(session: Session, query: string): Promise<DirectoryEntry[]> {
   if (!composioConfigured()) return [];
-  const [results, { data: conns }] = await Promise.all([
-    searchDirectory(query.slice(0, 80)),
-    adminDb().from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected"),
-  ]);
+  const { data: conns } = await adminDb().from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected");
   const connected = new Set((conns ?? []).map((c) => c.integration_key));
+  // Popular systems already connected are replaced by the next most common ones.
+  const results = await searchDirectory(query.slice(0, 80), 30, new Set([...connected].map(toolkitFor)));
   const custom = new Set(Object.keys(safeAuthConfigs()));
   return results.map((t) => {
     const key = integrationKeyFor(t.slug);
