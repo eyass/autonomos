@@ -60,7 +60,8 @@ describe("Composio directory", () => {
 
 describe("scan limits and the general reader", () => {
   it("reads 30 days for common systems and caps each", () => {
-    expect(scanLimitFor("gmail")).toEqual({ days: 30, max: 100 });
+    expect(scanLimitFor("gmail")).toEqual({ days: 30, max: 250 });
+    expect(scanLimitFor("google_drive")).toEqual({ days: 30, max: 150 });
     expect(scanLimitFor("stripe")).toEqual({ days: 30, max: 100 });
     expect(scanLimitFor("some_other_tool")).toEqual({ days: 30, max: 50 });
   });

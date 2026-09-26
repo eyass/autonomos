@@ -1,5 +1,14 @@
 import "server-only";
-import { draftProcessInventory, extractProcessesFromDocument, generateWorkflow, runDiscoveryTurn, suggestInterviewAnswers, type CompanyContext, type InterviewMessage } from "@autonomos/ai";
+import {
+  draftProcessInventory,
+  sameProcess,
+  extractProcessesFromDocument,
+  generateWorkflow,
+  runDiscoveryTurn,
+  suggestInterviewAnswers,
+  type CompanyContext,
+  type InterviewMessage,
+} from "@autonomos/ai";
 import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk } from "@autonomos/agents";
 import { DEPARTMENTS, DiscoveredProcessSchema, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
@@ -403,6 +412,12 @@ export async function discoverFromIntegrations(session: Session) {
 // systems were connected during onboarding. Everything lands as a draft to review.
 // ---------------------------------------------------------------------------
 
+// Processes this workspace said it does not run; discovery never proposes them again.
+export async function rejectedTitles(session: Session): Promise<string[]> {
+  const { data } = await adminDb().from("rejected_processes").select("title").eq("organization_id", session.org.id);
+  return (data ?? []).map((r) => r.title);
+}
+
 export async function draftInitialInventory(session: Session): Promise<string[]> {
   const profile = session.org.websiteProfile;
   const evidence = await connectedSystemEvidence(session);
@@ -419,6 +434,11 @@ export async function draftInitialInventory(session: Session): Promise<string[]>
     evidence,
     onUsage: usageSink(session),
   });
+  const rejected = await rejectedTitles(session);
   await track(session, "process_discovery_started", { method: "website" });
-  return saveDiscoveredProcesses(session, processes, profile ? "website" : "integration");
+  return saveDiscoveredProcesses(
+    session,
+    processes.filter((p) => !rejected.some((r) => sameProcess(r, p.title))),
+    profile ? "website" : "integration",
+  );
 }

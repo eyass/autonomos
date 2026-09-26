@@ -464,13 +464,13 @@ isOneToOne: false
                   ]
                 },"discovery_runs": {
                   Row: {
-                    "accepted": NonNullable<Json>,"created_at": string,"created_by": string | null,"error": string | null,"id": string,"organization_id": string,"proposals": NonNullable<Json>,"samples": Json | null,"status": string,"summary": string | null,"systems": NonNullable<Json>,"updated_at": string
+                    "accepted": NonNullable<Json>,"created_at": string,"created_by": string | null,"error": string | null,"id": string,"organization_id": string,"proposals": NonNullable<Json>,"rejected": NonNullable<Json>,"samples": Json | null,"status": string,"summary": string | null,"systems": NonNullable<Json>,"updated_at": string
                   }
                   Insert: {
-                    "accepted"?: NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"error"?: string | null,"id"?: string,"organization_id": string,"proposals"?: NonNullable<Json>,"samples"?: Json | null,"status"?: string,"summary"?: string | null,"systems"?: NonNullable<Json>,"updated_at"?: string
+                    "accepted"?: NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"error"?: string | null,"id"?: string,"organization_id": string,"proposals"?: NonNullable<Json>,"rejected"?: NonNullable<Json>,"samples"?: Json | null,"status"?: string,"summary"?: string | null,"systems"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Update: {
-                    "accepted"?: NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"error"?: string | null,"id"?: string,"organization_id"?: string,"proposals"?: NonNullable<Json>,"samples"?: Json | null,"status"?: string,"summary"?: string | null,"systems"?: NonNullable<Json>,"updated_at"?: string
+                    "accepted"?: NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"error"?: string | null,"id"?: string,"organization_id"?: string,"proposals"?: NonNullable<Json>,"rejected"?: NonNullable<Json>,"samples"?: Json | null,"status"?: string,"summary"?: string | null,"systems"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -937,6 +937,31 @@ isOneToOne: false
     },{
       foreignKeyName: "processes_reviewed_by_fkey"
       columns: ["reviewed_by"]
+isOneToOne: false
+      referencedRelation: "users"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"rejected_processes": {
+                  Row: {
+                    "created_at": string,"department": string | null,"id": string,"organization_id": string,"rejected_by": string | null,"title": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"department"?: string | null,"id"?: string,"organization_id": string,"rejected_by"?: string | null,"title": string
+                  }
+                  Update: {
+                    "created_at"?: string,"department"?: string | null,"id"?: string,"organization_id"?: string,"rejected_by"?: string | null,"title"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "rejected_processes_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "rejected_processes_rejected_by_fkey"
+      columns: ["rejected_by"]
 isOneToOne: false
       referencedRelation: "users"
       referencedColumns: ["id"]

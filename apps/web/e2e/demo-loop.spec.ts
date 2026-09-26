@@ -78,14 +78,39 @@ test("demo loop", async ({ page }) => {
   // Discovery reads the connected systems on its own and proposes processes with evidence
   await page.goto("/discover");
   await expect(page.getByRole("list", { name: "Systems read" }).getByText(/Read \d+ tickets/)).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText(/\d+ process(es)? found/)).toBeVisible({ timeout: 60_000 });
-  // Processes already in the inventory are not proposed again.
-  await expect(page.getByTestId("proposal").filter({ hasText: "Refund request handling" })).toHaveCount(0);
-  const orderStatus = page.getByTestId("proposal").filter({ hasText: "Order status enquiries" });
-  await expect(orderStatus.getByText(/Zendesk:/)).toBeVisible();
+  // Proposals come one at a time: add, reject (never suggested again) or decide later
+  const review = page.getByTestId("proposal-review");
+  await expect(review.getByText("Is this work you do?")).toBeVisible({ timeout: 60_000 });
+  const current = review.getByTestId("proposal").getByRole("heading");
+  await expect(current).toHaveText("Order status enquiries");
+  await expect(review.getByText(/Zendesk:/)).toBeVisible();
   await shot(page, "system-discovery");
-  await page.getByRole("button", { name: /Add \d+ to inventory/ }).click();
-  await expect(page).toHaveURL(/\/processes\?status=draft&drafted=\d+/);
+  await review.getByRole("button", { name: "Approve Order status enquiries" }).click();
+  await expect(current).not.toHaveText("Order status enquiries");
+  const rejectedTitle = (await current.textContent())!;
+  await review.getByRole("button", { name: `Reject ${rejectedTitle}` }).click();
+  await expect(current).not.toHaveText(rejectedTitle);
+  await review.getByRole("button", { name: "Undo reject" }).click();
+  await expect(current).toHaveText(rejectedTitle);
+  await page.keyboard.press("ArrowLeft");
+  await expect(current).not.toHaveText(rejectedTitle);
+  await expect(review.getByText(/1 added · 1 rejected/)).toBeVisible();
+
+  // Reading again never brings the rejected process back
+  await page.goto("/discover");
+  await page.getByRole("button", { name: "Read again" }).first().click();
+  await expect(review.getByText("Is this work you do?")).toBeVisible({ timeout: 60_000 });
+  const total = Number((await review.getByText(/^\d+ of \d+/).textContent())!.match(/of (\d+)/)![1]);
+  const seen: string[] = [];
+  for (let i = 0; i < total; i++) {
+    const title = (await current.textContent())!;
+    seen.push(title);
+    await page.keyboard.press("ArrowDown");
+    if (total > 1) await expect(current).not.toHaveText(title);
+  }
+  expect(seen).not.toContain(rejectedTitle);
+  expect(seen).not.toContain("Order status enquiries");
+  await page.goto("/processes?status=draft");
   await page.getByRole("link", { name: "Order status enquiries" }).click();
   await expect(page.getByText("Found in your systems")).toBeVisible();
   await page.goto("/processes");
