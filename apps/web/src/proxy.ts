@@ -58,7 +58,9 @@ export async function proxy(request: NextRequest) {
     return rewrite;
   }
 
-  const isPublic = isSite || matches(path, AUTH_PATHS);
+  // API-key requests are authenticated by the route handler itself.
+  const apiKey = path.startsWith("/api/") && (request.headers.get("authorization") ?? "").startsWith("Bearer aos_");
+  const isPublic = isSite || apiKey || matches(path, AUTH_PATHS);
   if (!user && !isPublic) {
     if (path.startsWith("/api/")) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
     const login = request.nextUrl.clone();

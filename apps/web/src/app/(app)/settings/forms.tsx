@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { inviteAction, saveDepartmentAction, setPausedAction, updateCompanyAction, updateProfileAction } from "./actions";
+import { createApiKeyAction, inviteAction, saveDepartmentAction, setApprovalLimitAction, setPausedAction, updateCompanyAction, updateProfileAction } from "./actions";
 import { FormField } from "@/components/app/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -193,6 +193,46 @@ export function ProfileForm({ firstName, lastName, prefs }: { firstName: string;
         Save
       </Button>
       <Result state={state} success="Saved" />
+    </form>
+  );
+}
+
+// Creates an API key and shows it once. Only the hash is stored.
+export function ApiKeyForm() {
+  const [state, action, pending] = useActionState(createApiKeyAction, null);
+  const created = state && (state as { ok: boolean }).ok ? (state as { ok: true; data: { key: string } }).data.key : null;
+  return (
+    <form action={action} className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input name="name" placeholder="Key name, for example Zapier" aria-label="Key name" className="sm:w-64" required />
+        <Button type="submit" variant="outline" disabled={pending}>
+          {pending ? "Creating…" : "Create API key"}
+        </Button>
+      </div>
+      {created ? (
+        <Alert variant="success">
+          <AlertDescription className="space-y-1">
+            <span className="block">Copy this key now. It is not shown again.</span>
+            <code className="block break-all rounded bg-background px-2 py-1 text-xs">{created}</code>
+          </AlertDescription>
+        </Alert>
+      ) : state && !(state as { ok: boolean }).ok ? (
+        <Result state={state} success="" />
+      ) : null}
+    </form>
+  );
+}
+
+export function ApprovalLimitForm({ userId, limit, currency }: { userId: string; limit: number | null; currency: string }) {
+  const [state, action, pending] = useActionState(setApprovalLimitAction, null);
+  return (
+    <form action={action} className="flex items-center gap-1">
+      <input type="hidden" name="userId" value={userId} />
+      <Input name="limit" type="number" min={0} step="1" defaultValue={limit ?? ""} placeholder="No limit" aria-label={`Approval limit (${currency})`} className="h-8 w-28" />
+      <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+        Set limit
+      </Button>
+      {state && !(state as { ok: boolean }).ok ? <span className="text-xs text-destructive">{(state as { error: string }).error}</span> : null}
     </form>
   );
 }

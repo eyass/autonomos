@@ -1,4 +1,5 @@
 "use server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runAction } from "@/lib/actions";
 import { rateLimit } from "@/lib/rate-limit";
@@ -18,6 +19,7 @@ import {
   updateProfile,
   upsertDepartment,
 } from "@/server/org";
+import { createApiKey, revokeApiKey, setApprovalLimit } from "@/server/platform";
 
 export async function updateCompanyAction(_: unknown, form: FormData) {
   return runAction(async () =>
@@ -105,5 +107,25 @@ export async function refreshProfileAction() {
     rateLimit(`website:${session.user.id}`, 6, 60_000);
     const analysis = await refreshWebsiteProfile(session);
     return { pages: analysis.pagesRead.length, tools: analysis.detectedTools.map((t) => t.name) };
+  });
+}
+
+export async function createApiKeyAction(_: unknown, form: FormData) {
+  return runAction(async () => {
+    const created = await createApiKey(await requireSessionOrThrow(), String(form.get("name") ?? ""));
+    revalidatePath("/settings");
+    return created;
+  });
+}
+
+export async function revokeApiKeyAction(id: string) {
+  return runAction(async () => revokeApiKey(await requireSessionOrThrow(), id));
+}
+
+export async function setApprovalLimitAction(_: unknown, form: FormData) {
+  return runAction(async () => {
+    const raw = String(form.get("limit") ?? "").trim();
+    await setApprovalLimit(await requireSessionOrThrow(), String(form.get("userId")), raw === "" ? null : Number(raw));
+    revalidatePath("/settings");
   });
 }

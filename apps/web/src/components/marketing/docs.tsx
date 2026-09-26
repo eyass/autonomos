@@ -43,6 +43,13 @@ export const DOCS: DocPage[] = [
     body: RunningAgents,
   },
   {
+    slug: "api",
+    href: "/docs/api",
+    title: "API",
+    description: "Authenticate with an API key and call AutonomOS from other systems.",
+    body: Api,
+  },
+  {
     slug: "faq",
     href: "/docs/faq",
     title: "FAQ",
@@ -134,6 +141,8 @@ function Approvals() {
       </ul>
       <h2>Deciding</h2>
       <p>Each request shows the proposed action, its arguments and why the policy asked for approval. Approve it and the action runs; reject it and the agent does not take it.</p>
+      <h2>Approval limits</h2>
+      <p>Admins can give each approver a personal limit in Settings → Members. An approver cannot approve an amount above their limit; someone with a higher limit has to.</p>
       <h2>Hard limits</h2>
       <p>Hard limits are the ceiling. An action beyond a hard limit is denied even if someone approves it.</p>
       <h2>Emergency stop</h2>
@@ -231,6 +240,51 @@ function Faq() {
           <p>{a}</p>
         </div>
       ))}
+    </>
+  );
+}
+
+function Api() {
+  return (
+    <>
+      <p>
+        Admins create API keys in Settings → Developers. A key is shown once and stored only as a hash. It acts with the current role of the admin who created it, so removing that person, or revoking
+        the key, stops it working.
+      </p>
+      <h2>Authentication</h2>
+      <pre>
+        <code>{`curl https://your-workspace.example/api/agents \\
+  -H "Authorization: Bearer aos_live_..."`}</code>
+      </pre>
+      <p>
+        Every response is JSON: <code>{`{ "ok": true, "data": ... }`}</code> or <code>{`{ "ok": false, "error": "..." }`}</code> with a matching HTTP status.
+      </p>
+      <h2>Endpoints</h2>
+      <ul>
+        <li>
+          <code>GET /api/agents</code>: agents with status and autonomy level.
+        </li>
+        <li>
+          <code>GET /api/activity?limit=50</code>: what AutonomOS and its agents did, newest first.
+        </li>
+        <li>
+          <code>POST /api/agents/:id/test</code>, <code>/run</code>, <code>/activate</code>, <code>/pause</code>. Test and run take <code>{`{ "input": { ... } }`}</code>.
+        </li>
+        <li>
+          <code>POST /api/approvals/:id/approve</code>, <code>/reject</code>, or <code>/modify</code> with <code>{`{ "changes": { "amount": 50 }, "comment": "..." }`}</code>. Approval limits apply.
+        </li>
+        <li>
+          <code>POST /api/processes</code> creates a process; <code>PATCH /api/processes/:id</code> edits one; <code>POST /api/processes/:id/generate-opportunities</code> finds opportunities.
+        </li>
+        <li>
+          <code>POST /api/opportunities/:id/create-agent</code> builds an agent, optionally with a full configuration.
+        </li>
+      </ul>
+      <h2>Incoming webhooks</h2>
+      <p>
+        Systems that push events send them to <code>POST /api/webhooks/:connectionId</code> with <code>X-AutonomOS-Signature: sha256=HMAC_SHA256(body, secret)</code>. Each connection has its own
+        signing secret, shown to admins on the Integrations page, where it can also be rotated.
+      </p>
     </>
   );
 }

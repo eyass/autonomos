@@ -4,8 +4,8 @@ import { ActionButton } from "@/components/action-button";
 import { dateTime, num, usd } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
-import { CompanyForm, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
+import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, revokeApiKeyAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
+import { ApiKeyForm, ApprovalLimitForm, CompanyForm, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
 import { DefinitionList } from "@/components/app/definition-list";
 import { PageHeader } from "@/components/app/page-header";
 import { ReadinessChecklist } from "@/components/app/readiness-checklist";
@@ -14,6 +14,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { executionReadiness } from "@/server/readiness";
+import { listApiKeys, planUsage } from "@/server/platform";
+import { PLANS } from "@autonomos/schemas";
+import { CONTACT_EMAIL } from "@/components/marketing/config";
+import { Progress } from "@/components/ui/progress";
 
 export const metadata = { title: "Settings" };
 
@@ -22,9 +26,9 @@ export default async function SettingsPage() {
   const admin = isAdmin(session);
   const supabase = await createClient();
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-  const [{ data: departments }, { data: members }, { data: invites }, { data: auditRows }, { count: runs }, { count: toolActions }, { data: usage }, { count: activeAgents }] = await Promise.all([
+  const [{ data: departments }, { data: members }, { data: invites }, { data: auditRows }, { count: runs }, { count: toolActions }, { data: usage }] = await Promise.all([
     supabase.from("departments").select("id, name, hourly_labour_cost").eq("organization_id", session.org.id).is("archived_at", null).order("name"),
-    supabase.from("organization_members").select("user_id, role, can_approve, notification_preferences, users(first_name, last_name, email)").eq("organization_id", session.org.id),
+    supabase.from("organization_members").select("user_id, role, can_approve, approval_limit, notification_preferences, users(first_name, last_name, email)").eq("organization_id", session.org.id),
     supabase.from("organization_invites").select("email, role, created_at").eq("organization_id", session.org.id).is("accepted_at", null),
     supabase
       .from("audit_events")
@@ -35,7 +39,6 @@ export default async function SettingsPage() {
     supabase.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).gte("queued_at", monthStart),
     supabase.from("agent_actions").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).gte("created_at", monthStart),
     supabase.from("model_usage").select("input_tokens, output_tokens, estimated_cost").eq("organization_id", session.org.id).gte("created_at", monthStart),
-    supabase.from("agents").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "active"),
   ]);
   const { data: org } = await adminDb().from("organizations").select("plan, subscription_status").eq("id", session.org.id).single();
   const readiness = await executionReadiness(session);
@@ -43,6 +46,17 @@ export default async function SettingsPage() {
     supabase.from("integration_connections").select("integration_key, provider, account_label").eq("organization_id", session.org.id).eq("status", "connected"),
     supabase.from("integrations").select("key, name"),
   ]);
+  const [apiKeys, usageVsPlan, { data: invoices }] = await Promise.all([
+    admin ? listApiKeys(session) : Promise.resolve([]),
+    planUsage(session),
+    supabase
+      .from("invoices")
+      .select("id, number, period_start, period_end, amount, currency, status, issued_at, url")
+      .eq("organization_id", session.org.id)
+      .order("issued_at", { ascending: false })
+      .limit(24),
+  ]);
+  const { plan } = usageVsPlan;
   const systemName = (key: string) => catalog?.find((c) => c.key === key)?.name ?? key;
   const me = (members ?? []).find((m) => m.user_id === session.user.id);
   const meUser = me?.users as unknown as { first_name: string; last_name: string } | null;
@@ -58,6 +72,7 @@ export default async function SettingsPage() {
     ["company", "Company"],
     ["departments", "Departments"],
     ["members", "Members"],
+    ...(admin ? ([["developers", "Developers"]] as const) : []),
     ["billing", "Billing"],
     ["audit", "Audit log"],
   ] as const;
@@ -204,13 +219,16 @@ export default async function SettingsPage() {
                     <Badge variant="outline" className="capitalize">
                       {m.role}
                     </Badge>
-                    <Badge variant={m.can_approve ? "success" : "secondary"}>{m.can_approve ? "Approver" : "No approvals"}</Badge>
+                    <Badge variant={m.can_approve ? "success" : "secondary"}>
+                      {m.can_approve ? (m.approval_limit === null ? "Approver" : `Approves up to ${usd(Number(m.approval_limit)).replace("$", "")} ${session.org.currency}`) : "No approvals"}
+                    </Badge>
                   </div>
                   {admin ? (
                     <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
                       <ActionButton size="sm" variant="ghost" action={setApprovalAction.bind(null, m.user_id, !m.can_approve)}>
                         {m.can_approve ? "Remove approval" : "Allow approvals"}
                       </ActionButton>
+                      {m.can_approve ? <ApprovalLimitForm userId={m.user_id} limit={m.approval_limit === null ? null : Number(m.approval_limit)} currency={session.org.currency} /> : null}
                       {editable ? (
                         <ActionButton size="sm" variant="ghost" action={setMemberRoleAction.bind(null, m.user_id, m.role === "admin" ? "member" : "admin")}>
                           {m.role === "admin" ? "Make member" : "Make admin"}
@@ -249,18 +267,145 @@ export default async function SettingsPage() {
           </div>
         </SettingsSection>
 
-        <SettingsSection id="billing" title="Billing and usage" description="Design partners are billed manually. Usage this month:">
-          <DefinitionList
-            className="lg:grid-cols-6"
-            items={[
-              { label: "Plan", value: <span className="capitalize">{org?.plan.replaceAll("_", " ")}</span> },
-              { label: "Agent runs", value: num(runs ?? 0) },
-              { label: "Tool actions", value: num(toolActions ?? 0) },
-              { label: "Model tokens", value: num(tokens) },
-              { label: "AI spend", value: usd(cost) },
-              { label: "Active agents", value: num(activeAgents ?? 0) },
-            ]}
-          />
+        {admin ? (
+          <SettingsSection id="developers" title="Developers" description="API keys let other systems use the AutonomOS API. A key acts with the role of the admin who created it.">
+            <div className="space-y-4">
+              <ApiKeyForm />
+              {apiKeys.length ? (
+                <ul className="-mx-6 border-t border-border text-sm">
+                  {apiKeys.map((k) => (
+                    <li key={k.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{k.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          <code>{k.prefix}…</code> · created {dateTime(k.created_at)} · {k.last_used_at ? `last used ${dateTime(k.last_used_at)}` : "never used"}
+                        </div>
+                      </div>
+                      {k.revoked_at ? (
+                        <Badge variant="secondary">Revoked</Badge>
+                      ) : (
+                        <ActionButton
+                          size="sm"
+                          variant="ghost"
+                          confirm={`Revoke "${k.name}"? Anything using it stops working immediately.`}
+                          confirmLabel="Revoke"
+                          action={revokeApiKeyAction.bind(null, k.id)}
+                        >
+                          Revoke
+                        </ActionButton>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                Send the key as <code>Authorization: Bearer aos_live_…</code>. See the{" "}
+                <Link href="/docs/api" className="underline">
+                  API reference
+                </Link>
+                . Webhook signing secrets belong to each connection; view or rotate them in{" "}
+                <Link href="/integrations" className="underline">
+                  Integrations
+                </Link>
+                .
+              </p>
+            </div>
+          </SettingsSection>
+        ) : null}
+
+        <SettingsSection
+          id="billing"
+          title="Billing and usage"
+          description={`${plan.name} plan${plan.price ? `, ${plan.price} ${session.org.currency} a month` : ", invoiced manually"}. Usage this month:`}
+        >
+          <div className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span>Live agents</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {usageVsPlan.activeAgents} of {plan.activeAgents}
+                  </span>
+                </div>
+                <Progress value={Math.min(100, (usageVsPlan.activeAgents / plan.activeAgents) * 100)} />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span>Production runs</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {num(usageVsPlan.runs)} of {num(plan.runsPerMonth)}
+                  </span>
+                </div>
+                <Progress value={Math.min(100, (usageVsPlan.runs / plan.runsPerMonth) * 100)} />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {usageVsPlan.overageRuns
+                ? `${num(usageVsPlan.overageRuns)} runs over the allowance, billed at ${plan.overagePerRun} ${session.org.currency} each (${usageVsPlan.overageCost.toFixed(2)} ${session.org.currency} so far).`
+                : `Runs above the allowance keep working and are billed at ${plan.overagePerRun} ${session.org.currency} each. Test runs are free. A new agent cannot go live once the live-agent limit is reached.`}
+            </p>
+            <DefinitionList
+              className="lg:grid-cols-4"
+              items={[
+                { label: "All runs incl. tests", value: num(runs ?? 0) },
+                { label: "Tool actions", value: num(toolActions ?? 0) },
+                { label: "Model tokens", value: num(tokens) },
+                { label: "AI spend", value: usd(cost) },
+              ]}
+            />
+            <div>
+              <div className="mb-2 text-sm font-medium">Plans</div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {Object.entries(PLANS).map(([key, p]) => (
+                  <div key={key} className={`rounded-md border p-3 text-xs ${key === (org?.plan ?? "design_partner") ? "border-primary" : "border-border"}`}>
+                    <div className="flex items-center justify-between text-sm font-medium">
+                      {p.name}
+                      {key === (org?.plan ?? "design_partner") ? <Badge variant="success">Current</Badge> : null}
+                    </div>
+                    <div className="mt-1 text-muted-foreground">{p.price ? `${p.price} ${session.org.currency} / month` : "By agreement"}</div>
+                    <div className="mt-1 text-muted-foreground">
+                      {p.activeAgents} live agents · {num(p.runsPerMonth)} runs · then {p.overagePerRun} per run
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                To change plan, email{" "}
+                <a className="underline" href={`mailto:${CONTACT_EMAIL}?subject=Change%20plan`}>
+                  {CONTACT_EMAIL}
+                </a>
+                .
+              </p>
+            </div>
+            <div>
+              <div className="mb-2 text-sm font-medium">Invoices</div>
+              {invoices?.length ? (
+                <ul className="-mx-6 border-t border-border text-sm">
+                  {invoices.map((inv) => (
+                    <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
+                      <span className="min-w-0 flex-1 truncate font-medium">{inv.number}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {inv.period_start} to {inv.period_end}
+                      </span>
+                      <span className="tabular-nums">
+                        {Number(inv.amount).toFixed(2)} {inv.currency}
+                      </span>
+                      <Badge variant={inv.status === "paid" ? "success" : inv.status === "open" ? "warning" : "secondary"} className="capitalize">
+                        {inv.status}
+                      </Badge>
+                      {inv.url ? (
+                        <a href={inv.url} className="text-xs underline" target="_blank" rel="noreferrer">
+                          PDF
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">No invoices yet.</p>
+              )}
+            </div>
+          </div>
         </SettingsSection>
 
         <SettingsSection id="audit" title="Audit log" description="Append-only record of material actions by people and agents. Latest 50.">

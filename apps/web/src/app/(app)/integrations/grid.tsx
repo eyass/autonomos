@@ -2,7 +2,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { ActionButton } from "@/components/action-button";
-import { connectOAuthAction, connectSandboxAction, disconnectAction } from "./actions";
+import { connectOAuthAction, connectSandboxAction, disconnectAction, rotateWebhookSecretAction } from "./actions";
 import type { IntegrationView } from "./data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
             </p>
           </div>
         ) : null}
-        {connected && !compact && i.webhook ? <WebhookInfo webhook={i.webhook} /> : null}
+        {connected && !compact && i.webhook ? <WebhookInfo integrationKey={i.key} webhook={i.webhook} /> : null}
       </CardContent>
       {canManage ? (
         <CardFooter className="flex-wrap gap-2">
@@ -149,7 +149,7 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
   );
 }
 
-function WebhookInfo({ webhook }: { webhook: { url: string; secret: string } }) {
+function WebhookInfo({ integrationKey, webhook }: { integrationKey: string; webhook: { url: string; secret: string } }) {
   const [show, setShow] = useState(false);
   return (
     <Collapsible className="text-xs">
@@ -178,6 +178,17 @@ function WebhookInfo({ webhook }: { webhook: { url: string; secret: string } }) 
               Reveal
             </Button>
           )}
+        </div>
+        <div className="pt-1">
+          <ActionButton
+            size="sm"
+            variant="outline"
+            confirm="Rotate the signing secret? Events signed with the old secret are rejected from now on, so update the sender straight away."
+            confirmLabel="Rotate secret"
+            action={() => rotateWebhookSecretAction(integrationKey)}
+          >
+            Rotate secret
+          </ActionButton>
         </div>
       </CollapsibleContent>
     </Collapsible>

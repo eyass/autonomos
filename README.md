@@ -106,6 +106,38 @@ Integration events arrive at `POST /api/webhooks/:connectionId` with `X-AutonomO
 - **Public pages:** signed-out visitors at `/` see the landing page. `/security`, `/docs`, `/terms` and `/privacy` are public. Terms and Privacy are drafts and need legal review before real customers sign up.
 - **Auth redirects:** in Supabase → Authentication → URL Configuration, set the Site URL to the production URL and add `https://autonom-ten.vercel.app/auth/callback**` to the redirect URLs. The wildcard matters: password reset links go to `/auth/callback?next=/reset-password`.
 
+## Setting up the services (step by step)
+
+Do these in order. Each step says where the value goes. Vercel variables go in Project `autonom` → Settings → Environment Variables, target **Production**, then redeploy.
+
+1. **Supabase (done).** Connected through the Vercel integration. In Supabase → Authentication → URL Configuration, set the Site URL to `https://autonom-ten.vercel.app` and add `https://autonom-ten.vercel.app/auth/callback**` to the redirect URLs.
+2. **Gemini (done).** `GOOGLE_GENERATIVE_AI_API_KEY` and `AI_PROVIDER=google` are set.
+3. **Trigger.dev (required for any agent run).**
+   1. In the Trigger.dev dashboard, open project `proj_xytjychoihbtmbxoztql` → API keys and copy the **Production** secret key (`tr_prod_...`).
+   2. Add it to Vercel as `TRIGGER_SECRET_KEY`.
+   3. Create a personal access token (Account → Tokens).
+   4. In GitHub → repository → Settings → Secrets and variables → Actions, add `TRIGGER_ACCESS_TOKEN` (the token), `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` and `COMPOSIO_API_KEY` (production values). Under the Variables tab, add `NEXT_PUBLIC_APP_URL=https://autonom-ten.vercel.app` so links in emails sent by the worker point at the app.
+   5. Merge to `main` or run the "Deploy Trigger.dev worker" workflow by hand. It deploys the worker and syncs those values into Trigger.dev.
+   6. Check Settings → Execution in the app. "Agent runtime" turns green.
+4. **Composio (live Zendesk, Stripe, Slack, Gmail).**
+   1. `COMPOSIO_API_KEY` is already set in Vercel. Add the same key as a GitHub secret (step 3.4) so the worker can call tools.
+   2. In the app, Integrations → a system → Connect → "Connect account". AutonomOS uses the Composio-managed auth config for that toolkit and creates one if none exists.
+   3. If Composio has no managed auth for a toolkit (Zendesk usually needs your subdomain), create an auth config in the Composio dashboard (Auth configs → New → pick the toolkit, fill in the fields), copy its id (`ac_...`) and set `COMPOSIO_AUTH_CONFIGS={"zendesk":"ac_..."}` in Vercel.
+   4. Connected accounts show as "Live" in Settings → Environment and in the header badge.
+5. **Email notifications (optional).** Create a Resend account, verify your sending domain, then set `RESEND_API_KEY` and `EMAIL_FROM` (for example `AutonomOS <notifications@yourdomain.com>`) in Vercel **and** as GitHub secrets (approval emails are sent by the worker). Without them, notifications are in-app only.
+6. **Product analytics (optional).** Set `POSTHOG_KEY` (and `POSTHOG_HOST` if not the US cloud).
+7. **Previews (optional).** Previews have no Supabase variables and show a 503 page. To use them, add Preview-target copies pointing at a separate Supabase project, never at production.
+8. **Contact addresses.** `apps/web/src/components/marketing/config.ts` holds `CONTACT_EMAIL` and `SECURITY_EMAIL`. Change them to mailboxes you own.
+
+## Platform features
+
+- **Sample workspace.** "Explore a sample workspace" (Overview or the account menu) creates a fictional company with sandbox systems and a Refund Agent. When the runtime is connected the agent really runs on three sample tickets: one routine refund, one that waits for approval, one prompt-injection attempt that is escalated. A banner marks the workspace as sample data.
+- **Workspaces.** The account menu lists every workspace you belong to and switches between them. "New workspace" starts onboarding for another company.
+- **API keys.** Settings → Developers. Keys are shown once and stored as SHA-256 hashes. A key acts as the admin who created it. See `/docs/api`.
+- **Webhook signing secrets.** Per connection on the Integrations page, with rotation.
+- **Approval limits.** Settings → Members: the largest amount each approver may approve.
+- **Plans.** `PLANS` in `packages/schemas`. Live-agent limits are enforced on activation; runs above the allowance keep working and count as overage. Invoices are rows in the `invoices` table and appear in Settings → Billing.
+
 ## The 10-minute demo
 
 After `pnpm db:seed:demo`, sign in as `demo@autonomos.local` / `autonomos-demo`. The seed contains a company, reviewed processes, sandbox Zendesk, Stripe and Slack, and the approved Refund Agent opportunity. No runs or metrics are fabricated.

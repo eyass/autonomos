@@ -9,6 +9,7 @@ import { activity, audit, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
 import { connectedIntegrationKeys } from "./opportunities";
 import { agentReadiness, enqueueOrFail } from "./readiness";
+import { assertAgentAllowance } from "@/server/platform";
 
 function mapRunError(error: unknown): never {
   if (error instanceof RunNotAllowedError) throw new HttpError(409, error.message);
@@ -205,6 +206,7 @@ export async function activateAgent(session: Session, agentId: string) {
   const blocking = readiness.checks.filter((c) => c.blocking && !c.ok);
   if (blocking.length) throw new HttpError(409, `Not ready to go live: ${blocking.map((c) => `${c.label}: ${c.detail}`).join(" ")}`);
   await assertToolsAllowed(session, config.tools);
+  if (agent.status !== "active") await assertAgentAllowance(session);
   try {
     await syncSchedule(session, agentId, config, agent.trigger_schedule_id);
   } catch (e) {

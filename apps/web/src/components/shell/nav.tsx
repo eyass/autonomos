@@ -1,7 +1,8 @@
 "use client";
-import { Activity, Bot, CheckCircle2, ChevronsUpDown, LayoutDashboard, LifeBuoy, Lightbulb, LogOut, Plug, Settings, Workflow } from "lucide-react";
+import { Activity, Bot, Check, CheckCircle2, ChevronsUpDown, FlaskConical, Plus, LayoutDashboard, LifeBuoy, Lightbulb, LogOut, Plug, Settings, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTransition } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -40,8 +41,29 @@ function isActive(path: string, href: string) {
 
 // The application sidebar, following the shadcn sidebar-07 block: collapses to icons on
 // desktop and becomes a Sheet on phones.
-export function AppSidebar({ pendingApprovals, orgName, email, name }: { pendingApprovals: number; orgName: string; email: string; name: string }) {
+type Workspace = { id: string; name: string; is_demo: boolean };
+
+export function AppSidebar({
+  pendingApprovals,
+  orgName,
+  orgId,
+  email,
+  name,
+  workspaces,
+  switchWorkspace,
+  createSample,
+}: {
+  pendingApprovals: number;
+  orgName: string;
+  orgId: string;
+  email: string;
+  name: string;
+  workspaces: Workspace[];
+  switchWorkspace: (id: string) => Promise<unknown>;
+  createSample: () => Promise<unknown>;
+}) {
   const path = usePathname();
+  const [pending, start] = useTransition();
   const { setOpenMobile } = useSidebar();
   const group = (items: typeof MAIN) => (
     <SidebarGroup>
@@ -112,6 +134,26 @@ export function AppSidebar({ pendingApprovals, orgName, email, name }: { pending
                   <div className="truncate text-sm font-medium">{orgName}</div>
                   <div className="truncate text-xs text-muted-foreground">{email}</div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Workspaces</DropdownMenuLabel>
+                {workspaces.map((w) => (
+                  <DropdownMenuItem key={w.id} disabled={pending} onSelect={() => w.id !== orgId && start(async () => void (await switchWorkspace(w.id)))}>
+                    {w.id === orgId ? <Check /> : <span className="size-4" />}
+                    <span className="truncate">{w.name}</span>
+                  </DropdownMenuItem>
+                ))}
+                {workspaces.some((w) => w.is_demo) ? null : (
+                  <DropdownMenuItem disabled={pending} onSelect={() => start(async () => void (await createSample()))}>
+                    <FlaskConical />
+                    {pending ? "Setting up…" : "Explore a sample workspace"}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link href="/onboarding/company?new=1" onClick={() => setOpenMobile(false)}>
+                    <Plus />
+                    New workspace
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/settings" onClick={() => setOpenMobile(false)}>

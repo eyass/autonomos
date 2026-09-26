@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
 import { StatCard } from "@/components/app/stat-card";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ActionButton } from "@/components/action-button";
+import { createSampleWorkspaceAction } from "./shell-actions";
 
 export const metadata = { title: "Overview" };
 
@@ -76,6 +78,14 @@ export default async function OverviewPage() {
             </li>
           ))}
         </ol>
+        {!session.org.isDemo && playbook.filter((p) => p.done).length < 3 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>Want to see it working first?</span>
+            <ActionButton size="sm" variant="outline" action={createSampleWorkspaceAction} pendingLabel="Setting up…">
+              Explore a sample workspace
+            </ActionButton>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   ) : null;

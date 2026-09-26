@@ -379,3 +379,15 @@ export const ANALYTICS_EVENTS = [
   "autonomy_changed",
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
+
+// Plan limits. Runs above the monthly allowance keep working and are billed as overage;
+// active agents above the limit cannot be activated until one is paused or the plan changes.
+export const PLANS = {
+  design_partner: { name: "Design partner", activeAgents: 5, runsPerMonth: 2000, overagePerRun: 0.05, price: null },
+  starter: { name: "Starter", activeAgents: 3, runsPerMonth: 1000, overagePerRun: 0.08, price: 490 },
+  growth: { name: "Growth", activeAgents: 15, runsPerMonth: 10000, overagePerRun: 0.05, price: 1900 },
+} as const;
+export type PlanKey = keyof typeof PLANS;
+export function planFor(key: string | null | undefined) {
+  return PLANS[(key ?? "design_partner") as PlanKey] ?? PLANS.design_partner;
+}

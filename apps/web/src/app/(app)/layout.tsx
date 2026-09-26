@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { markNotificationsRead } from "./shell-actions";
+import { listWorkspaces } from "@/server/platform";
+import { createSampleWorkspaceAction, markNotificationsRead, switchWorkspaceAction } from "./shell-actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
@@ -22,10 +23,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Which world agents act in: sample data only, real accounts, or both.
   const providers = new Set((connections ?? []).map((c) => c.provider));
   const mode = !providers.size ? null : providers.size === 1 && providers.has("sandbox") ? "sandbox" : providers.has("sandbox") ? "mixed" : "live";
+  const workspaces = await listWorkspaces(session);
   const defaultOpen = (await cookies()).get("sidebar_state")?.value !== "false";
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar pendingApprovals={pending ?? 0} orgName={session.org.name} email={session.user.email} name={`${session.user.firstName} ${session.user.lastName}`.trim()} />
+      <AppSidebar
+        pendingApprovals={pending ?? 0}
+        orgName={session.org.name}
+        orgId={session.org.id}
+        workspaces={workspaces}
+        switchWorkspace={switchWorkspaceAction}
+        createSample={createSampleWorkspaceAction}
+        email={session.user.email}
+        name={`${session.user.firstName} ${session.user.lastName}`.trim()}
+      />
       <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 sm:px-6">
           <SidebarTrigger className="-ml-1" />
@@ -42,6 +53,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Notifications items={notifications ?? []} markRead={markNotificationsRead} />
           </div>
         </header>
+        {session.org.isDemo ? (
+          <div className="border-b border-info/30 bg-info-soft px-4 py-2 text-sm text-info sm:px-6">
+            Sample workspace. The company and its customers are fictional and every system is a sandbox, so nothing real changes. Agent runs, costs and approvals here are real.
+          </div>
+        ) : null}
         {session.org.agentsPaused ? (
           <div className="border-b border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning sm:px-6">
             All agents are paused. No agent will take new actions until an admin resumes them in{" "}

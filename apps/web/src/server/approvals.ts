@@ -1,6 +1,6 @@
 import "server-only";
 import { applyApprovalChanges, INTERVENTION_MINUTES } from "@autonomos/agents";
-import { ToolError } from "@autonomos/integrations";
+import { getTool, ToolError } from "@autonomos/integrations";
 import { ApprovalDecisionSchema, type ApprovalDecision } from "@autonomos/schemas";
 import { enqueueRun, TriggerNotConfiguredError } from "@autonomos/workflows";
 import { activity, audit, track } from "@/lib/audit";
@@ -23,6 +23,15 @@ export async function resolveApproval(session: Session, approvalId: string, raw:
       changes = Object.fromEntries(Object.keys(decision.changes).map((k) => [k, merged[k]]));
     } catch (e) {
       throw new HttpError(400, e instanceof ToolError ? e.message : "Invalid modification");
+    }
+  }
+
+  // Approval limits: a member may only approve amounts up to their personal limit.
+  if (decision.decision !== "reject" && session.approvalLimit !== null) {
+    const field = getTool(approval.tool)?.amountField;
+    const amount = field ? Number({ ...(approval.proposed_action as Record<string, unknown>), ...(changes ?? {}) }[field]) : NaN;
+    if (Number.isFinite(amount) && amount > session.approvalLimit) {
+      throw new HttpError(403, `This is above your approval limit of ${session.approvalLimit} ${session.org.currency}. Ask someone with a higher limit, or reduce the amount.`);
     }
   }
 
