@@ -84,6 +84,7 @@ Discover → "From your systems" reads a recent sample from every connected syst
 
   Limits live in `SCAN_LIMITS` and `DEFAULT_SCAN_LIMIT` (`packages/integrations/src/scan.ts`). Sandbox systems get a month of fictional history the first time they are read. Systems whose toolkit has no suitable read action are shown as "cannot read this system for discovery yet".
 - **Privacy:** only subjects, short snippets, tags, dates and amounts are kept. Email addresses become their domain; phone numbers and IBANs are removed before anything reaches the model. The redacted sample is deleted once proposals are made; a run keeps counts and proposals (`discovery_runs`).
+- **Exhaustive by design:** two model passes run side by side. One lists every recurring process the data shows (up to 35, small and infrequent ones included); the other goes department by department and adds work a company like this almost certainly runs but the sample does not show (up to 25). They are merged and deduplicated (at most 60, `DISCOVERY_LIMITS`). Inferred ones are capped at confidence 0.45, listed under "Likely for a company like yours" and not preselected. The first inventory at onboarding drafts 12 to 25 processes.
 - **Output:** each proposal carries evidence ("5 of 15 tickets are about order status") and a volume estimate scaled from the sample. Accepted proposals become draft processes with a "Found in your systems" card.
 - **Interview:** the guided interview opens with what the systems showed for that department and asks about what the data cannot show.
 
