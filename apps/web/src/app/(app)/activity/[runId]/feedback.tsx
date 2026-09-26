@@ -1,7 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Button, Input, Notice } from "@/components/ui";
 import { feedbackAction } from "../../agents/actions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function Feedback({ runId, current }: { runId: string; current: string | null }) {
   const [verdict, setVerdict] = useState<string | null>(current);
@@ -16,14 +18,14 @@ export function Feedback({ runId, current }: { runId: string; current: string | 
       setVerdict(v);
       setAsking(false);
     });
-  if (verdict && !asking) return <p className="text-sm text-muted">Thanks, marked {verdict}.</p>;
+  if (verdict && !asking) return <p className="text-sm text-muted-foreground">Thanks, marked {verdict}.</p>;
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <Button size="sm" variant="secondary" disabled={pending} onClick={() => send("correct")}>
+        <Button size="sm" variant="outline" disabled={pending} onClick={() => send("correct")}>
           Correct
         </Button>
-        <Button size="sm" variant="secondary" disabled={pending} onClick={() => setAsking(true)}>
+        <Button size="sm" variant="outline" disabled={pending} onClick={() => setAsking(true)}>
           Incorrect
         </Button>
       </div>
@@ -35,7 +37,11 @@ export function Feedback({ runId, current }: { runId: string; current: string | 
           </Button>
         </div>
       ) : null}
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
     </div>
   );
 }

@@ -12,7 +12,7 @@ export default async function CompanyPage() {
     <>
       <Steps current={0} />
       <h1 className="mb-1 text-xl font-semibold">Create your company</h1>
-      <p className="mb-6 text-sm text-muted">This is the workspace your processes, agents and approvals live in.</p>
+      <p className="mb-6 text-sm text-muted-foreground">This is the workspace your processes, agents and approvals live in.</p>
       <CompanyForm />
     </>
   );

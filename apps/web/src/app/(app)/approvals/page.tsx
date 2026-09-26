@@ -1,9 +1,13 @@
 import { StatusBadge } from "@/components/domain";
-import { Card, EmptyState, PageHeader, RowLink, Tabs } from "@/components/ui";
 import { dateTime } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { ApprovalCard, type ApprovalView } from "./card";
+import { EmptyState } from "@/components/app/empty-state";
+import { LinkTabs } from "@/components/app/link-tabs";
+import { PageHeader } from "@/components/app/page-header";
+import { RowLink } from "@/components/app/row-link";
+import { Card } from "@/components/ui/card";
 
 export const metadata = { title: "Approvals" };
 
@@ -21,7 +25,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   q = resolved ? q.neq("status", "pending") : q.eq("status", "pending");
   const { data } = await q;
   const tabs = (
-    <Tabs
+    <LinkTabs
       items={[
         { href: "/approvals", label: "Needs your approval", active: !resolved },
         { href: "/approvals?view=resolved", label: "Resolved", active: resolved },

@@ -3,7 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "./ui";
+import { Button } from "@/components/ui/button";
 
 // A GET form that keeps secondary filters behind a toggle. Changing a select applies it
 // immediately; text fields apply on Enter. Hidden filters are still submitted.
@@ -21,8 +21,8 @@ export function FilterBar({ children, more, activeCount, clearHref, className }:
       <div className="flex gap-2">
         {children}
         {more ? (
-          <Button type="button" variant="secondary" className="h-10 shrink-0 sm:h-9" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-            <SlidersHorizontal size={14} />
+          <Button type="button" variant="outline" className="shrink-0" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            <SlidersHorizontal />
             <span>Filters{activeCount ? ` · ${activeCount}` : ""}</span>
           </Button>
         ) : null}
@@ -34,9 +34,9 @@ export function FilterBar({ children, more, activeCount, clearHref, className }:
         <div className={cn("grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6", !open && "hidden")}>
           {more}
           {activeCount ? (
-            <Link href={clearHref} className="flex h-10 items-center text-sm text-muted hover:text-foreground sm:h-9">
-              Clear filters
-            </Link>
+            <Button variant="link" asChild className="justify-start text-muted-foreground">
+              <Link href={clearHref}>Clear filters</Link>
+            </Button>
           ) : null}
         </div>
       ) : null}

@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { FilterBar } from "@/components/filter-bar";
-import { Badge, Card, EmptyState, Input, PageHeader, Select } from "@/components/ui";
 import { dateTime, time } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import { EmptyState } from "@/components/app/empty-state";
+import { PageHeader } from "@/components/app/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 export const metadata = { title: "Activity" };
 
-const TONES: Record<string, "ok" | "warn" | "danger" | "info" | "neutral"> = { success: "ok", warning: "warn", error: "danger", waiting: "warn", info: "neutral" };
+const TONES: Record<string, "success" | "warning" | "danger" | "secondary"> = { success: "success", warning: "warning", error: "danger", waiting: "warning", info: "secondary" };
 
 export default async function ActivityPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const session = await requireSession();
@@ -45,37 +50,37 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         clearHref="/activity"
         more={
           <>
-            <Select name="agent" defaultValue={f.agent ?? ""} aria-label="Agent">
-              <option value="">All agents</option>
+            <NativeSelect name="agent" defaultValue={f.agent ?? ""} aria-label="Agent">
+              <NativeSelectOption value="">All agents</NativeSelectOption>
               {(agents ?? []).map((a) => (
-                <option key={a.id} value={a.id}>
+                <NativeSelectOption key={a.id} value={a.id}>
                   {a.name}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-            <Select name="type" defaultValue={f.type ?? ""} aria-label="Action">
-              <option value="">All actions</option>
-              <option value="refund">Refunds</option>
-              <option value="send_reply">Replies</option>
-              <option value="approval">Approvals</option>
-              <option value="escalation">Escalations</option>
-              <option value="run">Runs</option>
-            </Select>
-            <Select name="status" defaultValue={f.status ?? ""} aria-label="Status">
-              <option value="">Any status</option>
-              <option value="success">Success</option>
-              <option value="waiting">Waiting</option>
-              <option value="warning">Warning</option>
-              <option value="error">Error</option>
-            </Select>
-            <Select name="department" defaultValue={f.department ?? ""} aria-label="Department">
-              <option value="">All departments</option>
+            </NativeSelect>
+            <NativeSelect name="type" defaultValue={f.type ?? ""} aria-label="Action">
+              <NativeSelectOption value="">All actions</NativeSelectOption>
+              <NativeSelectOption value="refund">Refunds</NativeSelectOption>
+              <NativeSelectOption value="send_reply">Replies</NativeSelectOption>
+              <NativeSelectOption value="approval">Approvals</NativeSelectOption>
+              <NativeSelectOption value="escalation">Escalations</NativeSelectOption>
+              <NativeSelectOption value="run">Runs</NativeSelectOption>
+            </NativeSelect>
+            <NativeSelect name="status" defaultValue={f.status ?? ""} aria-label="Status">
+              <NativeSelectOption value="">Any status</NativeSelectOption>
+              <NativeSelectOption value="success">Success</NativeSelectOption>
+              <NativeSelectOption value="waiting">Waiting</NativeSelectOption>
+              <NativeSelectOption value="warning">Warning</NativeSelectOption>
+              <NativeSelectOption value="error">Error</NativeSelectOption>
+            </NativeSelect>
+            <NativeSelect name="department" defaultValue={f.department ?? ""} aria-label="Department">
+              <NativeSelectOption value="">All departments</NativeSelectOption>
               {(departments ?? []).map((d) => (
-                <option key={d.id} value={d.id}>
+                <NativeSelectOption key={d.id} value={d.id}>
                   {d.name}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
+            </NativeSelect>
             <Input type="date" name="date" defaultValue={f.date} aria-label="Date" />
           </>
         }
@@ -86,19 +91,27 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         <div className="space-y-4">
           {[...byDay.entries()].map(([day, list]) => (
             <Card key={day}>
-              <div className="border-b border-border px-4 py-2 text-xs font-medium text-muted sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
+              <div className="border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
               <ul>
                 {list.map((e) => {
-                  const who = e.actor_type === "agent" ? (e.agents as unknown as { name: string } | null)?.name : e.actor_type === "user" ? (() => { const u = e.users as unknown as { first_name: string; last_name: string } | null; return u ? `${u.first_name} ${u.last_name}` : "User"; })() : "System";
+                  const who =
+                    e.actor_type === "agent"
+                      ? (e.agents as unknown as { name: string } | null)?.name
+                      : e.actor_type === "user"
+                        ? (() => {
+                            const u = e.users as unknown as { first_name: string; last_name: string } | null;
+                            return u ? `${u.first_name} ${u.last_name}` : "User";
+                          })()
+                        : "System";
                   const inner = (
-                    <div className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-surface-muted/50 sm:gap-4 sm:px-5">
-                      <span className="w-11 shrink-0 tabular-nums text-muted">{time(e.occurred_at)}</span>
+                    <div className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-muted/50 sm:gap-4 sm:px-5">
+                      <span className="w-11 shrink-0 tabular-nums text-muted-foreground">{time(e.occurred_at)}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-medium text-muted">{who}</div>
+                        <div className="text-xs font-medium text-muted-foreground">{who}</div>
                         <div>{e.title}</div>
                       </div>
                       {e.status !== "info" && e.status !== "success" ? (
-                        <Badge tone={TONES[e.status] ?? "neutral"} className="shrink-0 capitalize">
+                        <Badge variant={TONES[e.status] ?? "secondary"} className="shrink-0 capitalize">
                           {e.status}
                         </Badge>
                       ) : null}

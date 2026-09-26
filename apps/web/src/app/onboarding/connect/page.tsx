@@ -16,9 +16,7 @@ export default async function ConnectPage() {
     <>
       <Steps current={2} />
       <h1 className="mb-1 text-xl font-semibold">Connect systems</h1>
-      <p className="mb-6 text-sm text-muted">
-        Connect what you use. Nothing is required for process discovery; agents only get access to the specific actions you allow later.
-      </p>
+      <p className="mb-6 text-sm text-muted-foreground">Connect what you use. Nothing is required for process discovery; agents only get access to the specific actions you allow later.</p>
       <IntegrationGrid integrations={integrations} canManage={session.role !== "member"} compact />
       <div className="mt-6">
         <ActionButton action={finishOnboardingAction}>Continue</ActionButton>

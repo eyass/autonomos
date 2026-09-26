@@ -2,11 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { BeforeAfter, LevelChange, Scores, StatusBadge } from "@/components/domain";
-import { Badge, ButtonLink, Card, CardBody, CardHeader, Notice, PageHeader, Stat } from "@/components/ui";
 import { money, num } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { setOpportunityStatusAction } from "../actions";
+import { ButtonLink } from "@/components/app/button-link";
+import { PageHeader } from "@/components/app/page-header";
+import { StatCard } from "@/components/app/stat-card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type FutureStep = { title: string; actor: "agent" | "human" | "system"; approval?: boolean };
 
@@ -14,7 +19,12 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const session = await requireSession();
   const supabase = await createClient();
-  const { data: o } = await supabase.from("automation_opportunities").select("*, processes(id, title, description, process_steps(position, title, performed_by))").eq("organization_id", session.org.id).eq("id", id).maybeSingle();
+  const { data: o } = await supabase
+    .from("automation_opportunities")
+    .select("*, processes(id, title, description, process_steps(position, title, performed_by))")
+    .eq("organization_id", session.org.id)
+    .eq("id", id)
+    .maybeSingle();
   if (!o) notFound();
   const [{ data: connections }, { data: agent }] = await Promise.all([
     supabase.from("integration_connections").select("integration_key, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected"),
@@ -46,7 +56,7 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
             <>
               <ButtonLink href={`/agents/new?opportunity=${id}`}>Create agent</ButtonLink>
               {o.status === "suggested" ? (
-                <ActionButton variant="secondary" action={setOpportunityStatusAction.bind(null, id, "approved")}>
+                <ActionButton variant="outline" action={setOpportunityStatusAction.bind(null, id, "approved")}>
                   Approve
                 </ActionButton>
               ) : null}
@@ -65,19 +75,25 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
       />
 
       {missing.length ? (
-        <Notice tone="warn" className="mb-4">
-          Connect {missing.join(" and ")} in <Link className="underline" href="/integrations">Integrations</Link> before the agent can act.
-        </Notice>
+        <Alert variant="warning" className="mb-4">
+          <AlertDescription>
+            Connect {missing.join(" and ")} in{" "}
+            <Link className="underline" href="/integrations">
+              Integrations
+            </Link>{" "}
+            before the agent can act.
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       <p className="mb-6 max-w-3xl text-sm">{o.description}</p>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Hours saved" value={`${num(Number(o.estimated_hours_saved_monthly ?? 0))} h`} hint="per month, estimate" />
-        <Stat label="Estimated value" value={money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)} hint="per month" />
-        <Stat label="Autonomy" value={<LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />} hint="today → target" />
+        <StatCard label="Hours saved" value={`${num(Number(o.estimated_hours_saved_monthly ?? 0))} h`} hint="per month, estimate" />
+        <StatCard label="Estimated value" value={money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)} hint="per month" />
+        <StatCard label="Autonomy" value={<LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />} hint="today → target" />
         <Card className="px-4 py-3">
-          <div className="mb-2 text-xs font-medium text-muted">Scores</div>
+          <div className="mb-2 text-xs font-medium text-muted-foreground">Scores</div>
           <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} className="flex-col items-start gap-1.5" />
         </Card>
       </div>
@@ -85,17 +101,22 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="min-w-0 space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="What changes" description={o.problem} />
-            <CardBody>
+            <CardHeader>
+              <CardTitle>What changes</CardTitle>
+              <CardDescription>{o.problem}</CardDescription>
+            </CardHeader>
+            <CardContent>
               <BeforeAfter today={today} proposed={(o.future_state_steps as FutureStep[]) ?? []} />
-              <p className="mt-4 text-sm text-muted">{o.proposed_future_state}</p>
-            </CardBody>
+              <p className="mt-4 text-sm text-muted-foreground">{o.proposed_future_state}</p>
+            </CardContent>
           </Card>
           <Card>
-            <CardHeader title="The proposed agent" />
-            <CardBody className="space-y-3 text-sm">
+            <CardHeader>
+              <CardTitle>The proposed agent</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
               <div className="font-medium">{agentSpec.name}</div>
-              <p className="text-muted">{agentSpec.objective}</p>
+              <p className="text-muted-foreground">{agentSpec.objective}</p>
               <ul className="list-inside list-disc">
                 {(agentSpec.responsibilities ?? []).map((r) => (
                   <li key={r}>{r}</li>
@@ -103,19 +124,21 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
               </ul>
               {o.rationale ? (
                 <div>
-                  <div className="mb-1 text-xs font-medium text-muted">Why it is worth it</div>
-                  <p className="text-muted">{o.rationale}</p>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">Why it is worth it</div>
+                  <p className="text-muted-foreground">{o.rationale}</p>
                 </div>
               ) : null}
-            </CardBody>
+            </CardContent>
           </Card>
         </div>
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Humans and controls" />
-            <CardBody className="space-y-4 text-sm">
+            <CardHeader>
+              <CardTitle>Humans and controls</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Still done by people</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Still done by people</div>
                 <ul className="list-inside list-disc">
                   {o.human_involvement.map((h) => (
                     <li key={h}>{h}</li>
@@ -123,7 +146,7 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
                 </ul>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Needs approval</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Needs approval</div>
                 <ul className="list-inside list-disc">
                   {o.required_approvals.map((a) => (
                     <li key={a}>{a}</li>
@@ -131,25 +154,27 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
                 </ul>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Risks</div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Risks</div>
                 <ul className="list-inside list-disc">
                   {o.major_risks.map((a) => (
                     <li key={a}>{a}</li>
                   ))}
                 </ul>
               </div>
-              <p className="text-xs text-muted">Limits and escalations are enforced by the platform, not only by the agent&apos;s instructions.</p>
-            </CardBody>
+              <p className="text-xs text-muted-foreground">Limits and escalations are enforced by the platform, not only by the agent&apos;s instructions.</p>
+            </CardContent>
           </Card>
           <Card>
-            <CardHeader title="Systems needed" />
-            <CardBody className="flex flex-wrap gap-1.5">
+            <CardHeader>
+              <CardTitle>Systems needed</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-1.5">
               {o.required_integrations.map((s) => (
-                <Badge key={s} tone={connectedNames.includes(s.toLowerCase()) ? "ok" : "warn"}>
+                <Badge key={s} variant={connectedNames.includes(s.toLowerCase()) ? "success" : "warning"}>
                   {s} {connectedNames.includes(s.toLowerCase()) ? "connected" : "not connected"}
                 </Badge>
               ))}
-            </CardBody>
+            </CardContent>
           </Card>
         </div>
       </div>

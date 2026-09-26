@@ -1,49 +1,61 @@
 "use client";
 import { EMPLOYEE_COUNTS, INDUSTRIES } from "@autonomos/schemas";
 import { useActionState } from "react";
-import { Button, Card, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { createCompanyAction } from "../actions";
+import { FormField } from "@/components/app/form-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 
 export function CompanyForm() {
   const [state, action, pending] = useActionState(createCompanyAction, null);
   return (
-    <Card className="p-6">
-      <form action={action} className="space-y-4">
-        <Field label="Company name" htmlFor="name">
-          <Input id="name" name="name" required maxLength={120} />
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Website" htmlFor="website">
-            <Input id="website" name="website" placeholder="https://" />
-          </Field>
-          <Field label="Industry" htmlFor="industry">
-            <Select id="industry" name="industry" defaultValue="">
-              <option value="">Select…</option>
-              {INDUSTRIES.map((i) => (
-                <option key={i}>{i}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Number of employees" htmlFor="employeeCount">
-            <Select id="employeeCount" name="employeeCount" defaultValue="">
-              <option value="">Select…</option>
-              {EMPLOYEE_COUNTS.map((i) => (
-                <option key={i}>{i}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Country" htmlFor="country">
-            <Input id="country" name="country" />
-          </Field>
-        </div>
-        <Field label="Short description" htmlFor="description">
-          <Textarea id="description" name="description" rows={3} />
-        </Field>
-        {state && !state.ok ? <Notice tone="danger">{state.error}</Notice> : null}
-        <Button type="submit" disabled={pending}>
-          {pending ? "Creating…" : "Create company"}
-        </Button>
-      </form>
+    <Card>
+      <CardContent>
+        <form action={action} className="space-y-4">
+          <FormField label="Company name" htmlFor="name">
+            <Input id="name" name="name" required maxLength={120} />
+          </FormField>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Website" htmlFor="website">
+              <Input id="website" name="website" placeholder="https://" />
+            </FormField>
+            <FormField label="Industry" htmlFor="industry">
+              <NativeSelect id="industry" name="industry" defaultValue="">
+                <NativeSelectOption value="">Select…</NativeSelectOption>
+                {INDUSTRIES.map((i) => (
+                  <NativeSelectOption key={i}>{i}</NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </FormField>
+            <FormField label="Number of employees" htmlFor="employeeCount">
+              <NativeSelect id="employeeCount" name="employeeCount" defaultValue="">
+                <NativeSelectOption value="">Select…</NativeSelectOption>
+                {EMPLOYEE_COUNTS.map((i) => (
+                  <NativeSelectOption key={i}>{i}</NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </FormField>
+            <FormField label="Country" htmlFor="country">
+              <Input id="country" name="country" />
+            </FormField>
+          </div>
+          <FormField label="Short description" htmlFor="description">
+            <Textarea id="description" name="description" rows={3} />
+          </FormField>
+          {state && !state.ok ? (
+            <Alert variant="destructive">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
+          ) : null}
+          <Button type="submit" disabled={pending}>
+            {pending ? "Creating…" : "Create company"}
+          </Button>
+        </form>
+      </CardContent>
     </Card>
   );
 }

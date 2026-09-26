@@ -1,24 +1,26 @@
 "use client";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
+const config = { value: { label: "Autonomy", color: "var(--chart-1)" } } satisfies ChartConfig;
+
+// shadcn area chart (the "Area Chart - Gradient" pattern).
 export function AutonomyTrend({ data }: { data: Array<{ period: string; value: number }> }) {
   return (
-    <div className="h-48 w-full">
-      <ResponsiveContainer>
-        <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-          <defs>
-            <linearGradient id="autonomy" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="period" tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} />
-          <YAxis tickFormatter={(v) => `${Math.round(v * 100)}%`} tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} domain={[0, (max: number) => Math.max(0.1, Math.ceil(max * 10) / 10)]} />
-          <Tooltip formatter={(v) => [`${(Number(v) * 100).toFixed(1)}%`, "Autonomy"]} contentStyle={{ fontSize: 12, borderRadius: 6, border: "1px solid var(--border)" }} />
-          <Area type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2} fill="url(#autonomy)" />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
+    <ChartContainer config={config} className="aspect-auto h-48 w-full">
+      <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+        <defs>
+          <linearGradient id="fillAutonomy" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.35} />
+            <stop offset="95%" stopColor="var(--color-value)" stopOpacity={0.05} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} />
+        <XAxis dataKey="period" tickLine={false} axisLine={false} tickMargin={8} minTickGap={24} />
+        <YAxis tickFormatter={(v) => `${Math.round(v * 100)}%`} tickLine={false} axisLine={false} width={48} domain={[0, (max: number) => Math.max(0.1, Math.ceil(max * 10) / 10)]} />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" formatter={(v) => `${(Number(v) * 100).toFixed(1)}%`} />} />
+        <Area type="monotone" dataKey="value" stroke="var(--color-value)" strokeWidth={2} fill="url(#fillAutonomy)" />
+      </AreaChart>
+    </ChartContainer>
   );
 }

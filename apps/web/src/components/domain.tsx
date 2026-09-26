@@ -1,7 +1,7 @@
 import { AUTONOMY_LEVELS } from "@autonomos/schemas";
 import { Bot, Check, User, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "./ui";
+import { Badge } from "@/components/ui/badge";
 
 // Always show the autonomy vocabulary with the current level highlighted (PRD section 111).
 export function AutonomyLadder({ current, target, size = "md" }: { current: number; target?: number | null; size?: "sm" | "md" }) {
@@ -18,8 +18,8 @@ export function AutonomyLadder({ current, target, size = "md" }: { current: numb
             className={cn(
               "inline-flex items-center justify-center rounded font-semibold tabular-nums",
               size === "sm" ? "h-5 w-6 text-[10px]" : "h-6 w-8 text-xs",
-              isCurrent ? "text-white" : reached ? "text-white/90" : "bg-surface-muted text-muted",
-              isTarget && "ring-2 ring-accent ring-offset-1 ring-offset-surface text-accent bg-accent-soft",
+              isCurrent ? "text-white" : reached ? "text-white/90" : "bg-muted text-muted-foreground",
+              isTarget && "ring-2 ring-primary ring-offset-1 ring-offset-surface text-primary bg-primary/10",
             )}
             style={reached ? { background: `var(--level-${l.level})`, opacity: isCurrent ? 1 : 0.55 } : undefined}
           >
@@ -35,11 +35,11 @@ export function AutonomyLegend() {
   return (
     <ul className="grid gap-2 text-sm sm:grid-cols-5">
       {AUTONOMY_LEVELS.map((l) => (
-        <li key={l.level} className="rounded-md border border-border bg-surface px-3 py-2">
+        <li key={l.level} className="rounded-md border border-border bg-card px-3 py-2">
           <div className="text-xs font-semibold" style={{ color: `var(--level-${Math.max(l.level, 3)})` }}>
             {l.code} · {l.name}
           </div>
-          <div className="mt-0.5 text-xs text-muted">{l.short}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{l.short}</div>
         </li>
       ))}
     </ul>
@@ -47,14 +47,14 @@ export function AutonomyLegend() {
 }
 
 export function ScorePill({ value, kind }: { value: number | null | undefined; kind: "value" | "difficulty" | "risk" }) {
-  if (!value) return <span className="text-muted">–</span>;
+  if (!value) return <span className="text-muted-foreground">–</span>;
   const good = kind === "value" ? value >= 4 : value <= 2;
   const bad = kind === "value" ? value <= 2 : value >= 4;
   return (
     <span
       className={cn(
         "inline-flex h-6 min-w-8 items-center justify-center rounded px-1.5 text-xs font-semibold tabular-nums",
-        good ? "bg-ok-soft text-ok" : bad ? (kind === "risk" ? "bg-danger-soft text-danger" : "bg-warn-soft text-warn") : "bg-surface-muted text-foreground",
+        good ? "bg-success-soft text-success" : bad ? (kind === "risk" ? "bg-destructive-soft text-destructive" : "bg-warning-soft text-warning") : "bg-muted text-foreground",
       )}
       title={`${kind} ${value} of 5`}
     >
@@ -66,7 +66,7 @@ export function ScorePill({ value, kind }: { value: number | null | undefined; k
 // Value, difficulty and risk together, labelled, so the numbers read without a legend.
 export function Scores({ value, difficulty, risk, className }: { value: number | null | undefined; difficulty: number | null | undefined; risk: number | null | undefined; className?: string }) {
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted", className)}>
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground", className)}>
       <span className="inline-flex items-center gap-1">
         Value <ScorePill kind="value" value={value} />
       </span>
@@ -85,36 +85,36 @@ export function LevelChange({ from, to }: { from: number; to?: number | null }) 
   return (
     <span className="whitespace-nowrap font-medium tabular-nums">
       L{from}
-      {to && to !== from ? <span className="text-muted"> → L{to}</span> : null}
+      {to && to !== from ? <span className="text-muted-foreground"> → L{to}</span> : null}
     </span>
   );
 }
 
-const STATUS_TONES: Record<string, "neutral" | "accent" | "ok" | "warn" | "danger" | "info"> = {
-  draft: "neutral",
+const STATUS_TONES: Record<string, "secondary" | "outline" | "success" | "warning" | "danger" | "info"> = {
+  draft: "secondary",
   reviewed: "info",
-  active: "ok",
-  archived: "neutral",
+  active: "success",
+  archived: "secondary",
   suggested: "info",
-  reviewing: "warn",
-  approved: "ok",
-  building: "accent",
-  live: "ok",
+  reviewing: "warning",
+  approved: "success",
+  building: "outline",
+  live: "success",
   rejected: "danger",
   testing: "info",
-  paused: "warn",
+  paused: "warning",
   error: "danger",
-  queued: "neutral",
-  running: "accent",
-  waiting_for_approval: "warn",
-  completed: "ok",
+  queued: "secondary",
+  running: "outline",
+  waiting_for_approval: "warning",
+  completed: "success",
   failed: "danger",
-  cancelled: "neutral",
-  pending: "warn",
+  cancelled: "secondary",
+  pending: "warning",
   modified: "info",
-  expired: "neutral",
-  connected: "ok",
-  disconnected: "neutral",
+  expired: "secondary",
+  connected: "success",
+  disconnected: "secondary",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -125,7 +125,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function StatusBadge({ status }: { status: string }) {
   const label = STATUS_LABELS[status] ?? status.replaceAll("_", " ");
   return (
-    <Badge tone={STATUS_TONES[status] ?? "neutral"} className="capitalize">
+    <Badge variant={STATUS_TONES[status] ?? "secondary"} className="capitalize">
       {label}
     </Badge>
   );
@@ -133,20 +133,20 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function OutcomeBadge({ outcome, mode }: { outcome: string | null; mode?: string }) {
   if (!outcome) return null;
-  const map: Record<string, { label: string; tone: "ok" | "warn" | "danger" | "neutral" | "info" }> = {
-    completed: { label: "Done", tone: "ok" },
+  const map: Record<string, { label: string; tone: "success" | "warning" | "danger" | "secondary" | "info" }> = {
+    completed: { label: "Done", tone: "success" },
     drafted: { label: "Drafted for a human", tone: "info" },
     test_completed: { label: "Test finished", tone: "info" },
-    escalated: { label: "Handed to a human", tone: "warn" },
-    unsuccessful: { label: "Not completed", tone: "warn" },
+    escalated: { label: "Handed to a human", tone: "warning" },
+    unsuccessful: { label: "Not completed", tone: "warning" },
     failed: { label: "Failed", tone: "danger" },
-    cancelled: { label: "Stopped", tone: "neutral" },
+    cancelled: { label: "Stopped", tone: "secondary" },
   };
-  const m = map[outcome] ?? { label: outcome, tone: "neutral" as const };
+  const m = map[outcome] ?? { label: outcome, tone: "secondary" as const };
   return (
     <span className="inline-flex items-center gap-1">
-      <Badge tone={m.tone}>{m.label}</Badge>
-      {mode === "test" ? <Badge tone="neutral">Test</Badge> : null}
+      <Badge variant={m.tone}>{m.label}</Badge>
+      {mode === "test" ? <Badge variant="secondary">Test</Badge> : null}
     </span>
   );
 }
@@ -165,10 +165,10 @@ export function BeforeAfter({ today, proposed }: { today: Array<{ title: string;
 
 function FlowColumn({ title, subtitle, steps, highlight }: { title: string; subtitle: string; steps: FlowStep[]; highlight?: boolean }) {
   return (
-    <div className={cn("rounded-lg border p-4", highlight ? "border-accent/40 bg-accent-soft/40" : "border-border bg-surface")}>
+    <div className={cn("rounded-lg border p-4", highlight ? "border-primary/40 bg-primary/5" : "border-border bg-card")}>
       <div className="mb-3 flex items-baseline justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide">{title}</span>
-        <span className="text-xs text-muted">{subtitle}</span>
+        <span className="text-xs text-muted-foreground">{subtitle}</span>
       </div>
       <ol className="space-y-1.5">
         {steps.map((s, i) => (
@@ -176,7 +176,7 @@ function FlowColumn({ title, subtitle, steps, highlight }: { title: string; subt
             <span
               className={cn(
                 "mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
-                s.actor === "agent" ? "bg-accent text-white" : s.actor === "human" ? "bg-warn-soft text-warn" : "bg-surface-muted text-muted",
+                s.actor === "agent" ? "bg-primary text-white" : s.actor === "human" ? "bg-warning-soft text-warning" : "bg-muted text-muted-foreground",
               )}
             >
               {s.actor === "agent" ? <Bot size={12} /> : s.actor === "human" ? <User size={12} /> : <Workflow size={12} />}
@@ -184,7 +184,7 @@ function FlowColumn({ title, subtitle, steps, highlight }: { title: string; subt
             <span>
               {s.title}
               {s.approval ? (
-                <Badge tone="warn" className="ml-2">
+                <Badge variant="warning" className="ml-2">
                   <Check size={10} /> approval
                 </Badge>
               ) : null}

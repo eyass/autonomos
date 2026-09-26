@@ -3,7 +3,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, Field, Input, Notice } from "@/components/ui";
+import { FormField } from "@/components/app/form-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldDescription, FieldGroup, FieldSeparator } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { Input } from "@/components/ui/input";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -66,55 +72,73 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   }
 
   return (
-    <Card className="p-6">
-      <h1 className="mb-4 text-base font-semibold">{mode === "signup" ? "Create your account" : "Sign in"}</h1>
-      <Button type="button" variant="secondary" className="w-full" onClick={google}>
-        Continue with Google
-      </Button>
-      <div className="my-4 flex items-center gap-3 text-xs text-muted">
-        <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
-      </div>
-      <form action={submit} className="space-y-3">
-        {mode === "signup" ? (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="First name" htmlFor="firstName">
-              <Input id="firstName" name="firstName" required autoComplete="given-name" />
+    <Card>
+      <CardHeader className="text-center">
+        <CardTitle className="text-xl">{mode === "signup" ? "Create your account" : "Welcome back"}</CardTitle>
+        <CardDescription>{mode === "signup" ? "Start mapping what your company can automate" : "Sign in with Google or your work email"}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form action={submit}>
+          <FieldGroup>
+            <Field>
+              <Button type="button" variant="outline" className="w-full" onClick={google}>
+                Continue with Google
+              </Button>
             </Field>
-            <Field label="Last name" htmlFor="lastName">
-              <Input id="lastName" name="lastName" required autoComplete="family-name" />
+            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">Or continue with email</FieldSeparator>
+            {mode === "signup" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="First name" htmlFor="firstName">
+                  <Input id="firstName" name="firstName" required autoComplete="given-name" />
+                </FormField>
+                <FormField label="Last name" htmlFor="lastName">
+                  <Input id="lastName" name="lastName" required autoComplete="family-name" />
+                </FormField>
+              </div>
+            ) : null}
+            <FormField label="Work email" htmlFor="email">
+              <Input id="email" name="email" type="email" required autoComplete="email" placeholder="you@company.com" />
+            </FormField>
+            {mode === "signup" || usePassword ? (
+              <FormField label="Password" htmlFor="password" hint={mode === "signup" ? "At least 8 characters" : undefined}>
+                <Input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
+              </FormField>
+            ) : null}
+            {error ? (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+            {info ? (
+              <Alert variant="success">
+                <AlertDescription>{info}</AlertDescription>
+              </Alert>
+            ) : null}
+            <Field>
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? <Spinner /> : null}
+                {mode === "signup" ? "Create account" : usePassword ? "Sign in" : "Email me a link"}
+              </Button>
+              {mode === "login" ? (
+                <Button type="button" variant="link" size="sm" className="text-muted-foreground" onClick={() => setUsePassword((v) => !v)}>
+                  {usePassword ? "Use a magic link instead" : "Use a password instead"}
+                </Button>
+              ) : null}
+              <FieldDescription className="text-center">
+                {mode === "signup" ? (
+                  <>
+                    Already have an account? <Link href="/login">Sign in</Link>
+                  </>
+                ) : (
+                  <>
+                    New to AutonomOS? <Link href="/signup">Create an account</Link>
+                  </>
+                )}
+              </FieldDescription>
             </Field>
-          </div>
-        ) : null}
-        <Field label="Work email" htmlFor="email">
-          <Input id="email" name="email" type="email" required autoComplete="email" />
-        </Field>
-        {mode === "signup" || usePassword ? (
-          <Field label="Password" htmlFor="password" hint={mode === "signup" ? "At least 8 characters" : undefined}>
-            <Input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
-          </Field>
-        ) : null}
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        {info ? <Notice tone="ok">{info}</Notice> : null}
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Please wait…" : mode === "signup" ? "Create account" : usePassword ? "Sign in" : "Email me a link"}
-        </Button>
-      </form>
-      {mode === "login" ? (
-        <button type="button" className="mt-3 w-full text-center text-xs text-muted hover:text-foreground" onClick={() => setUsePassword((v) => !v)}>
-          {usePassword ? "Use a magic link instead" : "Use a password instead"}
-        </button>
-      ) : null}
-      <p className="mt-5 text-center text-sm text-muted">
-        {mode === "signup" ? (
-          <>
-            Already have an account? <Link className="text-accent hover:underline" href="/login">Sign in</Link>
-          </>
-        ) : (
-          <>
-            New to AutonomOS? <Link className="text-accent hover:underline" href="/signup">Create an account</Link>
-          </>
-        )}
-      </p>
+          </FieldGroup>
+        </form>
+      </CardContent>
     </Card>
   );
 }

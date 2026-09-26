@@ -1,8 +1,8 @@
 import { DEPARTMENTS } from "@autonomos/schemas";
-import { PageHeader } from "@/components/ui";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { NewProcessForm } from "./form";
+import { PageHeader } from "@/components/app/page-header";
 
 export const metadata = { title: "Add process" };
 

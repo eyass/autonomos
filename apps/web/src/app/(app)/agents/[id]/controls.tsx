@@ -2,8 +2,14 @@
 import { AUTONOMY_LEVELS } from "@autonomos/schemas";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Button, Card, CardBody, CardHeader, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { changeAutonomyAction, runNowAction, simulateTicketAction, testRunAction, testRunSampleAction } from "../actions";
+import { FormField } from "@/components/app/form-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 
 type Sample = { key: string; label: string };
 
@@ -30,28 +36,35 @@ export function TestPanel({ agentId, ticketDriven, samples }: { agentId: string;
     });
   return (
     <Card id="test">
-      <CardHeader title="Test run" description="Runs the agent end to end. Actions that change things are simulated, never executed." />
-      <CardBody className="space-y-3">
+      <CardHeader>
+        <CardTitle>Test run</CardTitle>
+        <CardDescription>Runs the agent end to end. Actions that change things are simulated, never executed.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
         {ticketDriven ? (
-          <Field label="Sample ticket">
-            <Select value={sample} onChange={(e) => setSample(e.target.value)}>
+          <FormField label="Sample ticket">
+            <NativeSelect value={sample} onChange={(e) => setSample(e.target.value)}>
               {samples.map((s) => (
-                <option key={s.key} value={s.key}>
+                <NativeSelectOption key={s.key} value={s.key}>
                   {s.label}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-          </Field>
+            </NativeSelect>
+          </FormField>
         ) : (
-          <Field label="Input (JSON)">
+          <FormField label="Input (JSON)">
             <Textarea value={json} onChange={(e) => setJson(e.target.value)} rows={3} className="font-mono text-xs" />
-          </Field>
+          </FormField>
         )}
-        {error ? <Notice tone="danger">{error}</Notice> : null}
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
         <Button onClick={run} disabled={pending}>
           {pending ? "Starting…" : "Run test"}
         </Button>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }
@@ -62,25 +75,31 @@ export function LivePanel({ agentId, samples, ticketDriven, sandbox }: { agentId
   const [pending, start] = useTransition();
   return (
     <Card>
-      <CardHeader
-        title={ticketDriven ? "Send a sandbox ticket" : "Run now"}
-        description={ticketDriven ? "A customer ticket arrives in the sandbox Zendesk and the live agent picks it up, exactly as a real one would." : "Start a production run now."}
-      />
-      <CardBody className="space-y-3">
+      <CardHeader>
+        <CardTitle>{ticketDriven ? "Send a sandbox ticket" : "Run now"}</CardTitle>
+        <CardDescription>
+          {ticketDriven ? "A customer ticket arrives in the sandbox Zendesk and the live agent picks it up, exactly as a real one would." : "Start a production run now."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
         {ticketDriven ? (
           sandbox ? (
-            <Select value={sample} onChange={(e) => setSample(e.target.value)}>
+            <NativeSelect value={sample} onChange={(e) => setSample(e.target.value)}>
               {samples.map((s) => (
-                <option key={s.key} value={s.key}>
+                <NativeSelectOption key={s.key} value={s.key}>
                   {s.label}
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
+            </NativeSelect>
           ) : (
-            <p className="text-sm text-muted">Zendesk is connected to a real account; new tickets trigger this agent automatically.</p>
+            <p className="text-sm text-muted-foreground">Zendesk is connected to a real account; new tickets trigger this agent automatically.</p>
           )
         ) : null}
-        {error ? <Notice tone="danger">{error}</Notice> : null}
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
         {!ticketDriven || sandbox ? (
           <Button
             disabled={pending}
@@ -95,7 +114,7 @@ export function LivePanel({ agentId, samples, ticketDriven, sandbox }: { agentId
             {pending ? "Starting…" : ticketDriven ? "Send ticket" : "Run now"}
           </Button>
         ) : null}
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }
@@ -106,29 +125,33 @@ export function AutonomyControl({ agentId, level, hasMoney, threshold, canChange
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
-  if (!canChange) return <p className="text-sm text-muted">Only admins can change autonomy.</p>;
+  if (!canChange) return <p className="text-sm text-muted-foreground">Only admins can change autonomy.</p>;
   return (
     <div className="space-y-3">
       <div className="grid gap-3">
-        <Field label="Autonomy level">
-          <Select value={next} onChange={(e) => setNext(Number(e.target.value))}>
+        <FormField label="Autonomy level">
+          <NativeSelect value={next} onChange={(e) => setNext(Number(e.target.value))}>
             {AUTONOMY_LEVELS.filter((l) => l.level > 1).map((l) => (
-              <option key={l.level} value={l.level}>
+              <NativeSelectOption key={l.level} value={l.level}>
                 {l.code} · {l.name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </Select>
-        </Field>
+          </NativeSelect>
+        </FormField>
         {hasMoney && next >= 4 ? (
-          <Field label="Max refund without approval">
+          <FormField label="Max refund without approval">
             <Input type="number" min={0} value={limit} onChange={(e) => setLimit(e.target.value)} />
-          </Field>
+          </FormField>
         ) : null}
       </div>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
       <Button
         size="sm"
-        variant="secondary"
+        variant="outline"
         disabled={pending || (next === level && (!hasMoney || limit === String(threshold ?? "")))}
         onClick={() =>
           start(async () => {
@@ -141,7 +164,7 @@ export function AutonomyControl({ agentId, level, hasMoney, threshold, canChange
       >
         {pending ? "Saving…" : "Change autonomy"}
       </Button>
-      <p className="text-xs text-muted">Autonomy never changes automatically. Each change creates a new configuration version.</p>
+      <p className="text-xs text-muted-foreground">Autonomy never changes automatically. Each change creates a new configuration version.</p>
     </div>
   );
 }

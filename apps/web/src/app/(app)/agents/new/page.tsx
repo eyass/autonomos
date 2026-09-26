@@ -1,11 +1,12 @@
 import { policyForTools } from "@autonomos/agents";
 import type { AgentConfig } from "@autonomos/schemas";
 import { redirect } from "next/navigation";
-import { Notice, PageHeader } from "@/components/ui";
 import { requireSession } from "@/lib/session";
 import { draftAgentForOpportunity } from "@/server/opportunities";
 import { toolOptions } from "../tool-options";
 import { NewAgentWizard } from "./wizard";
+import { PageHeader } from "@/components/app/page-header";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const metadata = { title: "Create agent" };
 
@@ -30,7 +31,11 @@ export default async function NewAgentPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader back={{ href: `/opportunities/${o.id}`, label: o.title }} title="Create agent" description={`From the opportunity "${o.title}". Everything is pre-filled; check each step.`} />
-      {!connected.length ? <Notice tone="warn" className="mb-4">No integrations are connected, so the agent has nothing it can act on yet.</Notice> : null}
+      {!connected.length ? (
+        <Alert variant="warning" className="mb-4">
+          <AlertDescription>No integrations are connected, so the agent has nothing it can act on yet.</AlertDescription>
+        </Alert>
+      ) : null}
       <NewAgentWizard initial={initial} tools={toolOptions(connected)} processId={o.process_id} opportunityId={o.id} />
     </>
   );
