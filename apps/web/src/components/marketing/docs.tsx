@@ -160,7 +160,7 @@ function Integrations() {
       </p>
       <h2>Live accounts</h2>
       <p>
-        Connecting a live account opens that system's own sign-in page. Our connection partner holds the sign-in tokens; AutonomOS stores only the connected account id. Production runs act on the live
+        Connecting a live account opens that system&apos;s own sign-in page. Our connection partner holds the sign-in tokens; AutonomOS stores only the connected account id. Production runs act on the live
         account once it is connected.
       </p>
       <h2>Test runs</h2>
