@@ -158,3 +158,19 @@ describe("combining systems into one process", () => {
     expect(kept.map((p) => p.title)).toEqual(["Both", "C"]);
   });
 });
+
+describe("analyst opportunities", () => {
+  it("proposes reviews that end in recommendations for ad accounts and the data warehouse, even with nothing read", async () => {
+    process.env.AI_MOCK = "1";
+    const { proposeProcessesFromSystems, playbookFor } = await import("./tasks/discovery");
+    const r = await proposeProcessesFromSystems({ company: { name: "Acme", connectedSystems: ["Google Ads", "Google BigQuery"] }, samples: [], existingProcesses: [] });
+    const titles = r.processes.map((p) => p.title);
+    expect(titles).toEqual(expect.arrayContaining(["Weekly Google Ads spend review", "Weekly business review from Google BigQuery"]));
+    const ads = r.processes.find((p) => p.title === "Weekly Google Ads spend review")!;
+    expect(ads.kind).toBe("improvement");
+    expect(ads.automation).toMatch(/email the marketing lead three concrete changes/);
+    expect(ads.confidence).toBeGreaterThan(0.45);
+    expect(playbookFor({ system: "Google BigQuery", itemKind: "warehouse tables" })).toMatch(/weekly KPI review/);
+    expect(playbookFor({ system: "Google Ads", itemKind: "records" })).toMatch(/wasted spend/);
+  });
+});

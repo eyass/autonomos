@@ -114,11 +114,19 @@ export function ProposalReview({ run, onReadAgain }: { run: DiscoveryRunView; on
           <CardContent key={current.title} className="space-y-4" data-testid="proposal">
             <div className="flex flex-wrap items-center gap-2">
               {current.confidence > INFERRED ? (
-                <Badge variant="agent">{spans(current).length >= 2 ? `Across ${spans(current).join(" + ")}` : current.primarySystem ? `Seen in ${current.primarySystem}` : "Seen in your data"}</Badge>
+                <Badge variant="agent">
+                  {spans(current).length >= 2
+                    ? `Across ${spans(current).join(" + ")}`
+                    : current.kind === "improvement"
+                      ? `Opportunity for ${current.primarySystem ?? "your systems"}`
+                      : current.primarySystem
+                        ? `Seen in ${current.primarySystem}`
+                        : "Seen in your data"}
+                </Badge>
               ) : (
                 <Badge variant="outline">Likely for a company like yours</Badge>
               )}
-              {current.kind === "improvement" ? <Badge variant="info">Improvement</Badge> : null}
+              {current.kind === "improvement" ? <Badge variant="info">New opportunity</Badge> : null}
               {current.department ? <Badge variant="secondary">{current.department}</Badge> : null}
               {current.confidence > INFERRED && current.confidence < 0.5 ? <Badge variant="warning">Weak evidence</Badge> : null}
             </div>

@@ -92,6 +92,13 @@ test("demo loop", async ({ page }) => {
   const review = page.getByTestId("proposal-review");
   await expect(review.getByText("Is this work you do?")).toBeVisible({ timeout: 60_000 });
   const current = review.getByTestId("proposal").getByRole("heading");
+  // Analyst proposals built on what is connected come with the ones seen in the data.
+  await expect(review.getByText(/of \d+/)).toBeVisible();
+  for (let i = 0; i < 20 && (await current.textContent()) !== "Order status enquiries"; i++) {
+    const before = await current.textContent();
+    await page.keyboard.press("ArrowDown");
+    await expect(current).not.toHaveText(before!);
+  }
   await expect(current).toHaveText("Order status enquiries");
   await expect(review.getByText(/Zendesk:/)).toBeVisible();
   await shot(page, "system-discovery");
