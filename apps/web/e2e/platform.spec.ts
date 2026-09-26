@@ -66,4 +66,32 @@ test("sample workspace, approval limits and API keys", async ({ page, request })
   await page.getByRole("menuitem", { name: "Acme Furniture" }).click();
   await expect(page.getByText(/Sample workspace\. The company/)).toHaveCount(0);
   await expect(page.getByText("Acme Furniture").first()).toBeVisible();
+
+  // Rename and delete a workspace: the sample one is renamed, then deleted, and the app
+  // moves to the remaining workspace.
+  await page.getByRole("button", { name: new RegExp(email) }).click();
+  await page.getByRole("menuitem", { name: "Northwind Marketplace (sample)" }).click();
+  await expect(page.getByText(/Sample workspace\. The company/)).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(email) }).click();
+  await page.getByRole("menuitem", { name: "Rename or delete workspace" }).click();
+  await expect(page).toHaveURL(/\/settings#company/);
+  await page.getByLabel("Workspace name").fill("Northwind test");
+  await page.locator("#company").getByRole("button", { name: /Save/ }).click();
+  await expect(page.getByText("Northwind test").first()).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Delete workspace", exact: true }).last().click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByRole("button", { name: "Delete permanently" })).toBeDisabled();
+  await dialog.getByLabel("Workspace name to confirm").fill("Northwind test");
+  await dialog.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(page).toHaveURL(/127\.0\.0\.1:3100\/$/);
+  await expect(page.getByText("Acme Furniture").first()).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(email) }).click();
+  await expect(page.getByRole("menuitem", { name: /Northwind/ })).toHaveCount(0);
+
+  // Sign out from the account menu ends the session.
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.goto("/settings");
+  await expect(page).toHaveURL(/\/login/);
 });

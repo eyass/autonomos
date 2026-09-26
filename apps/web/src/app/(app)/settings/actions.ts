@@ -22,7 +22,7 @@ import {
 import { createApiKey, revokeApiKey, setApprovalLimit } from "@/server/platform";
 
 export async function updateCompanyAction(_: unknown, form: FormData) {
-  return runAction(async () =>
+  const result = await runAction(async () =>
     updateCompany(
       await requireSessionOrThrow(),
       CompanySettingsSchema.parse({
@@ -35,6 +35,9 @@ export async function updateCompanyAction(_: unknown, form: FormData) {
       }),
     ),
   );
+  // The name shows in the sidebar and workspace menu on every page.
+  if (result.ok) revalidatePath("/(app)", "layout");
+  return result;
 }
 
 export async function saveDepartmentAction(_: unknown, form: FormData) {

@@ -98,7 +98,7 @@ export const CompanySettingsSchema = z.object({
 
 export async function updateCompany(session: Session, input: z.infer<typeof CompanySettingsSchema>) {
   requireRole(session, ["owner", "admin"]);
-  await adminDb()
+  const { error } = await adminDb()
     .from("organizations")
     .update({
       name: input.name,
@@ -109,6 +109,7 @@ export async function updateCompany(session: Session, input: z.infer<typeof Comp
       ...(input.summary !== undefined ? { company_summary: input.summary || null } : {}),
     })
     .eq("id", session.org.id);
+  if (error) throw new Error(`update company: ${error.message}`);
   await audit(session, { action: "organization.updated", input });
 }
 

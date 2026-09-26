@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Bot, Check, CheckCircle2, ChevronsUpDown, FlaskConical, Plus, LayoutDashboard, LifeBuoy, Lightbulb, LogOut, Plug, Settings, Workflow } from "lucide-react";
+import { Activity, Bot, Check, CheckCircle2, ChevronsUpDown, FlaskConical, Plus, LayoutDashboard, LifeBuoy, Lightbulb, LogOut, Pencil, Plug, Settings, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
@@ -53,6 +53,7 @@ export function AppSidebar({
   workspaces,
   switchWorkspace,
   createSample,
+  signOut,
 }: {
   pendingApprovals: number;
   orgName: string;
@@ -62,6 +63,7 @@ export function AppSidebar({
   workspaces: Workspace[];
   switchWorkspace: (id: string) => Promise<unknown>;
   createSample: () => Promise<unknown>;
+  signOut: () => Promise<unknown>;
 }) {
   const path = usePathname();
   const [pending, start] = useTransition();
@@ -162,6 +164,12 @@ export function AppSidebar({
                     New workspace
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings#company" onClick={() => setOpenMobile(false)}>
+                    <Pencil />
+                    Rename or delete workspace
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/settings" onClick={() => setOpenMobile(false)}>
@@ -169,14 +177,10 @@ export function AppSidebar({
                     Settings
                   </Link>
                 </DropdownMenuItem>
-                <form action="/auth/signout" method="post">
-                  <DropdownMenuItem asChild>
-                    <button type="submit" className="w-full">
-                      <LogOut />
-                      Sign out
-                    </button>
-                  </DropdownMenuItem>
-                </form>
+                <DropdownMenuItem onSelect={() => start(async () => void (await signOut()))}>
+                  <LogOut />
+                  Sign out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

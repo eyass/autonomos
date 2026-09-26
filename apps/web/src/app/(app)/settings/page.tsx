@@ -4,7 +4,7 @@ import { dateTime, num, usd } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, revokeApiKeyAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
-import { ApiKeyForm, ApprovalLimitForm, CompanyForm, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
+import { ApiKeyForm, ApprovalLimitForm, CompanyForm, DeleteWorkspace, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
 import { DefinitionList } from "@/components/app/definition-list";
 import { PageHeader } from "@/components/app/page-header";
 import { ReadinessChecklist } from "@/components/app/readiness-checklist";
@@ -143,7 +143,7 @@ export default async function SettingsPage() {
 
         <SettingsSection
           id="company"
-          title="Company"
+          title="Workspace and company"
           description={
             session.org.websiteProfile
               ? `Profile drafted from ${session.org.website ?? "your website"}${session.org.detectedTools.length ? `. Tools found: ${session.org.detectedTools.join(", ")}` : ""}.`
@@ -406,6 +406,14 @@ export default async function SettingsPage() {
               </li>
             ))}
           </ul>
+        </SettingsSection>
+
+        <SettingsSection
+          id="delete"
+          title="Delete workspace"
+          description={session.role === "owner" ? "Permanently delete this workspace and everything in it." : "Only the workspace owner can delete it."}
+        >
+          {session.role === "owner" ? <DeleteWorkspace name={session.org.name} /> : null}
         </SettingsSection>
       </div>
     </>
