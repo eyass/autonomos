@@ -119,3 +119,42 @@ describe("per-system discovery", () => {
     expect(p!.automation).toMatch(/an agent/);
   });
 });
+
+describe("combining systems into one process", () => {
+  const payments: SystemSample = {
+    system: "Stripe",
+    itemKind: "payments and refunds",
+    summary: "Stripe: 4 refunds",
+    periodDays: 20,
+    items: [
+      { title: "Refund (duplicate)", labels: ["refund"], amount: 20 },
+      { title: "Refund (requested by customer)", labels: ["refund"], amount: 35 },
+    ],
+  };
+  it("turns the same work seen in two systems into one end-to-end process, listed first", async () => {
+    process.env.AI_MOCK = "1";
+    const { proposeProcessesFromSystems } = await import("./tasks/discovery");
+    const r = await proposeProcessesFromSystems({ company: { name: "Acme", connectedSystems: ["Zendesk", "Stripe"] }, samples: [tickets, payments], existingProcesses: [] });
+    const first = r.processes[0]!;
+    expect(first.title).toBe("Refund request handling end to end");
+    expect(new Set(first.evidence.map((e) => e.source))).toEqual(new Set(["Zendesk", "Stripe"]));
+    expect(first.automation).toMatch(/across/);
+    // The single-system versions it replaces are gone.
+    expect(r.processes.filter((p) => p.title === "Refund request handling")).toHaveLength(0);
+  });
+  it("keeps one piece of evidence per system at the top", async () => {
+    const { diverseEvidence, absorb } = await import("./tasks/discovery");
+    const ev = [1, 2, 3, 4, 5, 6].map((i) => ({ source: "Gmail", detail: `g${i}` }));
+    expect(diverseEvidence([...ev, { source: "Stripe", detail: "s1" }]).map((e) => e.source)).toEqual(["Gmail", "Stripe", "Gmail", "Gmail", "Gmail", "Gmail"]);
+    const base = mockSystemDiscovery([tickets], []).processes[0]!;
+    const kept = absorb(
+      [{ ...base, title: "Both", combines: ["A", "B"] }],
+      [
+        { ...base, title: "A" },
+        { ...base, title: "B" },
+        { ...base, title: "C" },
+      ],
+    );
+    expect(kept.map((p) => p.title)).toEqual(["Both", "C"]);
+  });
+});

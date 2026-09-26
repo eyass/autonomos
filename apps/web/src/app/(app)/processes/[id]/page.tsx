@@ -208,6 +208,17 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
           />
         </div>
         <div className="space-y-6">
+          {p.proposed_automation ? (
+            <Card className="border-highlight/30">
+              <CardHeader>
+                <CardTitle>What an agent would do</CardTitle>
+                <CardDescription>Proposed by discovery from your data. Opportunities build on it.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">{p.proposed_automation}</p>
+              </CardContent>
+            </Card>
+          ) : null}
           {((p.evidence as Array<{ source: string; detail: string }> | null) ?? []).length ? (
             <Card>
               <CardHeader>

@@ -217,7 +217,7 @@ export async function acceptProposals(session: Session, runId: string, titles: s
     if (p)
       await db
         .from("processes")
-        .update({ evidence: p.evidence as never })
+        .update({ evidence: p.evidence as never, proposed_automation: p.automation ?? null })
         .eq("organization_id", session.org.id)
         .eq("id", row.id);
   }

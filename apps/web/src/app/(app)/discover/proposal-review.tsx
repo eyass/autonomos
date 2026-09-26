@@ -15,6 +15,8 @@ import { Progress } from "@/components/ui/progress";
 const INFERRED = 0.45;
 
 type Proposal = DiscoveryRunView["proposals"][number];
+// The systems a proposal draws on, in the order its evidence names them.
+const spans = (p: Proposal) => [...new Set(p.evidence.map((e) => e.source))].filter((s) => s !== "Company profile");
 type Decision = { title: string; action: "approved" | "rejected" };
 
 // Shows the proposals one at a time: add it, reject it (never suggested again), or decide later.
@@ -112,7 +114,7 @@ export function ProposalReview({ run, onReadAgain }: { run: DiscoveryRunView; on
           <CardContent key={current.title} className="space-y-4" data-testid="proposal">
             <div className="flex flex-wrap items-center gap-2">
               {current.confidence > INFERRED ? (
-                <Badge variant="agent">{current.primarySystem ? `Seen in ${current.primarySystem}` : "Seen in your data"}</Badge>
+                <Badge variant="agent">{spans(current).length >= 2 ? `Across ${spans(current).join(" + ")}` : current.primarySystem ? `Seen in ${current.primarySystem}` : "Seen in your data"}</Badge>
               ) : (
                 <Badge variant="outline">Likely for a company like yours</Badge>
               )}
