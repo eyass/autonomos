@@ -84,6 +84,14 @@ Every integration can connect in **sandbox** mode, backed by the `sandbox_record
 
 Integration events arrive at `POST /api/webhooks/:connectionId` with `X-AutonomOS-Signature: sha256=<HMAC of the body>`. The URL and secret are shown to admins on the Integrations page.
 
+## Production (Vercel + Supabase + Trigger.dev)
+
+- **Web app:** the Vercel project `autonom` (Root Directory `apps/web`) deploys `main` to https://autonom-ten.vercel.app. Supabase is connected through the Vercel integration.
+- **Database:** every production build runs `apps/web/scripts/migrate.mjs` before `next build`. It applies pending migrations with `supabase db push`, using `POSTGRES_URL_NON_POOLING` from the integration. Preview builds skip it.
+- **Worker:** `.github/workflows/trigger-deploy.yml` deploys `packages/workflows` to Trigger.dev on pushes to `main` once these repository secrets exist: `TRIGGER_ACCESS_TOKEN` (a Trigger.dev personal access token), `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` and optionally `COMPOSIO_API_KEY`. The deploy syncs them into the Trigger.dev production environment.
+- **Connecting the two:** set `TRIGGER_SECRET_KEY` in Vercel to the Trigger.dev **production** secret key (`tr_prod_...`), so the app enqueues runs where the deployed worker listens.
+- **Auth redirects:** in Supabase → Authentication → URL Configuration, set the Site URL to the production URL and add `https://autonom-ten.vercel.app/auth/callback` to the redirect URLs.
+
 ## The 10-minute demo
 
 After `pnpm db:seed:demo`, sign in as `demo@autonomos.local` / `autonomos-demo`. The seed contains a company, reviewed processes, sandbox Zendesk, Stripe and Slack, and the approved Refund Agent opportunity. No runs or metrics are fabricated.

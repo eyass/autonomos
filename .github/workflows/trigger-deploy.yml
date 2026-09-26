@@ -1,0 +1,61 @@
+name: Deploy Trigger.dev worker
+
+# Deploys packages/workflows to Trigger.dev (project proj_xytjychoihbtmbxoztql) on every push
+# to main. Inactive until the TRIGGER_ACCESS_TOKEN repository secret exists (a Trigger.dev
+# personal access token). Runtime variables the worker needs (Supabase URL and service role
+# key, model and Composio keys) are synced from the repository secrets of the same name.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/trigger-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: trigger-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+    steps:
+      - name: Skip when not configured
+        if: env.TRIGGER_ACCESS_TOKEN == ''
+        run: echo "TRIGGER_ACCESS_TOKEN is not set; add it as a repository secret to enable worker deploys."
+      - uses: actions/checkout@v4
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+      - uses: pnpm/action-setup@v4
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: env.TRIGGER_ACCESS_TOKEN != ''
+        run: pnpm install --frozen-lockfile
+      - name: Write worker env file from secrets
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+        run: |
+          umask 077
+          : > .env.local
+          for name in NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY GOOGLE_GENERATIVE_AI_API_KEY COMPOSIO_API_KEY RESEND_API_KEY EMAIL_FROM NEXT_PUBLIC_APP_URL; do
+            value="${!name}"
+            if [ -n "$value" ]; then printf '%s=%s\n' "$name" "$value" >> .env.local; fi
+          done
+          echo "AI_PROVIDER=google" >> .env.local
+      - name: Deploy
+        if: env.TRIGGER_ACCESS_TOKEN != ''
+        run: pnpm --filter @autonomos/workflows exec trigger deploy --env-file ../../.env.local --skip-update-check
