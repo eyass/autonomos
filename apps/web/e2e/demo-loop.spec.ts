@@ -146,7 +146,7 @@ test("demo loop", async ({ page }) => {
     await page.goto(url);
     await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    if (overflow > 0 && process.env.E2E_DEBUG)
+    if (overflow > 0)
       console.log(
         url,
         await page.evaluate(() =>

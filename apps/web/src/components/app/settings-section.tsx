@@ -1,7 +1,7 @@
 "use client";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
@@ -41,12 +41,17 @@ export function SettingsSection({
     <Collapsible open={open} onOpenChange={setOpen} asChild>
       <Card id={id} className={cn("scroll-mt-20", tone === "warning" && "border-warning")}>
         <CardHeader>
-          <CollapsibleTrigger className="group flex items-center gap-2 text-left md:pointer-events-none">
-            <CardTitle>{title}</CardTitle>
-            <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 md:hidden" />
-          </CollapsibleTrigger>
-          {description ? <CardDescription>{description}</CardDescription> : null}
-          {action ? <CardAction>{action}</CardAction> : null}
+          {/* On phones the action sits under the description so long labels never push the card wider than the screen. */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0 space-y-1.5">
+              <CollapsibleTrigger className="group flex items-center gap-2 text-left md:pointer-events-none">
+                <CardTitle>{title}</CardTitle>
+                <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 md:hidden" />
+              </CollapsibleTrigger>
+              {description ? <CardDescription>{description}</CardDescription> : null}
+            </div>
+            {action ? <div className="shrink-0">{action}</div> : null}
+          </div>
         </CardHeader>
         <CollapsibleContent forceMount className="data-[state=closed]:hidden md:data-[state=closed]:block">
           <CardContent>{children}</CardContent>

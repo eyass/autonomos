@@ -154,7 +154,7 @@ function WebhookInfo({ integrationKey, webhook }: { integrationKey: string; webh
   return (
     <Collapsible className="text-xs">
       <CollapsibleTrigger asChild>
-        <Button variant="link" size="sm" className="group h-auto px-0 text-xs text-muted-foreground">
+        <Button variant="link" size="sm" className="group h-auto max-w-full justify-start whitespace-normal px-0 text-left text-xs text-muted-foreground">
           Event webhook: send events from your own systems
           <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
         </Button>
