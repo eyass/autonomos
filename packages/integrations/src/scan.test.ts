@@ -59,3 +59,14 @@ describe("scanSystem on sandbox data", () => {
     expect(line).toContain("Examples:");
   });
 });
+
+describe("lookback window", () => {
+  it("leaves out records older than 30 days", async () => {
+    const store = memoryStore([
+      { system: "stripe", kind: "payment", record: { id: "p1", amount: 10, created_at: new Date(now.getTime() - 5 * 86_400_000).toISOString() } },
+      { system: "stripe", kind: "payment", record: { id: "p2", amount: 20, created_at: new Date(now.getTime() - 45 * 86_400_000).toISOString() } },
+    ]);
+    const scan = await scanSystem("stripe", { organizationId: "org", connection: { integration: "stripe", provider: "sandbox", externalAccountId: null }, sandbox: store, now });
+    expect(scan.stats.payments).toBe(1);
+  });
+});

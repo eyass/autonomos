@@ -140,6 +140,19 @@ test("demo loop", async ({ page }) => {
   await page.getByRole("button", { name: "Resume all agents" }).click();
   await expect(page.getByRole("button", { name: "Pause all agents" })).toBeVisible();
 
+  // Add systems: the popular list first, and search across the whole directory (needs a Composio key)
+  await page.goto("/integrations");
+  const addSystems = page.getByRole("button", { name: "Add systems" });
+  if (await addSystems.count()) {
+    await addSystems.click();
+    const sheet = page.getByRole("dialog", { name: "Add systems" });
+    await expect(sheet.getByTestId("directory-gmail")).toBeVisible({ timeout: 20_000 });
+    await expect(sheet.getByRole("list", { name: "Systems" }).getByRole("listitem")).toHaveCount(20);
+    await sheet.getByLabel("Search systems").fill("pipedrive");
+    await expect(sheet.getByTestId("directory-pipedrive")).toBeVisible({ timeout: 20_000 });
+    await page.keyboard.press("Escape");
+  }
+
   // Phone layout: every page fits the screen width and the menu reaches every section
   await page.setViewportSize({ width: 390, height: 844 });
   const pages = [

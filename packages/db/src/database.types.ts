@@ -644,13 +644,13 @@ isOneToOne: false
                   ]
                 },"integrations": {
                   Row: {
-                    "category": string,"description": string,"key": string,"name": string,"permissions": NonNullable<Json>,"priority": number,"sort_order": number
+                    "category": string,"composio_toolkit": string | null,"description": string,"key": string,"logo": string | null,"name": string,"permissions": NonNullable<Json>,"priority": number,"sort_order": number,"source": string
                   }
                   Insert: {
-                    "category": string,"description": string,"key": string,"name": string,"permissions"?: NonNullable<Json>,"priority"?: number,"sort_order"?: number
+                    "category": string,"composio_toolkit"?: string | null,"description": string,"key": string,"logo"?: string | null,"name": string,"permissions"?: NonNullable<Json>,"priority"?: number,"sort_order"?: number,"source"?: string
                   }
                   Update: {
-                    "category"?: string,"description"?: string,"key"?: string,"name"?: string,"permissions"?: NonNullable<Json>,"priority"?: number,"sort_order"?: number
+                    "category"?: string,"composio_toolkit"?: string | null,"description"?: string,"key"?: string,"logo"?: string | null,"name"?: string,"permissions"?: NonNullable<Json>,"priority"?: number,"sort_order"?: number,"source"?: string
                   }
                   Relationships: [
                     

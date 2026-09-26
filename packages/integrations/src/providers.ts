@@ -343,8 +343,8 @@ export const COMPOSIO_TOOLKITS: Record<string, string> = {
 };
 
 export async function startComposioConnection(organizationId: string, integration: string, callbackUrl: string) {
-  const toolkit = COMPOSIO_TOOLKITS[integration];
-  if (!toolkit) throw new ToolError("invalid_data", `No Composio toolkit for ${integration}`);
+  // Curated keys map to their toolkit; any other key is a Composio toolkit slug itself.
+  const toolkit = COMPOSIO_TOOLKITS[integration] ?? integration;
   const composio = getComposio();
   const authConfigId = await resolveAuthConfigId(toolkit, integration);
   // connectedAccounts.link is the supported flow; the legacy initiate endpoint (which

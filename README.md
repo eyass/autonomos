@@ -57,11 +57,32 @@ AutonomOS asks for as little as possible and drafts the rest for review:
 5. **First inventory** (`draftProcessInventory`). When onboarding finishes, the likely processes and the evidence from connected systems become draft processes (confidence at most 0.6, missing information listed). Duplicates across discovery sources are kept once.
 6. **Downstream.** Approving a process generates its automation opportunities; "Build and test agent" creates the proposed agent and starts a simulated test in one click; the interview offers suggested answers; a manually added process only needs a name and a sentence (department, steps and volume are inferred); Settings can refresh the profile from the website.
 
+### Adding systems
+
+Integrations → "Add systems" (and the same button in onboarding) lists the 20 most connected systems first (Gmail, Google Calendar, Outlook, Slack, Teams, Stripe, HubSpot, Salesforce, Zendesk, Intercom, Notion, Google Drive, Google Sheets, Facebook, Instagram, LinkedIn, Jira, Asana, Airtable, Mailchimp) and searches the whole Composio directory (about 1,500 toolkits, cached for an hour, `packages/integrations/src/directory.ts`). Connecting one adds it to the workspace (`integrations.source = 'directory'`) and opens its sign-in. Toolkits without Composio-managed sign-in show "Needs setup": add an auth config in Composio and list it in `COMPOSIO_AUTH_CONFIGS`.
+
 ### Discovery from connected systems
 
 Discover → "From your systems" reads a recent sample from every connected system and proposes the recurring work it shows. It runs on its own when the page opens and there is no result from the last day.
 
-- **What is read:** Gmail messages from the last 30 days (promotions and social excluded), the latest Zendesk tickets, recent Stripe charges and refunds, and the busiest Slack channels. It works on live accounts through Composio (`GMAIL_FETCH_EMAILS`, `ZENDESK_LIST_ZENDESK_TICKETS`, `STRIPE_LIST_CHARGES`, `STRIPE_LIST_REFUNDS`, `SLACK_LIST_ALL_CHANNELS`, `SLACK_FETCH_CONVERSATION_HISTORY`) and on sandbox systems, which get a month of fictional history the first time they are read.
+- **What is read, and how far back:** every system is read for the last 30 days, capped per system so a busy account stays fast:
+
+  | System | Window | Cap | Composio action |
+  | --- | --- | --- | --- |
+  | Gmail | 30 days (promotions and social excluded) | 100 messages | `GMAIL_FETCH_EMAILS` |
+  | Outlook | 30 days | 100 messages | `OUTLOOK_OUTLOOK_LIST_MESSAGES` |
+  | Google Calendar | 30 days | 100 events | `GOOGLECALENDAR_FIND_EVENT` |
+  | Zendesk | 30 days | 100 tickets | `ZENDESK_LIST_ZENDESK_TICKETS` |
+  | Stripe | 30 days | 100 charges plus refunds | `STRIPE_LIST_CHARGES`, `STRIPE_LIST_REFUNDS` |
+  | Slack | 30 days, 6 busiest channels | 150 messages | `SLACK_LIST_ALL_CHANNELS`, `SLACK_FETCH_CONVERSATION_HISTORY` |
+  | Microsoft Teams | 30 days, 10 chats | 100 messages | `MICROSOFT_TEAMS_CHATS_GET_ALL_CHATS`, `..._GET_ALL_MESSAGES` |
+  | HubSpot | 30 days | 100 tickets and deals | `HUBSPOT_LIST_TICKETS`, `HUBSPOT_HUBSPOT_LIST_DEALS` |
+  | Salesforce | 30 days | 100 cases and opportunities | `SALESFORCE_EXECUTE_SOQL_QUERY` |
+  | Jira | 30 days | 100 issues | `JIRA_SEARCH_FOR_ISSUES_USING_JQL_GET` |
+  | Intercom, Notion | 30 days | 100 items | `INTERCOM_LIST_CONVERSATIONS`, `NOTION_SEARCH_NOTION_PAGE` |
+  | Anything else (Asana: 100) | 30 days | 50 items | up to two read-only list actions picked from the toolkit |
+
+  Limits live in `SCAN_LIMITS` and `DEFAULT_SCAN_LIMIT` (`packages/integrations/src/scan.ts`). Sandbox systems get a month of fictional history the first time they are read. Systems whose toolkit has no suitable read action are shown as "cannot read this system for discovery yet".
 - **Privacy:** only subjects, short snippets, tags, dates and amounts are kept. Email addresses become their domain; phone numbers and IBANs are removed before anything reaches the model. The redacted sample is deleted once proposals are made; a run keeps counts and proposals (`discovery_runs`).
 - **Output:** each proposal carries evidence ("5 of 15 tickets are about order status") and a volume estimate scaled from the sample. Accepted proposals become draft processes with a "Found in your systems" card.
 - **Interview:** the guided interview opens with what the systems showed for that department and asks about what the data cannot show.

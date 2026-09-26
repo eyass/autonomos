@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { IntegrationGrid } from "@/app/(app)/integrations/grid";
 import { loadIntegrations } from "@/app/(app)/integrations/data";
+import { AddSystems } from "@/app/(app)/integrations/add-systems";
+import { canUseComposio } from "@/server/integrations";
 import { ActionButton } from "@/components/action-button";
 import { Steps } from "../steps";
 import { finishOnboardingAction } from "../actions";
@@ -17,6 +19,12 @@ export default async function ConnectPage() {
       <Steps current={1} />
       <h1 className="mb-1 text-xl font-semibold">Connect systems</h1>
       <p className="mb-6 text-sm text-muted-foreground">Connect what you use. Nothing is required for process discovery; agents only get access to the specific actions you allow later.</p>
+      {canUseComposio() ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-dashed p-3">
+          <AddSystems canManage={session.role !== "member"} variant="outline" />
+          <p className="text-sm text-muted-foreground">Gmail, Google Calendar, Outlook, Slack, HubSpot and about 1,500 more.</p>
+        </div>
+      ) : null}
       <IntegrationGrid integrations={integrations} canManage={session.role !== "member"} compact highlight={session.org.detectedTools} />
       <div className="mt-6">
         <ActionButton action={finishOnboardingAction} pendingLabel="Mapping your processes…">
