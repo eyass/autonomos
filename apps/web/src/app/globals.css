@@ -56,3 +56,10 @@ body {
     border-color: var(--border);
   }
 }
+
+/* Inline metadata ("Support · 43 h / month · L3 → L4") separated by dots. */
+.meta-dots > * + *::before {
+  content: "·";
+  margin-right: 0.5rem;
+  color: var(--muted);
+}

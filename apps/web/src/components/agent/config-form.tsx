@@ -60,8 +60,21 @@ export function AgentConfigForm({
     });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-4">
-      <ol className="space-y-1 text-sm">
+    <div className="grid gap-4 lg:grid-cols-4 lg:gap-6">
+      <div className="lg:hidden">
+        <div className="mb-1.5 flex items-center justify-between text-xs text-muted">
+          <span>
+            Step {step + 1} of {STEPS.length}
+          </span>
+          {step < STEPS.length - 1 ? <span>Next: {STEPS[step + 1]}</span> : null}
+        </div>
+        <div className="flex gap-1">
+          {STEPS.map((s, i) => (
+            <button key={s} type="button" aria-label={`Step ${i + 1}: ${s}`} onClick={() => setStep(i)} className={cn("h-1.5 flex-1 rounded-full", i <= step ? "bg-accent" : "bg-border")} />
+          ))}
+        </div>
+      </div>
+      <ol className="hidden space-y-1 text-sm lg:block">
         {STEPS.map((s, i) => (
           <li key={s}>
             <button type="button" onClick={() => setStep(i)} className={cn("w-full rounded-md px-3 py-2 text-left", i === step ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-surface-muted")}>
@@ -70,7 +83,7 @@ export function AgentConfigForm({
           </li>
         ))}
       </ol>
-      <Card className="lg:col-span-3">
+      <Card className="min-w-0 lg:col-span-3">
         <CardHeader title={STEPS[step]} />
         <CardBody className="space-y-4">
           {step === 0 ? (
@@ -140,18 +153,18 @@ export function AgentConfigForm({
               {tools.length === 0 ? <Notice tone="warn">Connect an integration first.</Notice> : null}
               <div className="space-y-2">
                 {tools.map((t) => (
-                  <label key={t.key} className="flex items-start gap-3 rounded-md border border-border px-3 py-2 text-sm has-[:checked]:border-accent/50 has-[:checked]:bg-accent-soft/40">
+                  <label key={t.key} className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-md border border-border px-3 py-2 text-sm has-[:checked]:border-accent/50 has-[:checked]:bg-accent-soft/40">
                     <input
                       type="checkbox"
                       className="mt-1"
                       checked={c.tools.includes(t.key)}
                       onChange={(e) => set("tools", e.target.checked ? [...c.tools, t.key] : c.tools.filter((x) => x !== t.key))}
                     />
-                    <span className="flex-1">
+                    <span className="min-w-0 flex-1 basis-48">
                       <span className="font-medium">{t.label}</span> <span className="text-muted">· {t.integration}</span>
                       <span className="block text-xs text-muted">{t.description}</span>
                     </span>
-                    {t.access === "write" ? <Badge tone={t.highRisk ? "warn" : "info"}>{t.highRisk ? "takes action, approval by default" : "takes action"}</Badge> : <Badge>read only</Badge>}
+                    {t.access === "write" ? <Badge tone={t.highRisk ? "warn" : "info"} className="ml-7 sm:ml-0">{t.highRisk ? "takes action, approval by default" : "takes action"}</Badge> : <Badge className="ml-7 sm:ml-0">read only</Badge>}
                   </label>
                 ))}
               </div>
@@ -161,7 +174,7 @@ export function AgentConfigForm({
             <>
               <div>
                 <div className="mb-2 text-sm font-medium">Autonomy level</div>
-                <div className="grid gap-2 sm:grid-cols-5">
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                   {AUTONOMY_LEVELS.map((l) => (
                     <button
                       type="button"
@@ -171,11 +184,12 @@ export function AgentConfigForm({
                       className={cn("rounded-md border px-2 py-2 text-left text-xs disabled:opacity-40", c.autonomyLevel === l.level ? "border-accent bg-accent-soft" : "border-border hover:bg-surface-muted")}
                     >
                       <div className="font-semibold">{l.code}</div>
-                      <div>{l.name}</div>
+                      <div className="hidden truncate sm:block">{l.name}</div>
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-muted">{AUTONOMY_LEVELS[c.autonomyLevel - 1]?.short}. Start at L3 for anything involving money or customers.</p>
+                <p className="mt-2 text-xs text-muted">
+                  <span className="font-medium text-foreground">{AUTONOMY_LEVELS[c.autonomyLevel - 1]?.name}:</span> {AUTONOMY_LEVELS[c.autonomyLevel - 1]?.short}. Start at L3 for anything involving money or customers.</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Minimum confidence to act alone" hint="Below this, a human approves">
@@ -240,7 +254,7 @@ export function AgentConfigForm({
                   <div className="mb-2 text-sm font-medium">Extra rules</div>
                   <ul className="space-y-1 text-sm">
                     {c.policy.conditions.map((r: ConditionRule, i) => (
-                      <li key={i} className="flex items-center justify-between rounded-md bg-surface-muted px-3 py-1.5">
+                      <li key={i} className="flex items-center justify-between gap-2 rounded-md bg-surface-muted px-3 py-1.5">
                         <span>
                           {r.label} <Badge tone={r.effect === "deny" ? "danger" : "warn"}>{r.effect === "deny" ? "blocks" : "needs approval"}</Badge>
                         </span>

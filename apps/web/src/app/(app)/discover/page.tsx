@@ -1,7 +1,6 @@
 import { DEPARTMENTS } from "@autonomos/schemas";
-import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
-import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui";
+import { Card, CardBody, CardHeader, PageHeader, Tabs } from "@/components/ui";
 import { requireSession } from "@/lib/session";
 import { discoverFromIntegrationsAction } from "./actions";
 import { DocumentImport } from "./document-import";
@@ -27,7 +26,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader title="Discover processes" description="Map the recurring work in your company. Everything discovered starts as a draft for you to review." />
       {welcome ? (
-        <Card className="mb-6 border-accent/40">
+        <Card className="mb-4 border-accent/40">
           <CardBody>
             <div className="mb-2 text-sm font-semibold">Welcome to AutonomOS. Here is the path to your first agent:</div>
             <ol className="grid gap-1 text-sm text-muted sm:grid-cols-2">
@@ -40,20 +39,14 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
           </CardBody>
         </Card>
       ) : null}
-      <div className="mb-4 flex gap-4 border-b border-border text-sm">
-        <Link href="/discover" className={`-mb-px border-b-2 px-1 pb-2 ${tab !== "document" ? "border-accent font-medium" : "border-transparent text-muted"}`}>
-          Guided interview
-        </Link>
-        <Link href="/discover?tab=document" className={`-mb-px border-b-2 px-1 pb-2 ${tab === "document" ? "border-accent font-medium" : "border-transparent text-muted"}`}>
-          Import a document
-        </Link>
-        <Link href="/discover?tab=integrations" className={`-mb-px border-b-2 px-1 pb-2 ${tab === "integrations" ? "border-accent font-medium" : "border-transparent text-muted"}`}>
-          From connected systems
-        </Link>
-        <Link href="/processes/new" className="-mb-px border-b-2 border-transparent px-1 pb-2 text-muted">
-          Add manually
-        </Link>
-      </div>
+      <Tabs
+        items={[
+          { href: "/discover", label: "Interview", active: tab !== "document" && tab !== "integrations" },
+          { href: "/discover?tab=document", label: "Document", active: tab === "document" },
+          { href: "/discover?tab=integrations", label: "Connected systems", active: tab === "integrations" },
+          { href: "/processes/new", label: "Add manually", active: false },
+        ]}
+      />
       {tab === "document" ? (
         <DocumentImport />
       ) : tab === "integrations" ? (

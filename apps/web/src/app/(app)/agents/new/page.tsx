@@ -29,7 +29,7 @@ export default async function NewAgentPage({ searchParams }: { searchParams: Pro
   };
   return (
     <>
-      <PageHeader title="Create agent" description={`From the opportunity "${o.title}". Everything is pre-filled; check each step.`} />
+      <PageHeader back={{ href: `/opportunities/${o.id}`, label: o.title }} title="Create agent" description={`From the opportunity "${o.title}". Everything is pre-filled; check each step.`} />
       {!connected.length ? <Notice tone="warn" className="mb-4">No integrations are connected, so the agent has nothing it can act on yet.</Notice> : null}
       <NewAgentWizard initial={initial} tools={toolOptions(connected)} processId={o.process_id} opportunityId={o.id} />
     </>

@@ -2,7 +2,7 @@ import { getTool } from "@autonomos/integrations";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OutcomeBadge, StatusBadge } from "@/components/domain";
-import { Badge, ButtonLink, Card, CardBody, CardHeader, Notice, PageHeader, Stat } from "@/components/ui";
+import { Badge, ButtonLink, Card, CardBody, CardHeader, DefinitionList, Notice, PageHeader } from "@/components/ui";
 import { dateTime, hours, time, usd } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -33,7 +33,6 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
   const proc = run.processes as unknown as { id: string; title: string };
   const version = run.agent_versions as unknown as { version: number; autonomy_level: number };
   const active = ["queued", "running"].includes(run.status);
-  const toolsUsed = [...new Set((steps ?? []).map((s) => s.tool).filter(Boolean) as string[])];
   const duration = run.started_at && run.finished_at ? (new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000 : null;
   const lastDecision = [...(steps ?? [])].reverse().find((s) => s.type === "decision");
   const output = (run.output ?? {}) as { result?: string; wouldRequireApproval?: Array<{ tool: string; args: Record<string, unknown>; reasons: string[] }> };
@@ -42,34 +41,34 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
   return (
     <>
       <LiveRefresh active={active} />
-      <div className="mb-2 text-sm">
-        <Link href="/activity" className="text-muted hover:text-foreground">
-          Activity
-        </Link>
-      </div>
       <PageHeader
+        back={{ href: "/activity", label: "Activity" }}
         title={`${agent.name}${run.mode === "test" ? " · test run" : ""}`}
         description={
-          <span className="flex flex-wrap items-center gap-2">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <StatusBadge status={run.status} />
             <OutcomeBadge outcome={run.outcome} mode={run.mode} />
+            <Link href={`/processes/${proc.id}`} className="hover:underline">
+              {proc.title}
+            </Link>
             <span>
-              <Link href={`/processes/${proc.id}`} className="hover:underline">
-                {proc.title}
-              </Link>{" "}
               · v{version.version} · L{version.autonomy_level} · {dateTime(run.queued_at)}
             </span>
           </span>
         }
-        actions={<ButtonLink href={`/agents/${agent.id}`} variant="secondary">Open agent</ButtonLink>}
+        actions={
+          <ButtonLink href={`/agents/${agent.id}`} variant="secondary">
+            Open agent
+          </ButtonLink>
+        }
       />
       {run.status === "queued" ? (
-        <Notice tone="info" className="mb-6">
+        <Notice tone="info" className="mb-4">
           Queued on the durable runtime. If this stays queued, check that the Trigger.dev worker is running.
         </Notice>
       ) : null}
       {pending ? (
-        <Notice tone="warn" className="mb-6">
+        <Notice tone="warn" className="mb-4">
           Waiting for approval: {pending.title}{" "}
           <Link href="/approvals" className="font-medium underline">
             Review it
@@ -77,25 +76,32 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
         </Notice>
       ) : null}
       {run.error ? (
-        <Notice tone="danger" className="mb-6">
+        <Notice tone="danger" className="mb-4">
           {run.error_retryable ? "Temporary error, retrying: " : "Error: "}
           {run.error}
         </Notice>
       ) : null}
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Result" value={<span className="text-base">{run.summary ?? "In progress"}</span>} className="sm:col-span-3 lg:col-span-2" />
-        <Stat label="Time saved" value={hours(Number(run.estimated_minutes_saved ?? 0))} hint={run.baseline_minutes ? `baseline ${Number(run.baseline_minutes)} min` : undefined} />
-        <Stat label="Human time" value={`${Number(run.human_minutes)} min`} />
-        <Stat label="AI cost" value={usd(Number(run.model_cost))} hint={`${run.input_tokens + run.output_tokens} tokens`} />
-        <Stat label="Duration" value={duration === null ? "–" : `${duration.toFixed(1)} s`} />
-      </div>
+      <Card className="mb-6">
+        <CardBody className="space-y-4">
+          <p className="text-sm">{run.summary ?? "In progress"}</p>
+          <DefinitionList
+            className="sm:grid-cols-4"
+            items={[
+              { label: "Time saved", value: hours(Number(run.estimated_minutes_saved ?? 0)) },
+              { label: "Human time", value: `${Number(run.human_minutes)} min` },
+              { label: "AI cost", value: <span title={`${run.input_tokens + run.output_tokens} tokens`}>{usd(Number(run.model_cost))}</span> },
+              { label: "Duration", value: duration === null ? "–" : `${duration.toFixed(1)} s` },
+            ]}
+          />
+        </CardBody>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="min-w-0 lg:col-span-2">
           <CardHeader title="What happened" description="Every material step, in order." />
           <CardBody>
-            <ol className="relative space-y-4 border-l border-border pl-5">
+            <ol className="relative ml-1 space-y-4 border-l border-border pl-5">
               {(steps ?? []).map((s) => {
                 const decision = s.type === "decision" ? (s.output as { reasoningSummary?: string; confidence?: number; proposedTool?: string }) : null;
                 return (
@@ -103,8 +109,8 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
                     <span className={cn("absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full", STEP_TONE[s.status] ?? "bg-muted")} />
                     <div className="flex flex-wrap items-baseline gap-2 text-sm">
                       <span className="tabular-nums text-xs text-muted">{time(s.created_at)}</span>
-                      <span className="font-medium">{s.description}</span>
-                      {s.tool ? <Badge>{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
+                      <span className="min-w-0 font-medium break-words">{s.description}</span>
+                      {s.tool && (getTool(s.tool)?.label ?? s.tool) !== s.description ? <Badge>{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
                       {s.status === "simulated" ? <Badge tone="info">simulated</Badge> : null}
                     </div>
                     {s.type === "approval_requested" ? (
@@ -123,7 +129,7 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
                     {s.type !== "decision" && (s.input || s.output) ? (
                       <details className="mt-1 text-xs">
                         <summary className="cursor-pointer text-muted">Data</summary>
-                        <div className="mt-1 grid gap-2 md:grid-cols-2">
+                        <div className="mt-1 grid gap-2 md:grid-cols-2 [&>*]:min-w-0">
                           {s.input ? <pre className="overflow-x-auto rounded bg-surface-muted p-2">{JSON.stringify(s.input, null, 2)}</pre> : null}
                           {s.output ? <pre className="overflow-x-auto rounded bg-surface-muted p-2">{JSON.stringify(s.output, null, 2)}</pre> : null}
                         </div>
@@ -151,18 +157,6 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
             </Card>
           ) : null}
           <Card>
-            <CardHeader title="Input" />
-            <CardBody>
-              <pre className="overflow-x-auto rounded bg-surface-muted p-2 text-xs">{JSON.stringify(run.input, null, 2)}</pre>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Tools used" />
-            <CardBody className="flex flex-wrap gap-1.5">
-              {toolsUsed.length ? toolsUsed.map((t) => <Badge key={t}>{getTool(t)?.label ?? t}</Badge>) : <span className="text-sm text-muted">None</span>}
-            </CardBody>
-          </Card>
-          <Card>
             <CardHeader title="Human involvement" />
             <CardBody className="space-y-2 text-sm">
               {(interventions ?? []).map((i, n) => (
@@ -171,6 +165,10 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
                 </div>
               ))}
               {!interventions?.length ? <p className="text-muted">None</p> : null}
+              <details className="pt-2 text-xs">
+                <summary className="cursor-pointer text-muted hover:text-foreground">Run input</summary>
+                <pre className="mt-2 overflow-x-auto rounded bg-surface-muted p-2">{JSON.stringify(run.input, null, 2)}</pre>
+              </details>
             </CardBody>
           </Card>
           {lastDecision && !active ? (

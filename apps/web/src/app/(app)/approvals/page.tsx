@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { StatusBadge } from "@/components/domain";
-import { Card, EmptyState, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Card, EmptyState, PageHeader, RowLink, Tabs } from "@/components/ui";
 import { dateTime } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -22,14 +21,12 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   q = resolved ? q.neq("status", "pending") : q.eq("status", "pending");
   const { data } = await q;
   const tabs = (
-    <div className="mb-4 flex gap-4 border-b border-border text-sm">
-      <Link href="/approvals" className={`-mb-px border-b-2 px-1 pb-2 ${!resolved ? "border-accent font-medium" : "border-transparent text-muted"}`}>
-        Needs your approval
-      </Link>
-      <Link href="/approvals?view=resolved" className={`-mb-px border-b-2 px-1 pb-2 ${resolved ? "border-accent font-medium" : "border-transparent text-muted"}`}>
-        Resolved
-      </Link>
-    </div>
+    <Tabs
+      items={[
+        { href: "/approvals", label: "Needs your approval", active: !resolved },
+        { href: "/approvals?view=resolved", label: "Resolved", active: resolved },
+      ]}
+    />
   );
 
   if (resolved) {
@@ -37,40 +34,31 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       <>
         <PageHeader title="Approvals" description="Every decision is recorded in the audit log." />
         {tabs}
-        <Card>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Request</Th>
-                <Th>Agent</Th>
-                <Th>Decision</Th>
-                <Th>By</Th>
-                <Th>When</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data ?? []).map((a) => {
-                const by = a.users as unknown as { first_name: string; last_name: string } | null;
-                return (
-                  <tr key={a.id}>
-                    <Td>
-                      <Link href={`/activity/${a.agent_run_id}`} className="hover:underline">
-                        {a.title}
-                      </Link>
-                      {a.comment ? <div className="text-xs text-muted">“{a.comment}”</div> : null}
-                    </Td>
-                    <Td>{(a.agents as unknown as { name: string } | null)?.name}</Td>
-                    <Td>
-                      <StatusBadge status={a.status} />
-                    </Td>
-                    <Td className="text-muted">{by ? `${by.first_name} ${by.last_name}` : a.status === "expired" ? "Expired" : "–"}</Td>
-                    <Td className="whitespace-nowrap text-muted">{dateTime(a.resolved_at)}</Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </Card>
+        {data?.length ? (
+          <Card>
+            {data.map((a) => {
+              const by = a.users as unknown as { first_name: string; last_name: string } | null;
+              return (
+                <RowLink
+                  key={a.id}
+                  href={`/activity/${a.agent_run_id}`}
+                  title={a.title}
+                  meta={
+                    <>
+                      <span>{(a.agents as unknown as { name: string } | null)?.name}</span>
+                      <span>{by ? `${by.first_name} ${by.last_name}` : a.status === "expired" ? "Expired" : "–"}</span>
+                      <span>{dateTime(a.resolved_at)}</span>
+                      {a.comment ? <span className="w-full truncate">“{a.comment}”</span> : null}
+                    </>
+                  }
+                  aside={<StatusBadge status={a.status} />}
+                />
+              );
+            })}
+          </Card>
+        ) : (
+          <EmptyState title="No resolved approvals yet." />
+        )}
       </>
     );
   }

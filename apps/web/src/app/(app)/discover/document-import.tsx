@@ -28,7 +28,7 @@ export function DocumentImport() {
     <Card>
       <CardHeader title="Import a document" description="SOPs, process documentation, handbooks or team descriptions. PDF, DOCX, TXT or MD, or paste the text." />
       <CardBody className="space-y-4">
-        <input type="file" accept=".pdf,.docx,.txt,.md" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} className="text-sm" />
+        <input type="file" accept=".pdf,.docx,.txt,.md" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} className="w-full text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-sm" />
         <Field label="Title">
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Support team handbook" />
         </Field>

@@ -33,8 +33,8 @@ function IntegrationCard({ i, canManage, compact }: { i: IntegrationView; canMan
   return (
     <Card className="p-4" data-testid={`integration-${i.key}`}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 font-medium">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 font-medium">
             {i.name}
             {connected ? <Badge tone="ok">Connected{i.provider === "sandbox" ? " · sandbox" : ""}</Badge> : <Badge>Not connected</Badge>}
           </div>
@@ -42,7 +42,7 @@ function IntegrationCard({ i, canManage, compact }: { i: IntegrationView; canMan
         </div>
       </div>
       {connected && !compact ? (
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs [&>dd]:min-w-0 [&>dd]:truncate">
           <dt className="text-muted">Account</dt>
           <dd>{i.accountLabel ?? "–"}</dd>
           <dt className="text-muted">Connected by</dt>
@@ -117,10 +117,10 @@ function WebhookInfo({ webhook }: { webhook: { url: string; secret: string } }) 
           POST <code className="break-all">{webhook.url}</code>
         </div>
         <div>
-          Body <code>{`{"event":"zendesk.ticket.created","data":{"ticket_id":"123"}}`}</code>
+          Body <code className="break-all">{`{"event":"zendesk.ticket.created","data":{"ticket_id":"123"}}`}</code>
         </div>
         <div>
-          Header <code>X-AutonomOS-Signature: sha256=HMAC_SHA256(body, secret)</code>
+          Header <code className="break-all">X-AutonomOS-Signature: sha256=HMAC_SHA256(body, secret)</code>
         </div>
         <div>
           Secret{" "}

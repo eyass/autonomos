@@ -63,6 +63,33 @@ export function ScorePill({ value, kind }: { value: number | null | undefined; k
   );
 }
 
+// Value, difficulty and risk together, labelled, so the numbers read without a legend.
+export function Scores({ value, difficulty, risk, className }: { value: number | null | undefined; difficulty: number | null | undefined; risk: number | null | undefined; className?: string }) {
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted", className)}>
+      <span className="inline-flex items-center gap-1">
+        Value <ScorePill kind="value" value={value} />
+      </span>
+      <span className="inline-flex items-center gap-1">
+        Difficulty <ScorePill kind="difficulty" value={difficulty} />
+      </span>
+      <span className="inline-flex items-center gap-1">
+        Risk <ScorePill kind="risk" value={risk} />
+      </span>
+    </div>
+  );
+}
+
+// "L1 → L4": where something is and where it could go.
+export function LevelChange({ from, to }: { from: number; to?: number | null }) {
+  return (
+    <span className="whitespace-nowrap font-medium tabular-nums">
+      L{from}
+      {to && to !== from ? <span className="text-muted"> → L{to}</span> : null}
+    </span>
+  );
+}
+
 const STATUS_TONES: Record<string, "neutral" | "accent" | "ok" | "warn" | "danger" | "info"> = {
   draft: "neutral",
   reviewed: "info",

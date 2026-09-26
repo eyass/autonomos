@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ScorePill, StatusBadge } from "@/components/domain";
-import { ButtonLink, Card, CardBody, CardHeader, EmptyState, PageHeader, Table, Td, Th } from "@/components/ui";
+import { LevelChange, Scores, StatusBadge } from "@/components/domain";
+import { ButtonLink, Card, CardBody, CardHeader, EmptyState, PageHeader, Table, Tabs, Td, Th } from "@/components/ui";
 import { money, num } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -35,82 +35,84 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
     );
   }
 
+  const rejected = q.status === "rejected";
   return (
     <>
-      <PageHeader
-        title="Opportunities"
-        description="Ranked by business value × automation potential ÷ difficulty. Risk is shown separately and never hidden in the ranking."
-        actions={
-          <>
-            <ButtonLink href="/opportunities" variant={q.status ? "secondary" : "primary"} size="sm">
-              Open
-            </ButtonLink>
-            <ButtonLink href="/opportunities?status=rejected" variant={q.status === "rejected" ? "primary" : "secondary"} size="sm">
-              Rejected
-            </ButtonLink>
-          </>
-        }
+      <PageHeader title="Opportunities" description="Where agents should take over work, best first. Risk is shown separately and never hidden in the ranking." />
+      <Tabs
+        items={[
+          { href: "/opportunities", label: "Open", active: !rejected },
+          { href: "/opportunities?status=rejected", label: "Rejected", active: rejected },
+        ]}
       />
-      <Card className="mb-6">
-        <CardHeader title="Value vs difficulty" description="Bubble size is estimated hours saved per month. Top left is where to start." />
-        <CardBody>
-          <OpportunityMatrix
-            points={list.map((o) => ({
-              id: o.id,
-              title: o.title,
-              value: o.business_value_score,
-              difficulty: o.automation_difficulty_score,
-              risk: o.risk_score,
-              hours: Number(o.estimated_hours_saved_monthly ?? 0),
-            }))}
-          />
-        </CardBody>
-      </Card>
-      <Card>
-        <Table>
-          <thead>
-            <tr>
-              <Th>Opportunity</Th>
-              <Th>Department</Th>
-              <Th>Process</Th>
-              <Th>Value</Th>
-              <Th>Difficulty</Th>
-              <Th>Risk</Th>
-              <Th>Hours saved</Th>
-              <Th>Current</Th>
-              <Th>Target</Th>
-              <Th>Status</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((o) => {
-              const proc = o.processes as unknown as { id: string; title: string } | null;
-              return (
-                <tr key={o.id} className="hover:bg-surface-muted/50">
-                  <Td>
-                    <Link href={`/opportunities/${o.id}`} className="font-medium hover:underline">
-                      {o.title}
-                    </Link>
-                    <div className="text-xs text-muted">Score {Number(o.opportunity_score).toFixed(1)}</div>
-                  </Td>
-                  <Td className="text-muted">{(o.departments as unknown as { name: string } | null)?.name ?? "–"}</Td>
-                  <Td>{proc ? <Link href={`/processes/${proc.id}`} className="text-muted hover:underline">{proc.title}</Link> : "–"}</Td>
-                  <Td><ScorePill kind="value" value={o.business_value_score} /></Td>
-                  <Td><ScorePill kind="difficulty" value={o.automation_difficulty_score} /></Td>
-                  <Td><ScorePill kind="risk" value={o.risk_score} /></Td>
-                  <Td className="tabular-nums">
-                    {num(Number(o.estimated_hours_saved_monthly ?? 0))} h
-                    <div className="text-xs text-muted">{money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}</div>
-                  </Td>
-                  <Td>L{o.current_autonomy_level}</Td>
-                  <Td className="font-medium">L{o.target_autonomy_level}</Td>
-                  <Td><StatusBadge status={o.status} /></Td>
+      {!list.length ? (
+        <EmptyState title={rejected ? "No rejected opportunities." : "No open opportunities."} />
+      ) : (
+        <>
+          <Card className="mb-6">
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Opportunity</Th>
+                  <Th className="hidden sm:table-cell">Hours saved</Th>
+                  <Th className="hidden lg:table-cell">Scores</Th>
+                  <Th className="hidden md:table-cell">Autonomy</Th>
+                  <Th className="hidden md:table-cell">Status</Th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </Table>
-      </Card>
+              </thead>
+              <tbody>
+                {list.map((o) => {
+                  const proc = o.processes as unknown as { id: string; title: string } | null;
+                  return (
+                    <tr key={o.id} className="hover:bg-surface-muted/50">
+                      <Td>
+                        <Link href={`/opportunities/${o.id}`} className="font-medium hover:underline">
+                          {o.title}
+                        </Link>
+                        <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted">
+                          {proc ? <span>{proc.title}</span> : null}
+                          <span className="sm:hidden">{num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month</span>
+                          <span className="md:hidden">
+                            <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />
+                          </span>
+                        </div>
+                      </Td>
+                      <Td className="hidden tabular-nums sm:table-cell">
+                        {num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month
+                        <div className="text-xs text-muted">{money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}</div>
+                      </Td>
+                      <Td className="hidden lg:table-cell">
+                        <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} />
+                      </Td>
+                      <Td className="hidden md:table-cell">
+                        <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />
+                      </Td>
+                      <Td className="hidden md:table-cell">
+                        <StatusBadge status={o.status} />
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </Card>
+          <Card>
+            <CardHeader title="Value vs difficulty" description="Bubble size is hours saved per month. Start top left." />
+            <CardBody>
+              <OpportunityMatrix
+                points={list.map((o) => ({
+                  id: o.id,
+                  title: o.title,
+                  value: o.business_value_score,
+                  difficulty: o.automation_difficulty_score,
+                  risk: o.risk_score,
+                  hours: Number(o.estimated_hours_saved_monthly ?? 0),
+                }))}
+              />
+            </CardBody>
+          </Card>
+        </>
+      )}
     </>
   );
 }

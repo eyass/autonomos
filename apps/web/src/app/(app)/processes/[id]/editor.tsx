@@ -95,7 +95,7 @@ export function ProcessEditor({ id, initial, departments }: { id: string; initia
             <Input type="number" min={0} value={v.estimatedMinutesPerOccurrence ?? ""} onChange={(e) => set("estimatedMinutesPerOccurrence", num(e.target.value))} />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           {score("currentAutonomyLevel", "Current", "L")}
           {score("potentialAutonomyLevel", "Potential", "L")}
           {score("businessValue", "Value")}
@@ -106,14 +106,15 @@ export function ProcessEditor({ id, initial, departments }: { id: string; initia
           <div className="mb-2 text-sm font-medium">Steps</div>
           <div className="space-y-2">
             {v.steps.map((s, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2">
-                <Input className="col-span-5" value={s.title} onChange={(e) => setStep(i, { title: e.target.value })} placeholder="Step" />
-                <Input className="col-span-3" value={s.performedBy ?? ""} onChange={(e) => setStep(i, { performedBy: e.target.value })} placeholder="Who" />
-                <Input className="col-span-2" value={s.system ?? ""} onChange={(e) => setStep(i, { system: e.target.value })} placeholder="System" />
-                <label className="col-span-1 flex items-center text-xs" title="Requires judgement">
+              <div key={i} className="grid grid-cols-2 gap-2 rounded-md border border-border p-2 sm:grid-cols-12 sm:border-0 sm:p-0">
+                <Input className="col-span-2 sm:col-span-5" value={s.title} onChange={(e) => setStep(i, { title: e.target.value })} placeholder={`Step ${i + 1}`} aria-label={`Step ${i + 1}`} />
+                <Input className="sm:col-span-3" value={s.performedBy ?? ""} onChange={(e) => setStep(i, { performedBy: e.target.value })} placeholder="Who" aria-label="Who" />
+                <Input className="sm:col-span-2" value={s.system ?? ""} onChange={(e) => setStep(i, { system: e.target.value })} placeholder="System" aria-label="System" />
+                <label className="flex items-center gap-2 text-xs text-muted sm:col-span-1" title="Requires judgement">
                   <input type="checkbox" checked={Boolean(s.requiresJudgement)} onChange={(e) => setStep(i, { requiresJudgement: e.target.checked })} />
+                  <span className="sm:sr-only">Needs judgement</span>
                 </label>
-                <button type="button" className="col-span-1 text-xs text-muted hover:text-danger" onClick={() => set("steps", v.steps.filter((_, j) => j !== i))}>
+                <button type="button" className="justify-self-end text-xs text-muted hover:text-danger sm:col-span-1 sm:justify-self-start" onClick={() => set("steps", v.steps.filter((_, j) => j !== i))}>
                   Remove
                 </button>
               </div>

@@ -1,6 +1,6 @@
 import { snapshotMetrics } from "@autonomos/db";
 import Link from "next/link";
-import { ButtonLink, Card, CardBody, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { ButtonLink, Card, CardBody, CardHeader, EmptyState, PageHeader, RowLink, Stat } from "@/components/ui";
 import { hours, money, num, pct, usd } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -46,41 +46,59 @@ export default async function OverviewPage() {
   }));
   const daily = (trend ?? []).slice(-30).map((t) => ({ period: t.period.slice(5), value: Number(t.value) }));
 
+  const chart = trendData.length > 1 ? trendData : daily;
   return (
     <>
-      <PageHeader title="Overview" description="How autonomous is your company, and what should become autonomous next." />
-      <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
+      <PageHeader title="Overview" description="How autonomous your company is, and what should become autonomous next." />
+      <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-3">
+        <Card>
           <CardBody>
             <div className="text-xs font-medium text-muted">Company autonomy score</div>
-            <div className="mt-2 text-5xl font-semibold tabular-nums" data-testid="autonomy-score">
+            <div className="mt-2 text-4xl font-semibold tabular-nums sm:text-5xl" data-testid="autonomy-score">
               {pct(m.autonomyScore)}
             </div>
-            <p className="mt-2 text-xs text-muted">
-              Share of mapped human work handled by agents, weighted by monthly time (L1 0, L2 20%, L3 40%, L4 75%, L5 100%).
-            </p>
+            <p className="mt-2 text-xs text-muted">Share of mapped human work that agents handle, weighted by time.</p>
           </CardBody>
         </Card>
         <Card className="lg:col-span-2">
           <CardHeader title="Autonomy over time" />
-          <CardBody>{(trendData.length > 1 ? trendData : daily).length > 1 ? <AutonomyTrend data={trendData.length > 1 ? trendData : daily} /> : <p className="py-10 text-center text-sm text-muted">The trend appears after the first days of use.</p>}</CardBody>
+          <CardBody>{chart.length > 1 ? <AutonomyTrend data={chart} /> : <p className="py-8 text-center text-sm text-muted">The trend appears after the first days of use.</p>}</CardBody>
         </Card>
       </div>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label="Processes mapped" value={num(m.processesMapped)} />
-        <Stat label="Automation opportunities" value={num(m.opportunities)} />
-        <Stat label="Active agents" value={num(m.activeAgents)} hint={`${m.processesAutomated} process${m.processesAutomated === 1 ? "" : "es"} automated`} />
-        <Stat label="Tasks executed this month" value={num(m.tasksExecuted)} />
-        <Stat label="Human interventions" value={num(m.humanInterventions)} hint="this month" />
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:mb-6 lg:grid-cols-4">
+        <Stat label="Active agents" value={num(m.activeAgents)} hint={`${m.processesAutomated} of ${m.processesMapped} processes`} />
         <Stat label="Hours saved" value={hours(m.minutesSaved)} hint="this month, estimate" />
-        <Stat label="Estimated value" value={money(m.valueCreated, m.currency)} hint={`at ${money(m.hourlyCost, m.currency)}/h`} />
-        <Stat label="AI cost" value={usd(m.aiCost)} hint="this month" />
-        <Stat label="Estimated ROI" value={m.roi === null ? "–" : `${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}×`} hint="value ÷ AI cost" />
-        <Stat label="Cost per completed task" value={m.tasksExecuted ? usd(m.aiCost / m.tasksExecuted) : "–"} hint="AI cost ÷ tasks" />
+        <Stat label="Tasks done" value={num(m.tasksExecuted)} hint={`${num(m.humanInterventions)} needed a human`} />
+        <Stat label="Estimated ROI" value={m.roi === null ? "–" : `${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}×`} hint={`${money(m.valueCreated, m.currency)} value, ${usd(m.aiCost)} AI`} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
+        <Card>
+          <CardHeader title="What to automate next" action={<Link href="/opportunities" className="text-xs font-medium text-accent hover:underline">All {num(m.opportunities)}</Link>} />
+          {(top ?? []).length ? (
+            <div>
+              {(top ?? []).map((o) => (
+                <RowLink
+                  key={o.id}
+                  href={`/opportunities/${o.id}`}
+                  title={o.title}
+                  meta={
+                    <>
+                      <span>{(o.processes as unknown as { title: string } | null)?.title}</span>
+                      <span>~{num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month</span>
+                      <span>L{o.target_autonomy_level} target</span>
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <CardBody>
+              <p className="text-sm text-muted">Review a process and generate opportunities to see recommendations.</p>
+            </CardBody>
+          )}
+        </Card>
         <Card>
           <CardHeader title="Autonomy by department" />
           <CardBody className="space-y-3">
@@ -89,8 +107,8 @@ export default async function OverviewPage() {
               .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
               .map((d) => (
                 <Link key={d.departmentId ?? "none"} href={d.departmentId ? `/processes?department=${d.departmentId}` : "/processes"} className="block">
-                  <div className="mb-1 flex justify-between text-sm">
-                    <span>{d.name}</span>
+                  <div className="mb-1 flex justify-between gap-2 text-sm">
+                    <span className="truncate">{d.name}</span>
                     <span className="tabular-nums text-muted">{pct(d.score)}</span>
                   </div>
                   <div className="h-2 rounded-full bg-surface-muted">
@@ -98,25 +116,6 @@ export default async function OverviewPage() {
                   </div>
                 </Link>
               ))}
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader title="Highest-impact opportunities" description="What should become autonomous next" />
-          <CardBody className="space-y-3">
-            {(top ?? []).map((o) => (
-              <div key={o.id} className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
-                <div>
-                  <div className="text-sm font-medium">{o.title}</div>
-                  <div className="text-xs text-muted">
-                    {(o.processes as unknown as { title: string } | null)?.title} · ~{num(Number(o.estimated_hours_saved_monthly ?? 0))} h/month · difficulty {o.automation_difficulty_score}/5 · target L{o.target_autonomy_level}
-                  </div>
-                </div>
-                <ButtonLink href={`/opportunities/${o.id}`} size="sm" variant="secondary">
-                  Review opportunity
-                </ButtonLink>
-              </div>
-            ))}
-            {!top?.length ? <p className="text-sm text-muted">Review a process and generate opportunities to see recommendations.</p> : null}
           </CardBody>
         </Card>
       </div>
