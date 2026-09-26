@@ -100,7 +100,7 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
             </div>
             <p className="text-muted-foreground sm:col-span-2">
               {i.provider === "composio"
-                ? "Sign-in tokens are held by Composio; AutonomOS stores only the account id. Data an agent reads is kept in that run's history."
+                ? "Sign-in tokens are held by our secure connection partner; AutonomOS stores only the account id. Data an agent reads is kept in that run's history."
                 : "Sandbox data never leaves AutonomOS. Data an agent reads is kept in that run's history."}
             </p>
           </div>

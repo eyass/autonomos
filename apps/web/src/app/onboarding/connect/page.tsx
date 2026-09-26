@@ -1,3 +1,5 @@
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { IntegrationGrid } from "@/app/(app)/integrations/grid";
@@ -5,6 +7,7 @@ import { loadIntegrations } from "@/app/(app)/integrations/data";
 import { AddSystems } from "@/app/(app)/integrations/add-systems";
 import { canUseComposio } from "@/server/integrations";
 import { ActionButton } from "@/components/action-button";
+import { Button } from "@/components/ui/button";
 import { Steps } from "../steps";
 import { finishOnboardingAction } from "../actions";
 
@@ -27,9 +30,17 @@ export default async function ConnectPage() {
       ) : null}
       <IntegrationGrid integrations={integrations} canManage={session.role !== "member"} compact highlight={session.org.detectedTools} />
       <div className="mt-6">
-        <ActionButton action={finishOnboardingAction} pendingLabel="Mapping your processes…">
-          Continue
-        </ActionButton>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/onboarding/about">
+              <ArrowLeft />
+              Back to company info
+            </Link>
+          </Button>
+          <ActionButton action={finishOnboardingAction} pendingLabel="Mapping your processes…">
+            Continue
+          </ActionButton>
+        </div>
         <p className="mt-2 text-xs text-muted-foreground">Next, AutonomOS drafts your first process inventory from your website and connected systems.</p>
       </div>
     </>

@@ -33,7 +33,7 @@ describe("Composio directory", () => {
     const [shopify] = await searchDirectory("shopify");
     expect(shopify!.managedAuth).toBe(false);
     const [gmail] = await searchDirectory("gmail");
-    expect(gmail).toMatchObject({ managedAuth: true, logo: "g.png", category: "Communication" });
+    expect(gmail).toMatchObject({ managedAuth: true, logo: "g.png", category: "Email & chat", groups: ["communication"] });
   });
   it("lists twenty popular systems", () => {
     expect(POPULAR_TOOLKITS).toHaveLength(20);
@@ -50,6 +50,25 @@ describe("Composio directory", () => {
     expect(rest.map((t) => t.slug)).not.toContain("gmail");
     expect(rest.map((t) => t.slug)).not.toContain("stripe");
     expect(rest.slice(-2).map((t) => t.slug)).toEqual([POPULAR_BACKFILL[0], POPULAR_BACKFILL[1]]);
+  });
+  it("filters by business category and lists the best known systems first", async () => {
+    const { searchDirectory, directoryGroups } = await withDirectory();
+    toolkits.splice(
+      0,
+      toolkits.length,
+      { slug: "freshdesk", name: "Freshdesk", composio_managed_auth_schemes: [], meta: { description: "", categories: [{ name: "customer support" }] } },
+      { slug: "zendesk", name: "Zendesk", composio_managed_auth_schemes: ["OAUTH2"], meta: { description: "", categories: [{ name: "crm" }, { name: "customer support" }] } },
+      { slug: "xero", name: "Xero", composio_managed_auth_schemes: [], meta: { description: "", categories: [{ name: "accounting" }] } },
+    );
+    expect((await searchDirectory("", 30, new Set(), "support")).map((t) => t.slug)).toEqual(["zendesk", "freshdesk"]);
+    expect((await searchDirectory("", 30, new Set(), "sales")).map((t) => t.slug)).toEqual(["zendesk"]);
+    expect((await searchDirectory("fresh", 30, new Set(), "finance")).map((t) => t.slug)).toEqual([]);
+    expect(await directoryGroups()).toEqual(
+      expect.arrayContaining([
+        { key: "support", label: "Customer support", count: 2 },
+        { key: "finance", label: "Finance & accounting", count: 1 },
+      ]),
+    );
   });
   it("maps toolkit slugs to integration keys both ways", () => {
     expect(integrationKeyFor("googledrive")).toBe("google_drive");

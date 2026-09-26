@@ -1,4 +1,3 @@
-import { isMockMode, modelIdFor } from "@autonomos/ai";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { dateTime, num, usd } from "@/lib/format";
@@ -12,7 +11,6 @@ import { ReadinessChecklist } from "@/components/app/readiness-checklist";
 import { SettingsSection } from "@/components/app/settings-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { executionReadiness } from "@/server/readiness";
 import { listApiKeys, planUsage } from "@/server/platform";
 import { PLANS } from "@autonomos/schemas";
@@ -110,23 +108,6 @@ export default async function SettingsPage() {
           defaultOpen={!readiness.ready}
         >
           <ReadinessChecklist checks={readiness.checks} />
-          {admin ? (
-            <Collapsible className="mt-3">
-              <CollapsibleTrigger asChild>
-                <Button variant="link" size="sm" className="h-auto px-0 text-muted-foreground">
-                  Technical details
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2 space-y-1.5 text-xs">
-                {(["FAST_MODEL", "SMART_MODEL", "AGENT_MODEL"] as const).map((c) => (
-                  <div key={c} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="w-24 text-muted-foreground">{{ FAST_MODEL: "Quick tasks", SMART_MODEL: "Analysis", AGENT_MODEL: "Agents" }[c]}</span>
-                    <code className="break-all rounded bg-muted px-2 py-0.5">{isMockMode(c) ? "demo (scripted)" : modelIdFor(c)}</code>
-                  </div>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
-          ) : null}
         </SettingsSection>
 
         <SettingsSection

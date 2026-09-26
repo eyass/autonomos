@@ -79,7 +79,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
       ) : null}
       {run.status === "queued" ? (
         <Alert variant="info" className="mb-4">
-          <AlertDescription>Queued on the durable runtime. If this stays queued, check that the Trigger.dev worker is running.</AlertDescription>
+          <AlertDescription>Queued. It starts in a moment. If it is still waiting after a few minutes, ask your administrator to check that agents can run (Settings, Execution).</AlertDescription>
         </Alert>
       ) : null}
       {pending ? (

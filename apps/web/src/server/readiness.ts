@@ -33,7 +33,7 @@ export async function executionReadiness(session: Session): Promise<Readiness> {
       key: "runtime",
       label: "Agent runtime",
       ok: triggerConfigured(),
-      detail: triggerConfigured() ? "Connected. Runs are durable and survive restarts." : "Not connected, so agents cannot run yet. An administrator connects it once.",
+      detail: triggerConfigured() ? "Ready. Runs keep going through restarts and can wait for approvals." : "Not connected, so agents cannot run yet. An administrator connects it once.",
       href: "/docs/running-agents",
       blocking: true,
     },

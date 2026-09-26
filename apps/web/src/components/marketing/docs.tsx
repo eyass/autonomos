@@ -1,8 +1,6 @@
 import Link from "next/link";
 import type * as React from "react";
 
-export const README_URL = "https://github.com/eyass/autonomos#production-vercel--supabase--triggerdev";
-
 export type DocPage = { slug: string; href: string; title: string; description: string; body: () => React.ReactNode };
 
 // The public documentation. `DOCS_ROUTES` is the list the app can link to (for example a Help link to /docs).
@@ -162,8 +160,8 @@ function Integrations() {
       </p>
       <h2>Live accounts</h2>
       <p>
-        Connecting a live account starts an OAuth flow through Composio. Composio holds the tokens; AutonomOS stores only the connected account id. Production runs act on the live account once it is
-        connected.
+        Connecting a live account opens that system's own sign-in page. Our connection partner holds the sign-in tokens; AutonomOS stores only the connected account id. Production runs act on the live
+        account once it is connected.
       </p>
       <h2>Test runs</h2>
       <p>Test runs simulate every write, whichever way an integration is connected.</p>
@@ -176,7 +174,7 @@ function Integrations() {
 function RunningAgents() {
   return (
     <>
-      <p>AutonomOS runs agents on a durable runtime, so a run can wait hours for an approval and pick up exactly where it stopped.</p>
+      <p>Agent runs keep going through restarts, so a run can wait hours for an approval and pick up exactly where it stopped.</p>
       <h2>Test runs and production runs</h2>
       <ul>
         <li>A test run simulates every write and lists the approvals a production run would need.</li>
@@ -184,24 +182,8 @@ function RunningAgents() {
       </ul>
       <h2>Execution readiness</h2>
       <p>
-        Agents run only once the durable runtime (Trigger.dev) is connected to your workspace&apos;s deployment. Until then, AutonomOS will not start runs and tells you so. Connecting it is a one-time
-        task for an administrator. If you see that runs are unavailable, ask your administrator to complete the setup below.
-      </p>
-      <h2 id="administrators">For administrators</h2>
-      <p>Set these environment variables in the web host (for example Vercel) and the worker:</p>
-      <ul>
-        <li>
-          <code>TRIGGER_SECRET_KEY</code>: the Trigger.dev secret key for the environment the worker is deployed to. Required to run agents.
-        </li>
-        <li>
-          <code>GOOGLE_GENERATIVE_AI_API_KEY</code>: the key for Gemini, the default model provider. Without a model key, AI steps run in a mock mode.
-        </li>
-        <li>
-          <code>COMPOSIO_API_KEY</code>: optional, needed to connect live accounts. Without it, integrations use sandbox data only.
-        </li>
-      </ul>
-      <p>
-        The full production setup is in the <a href={README_URL}>README</a>.
+        Settings, Execution shows whether your workspace is ready to run agents. Until it is, AutonomOS will not start runs and tells you what is missing. If it says agents cannot run yet, ask your
+        administrator or contact support.
       </p>
     </>
   );
@@ -212,11 +194,11 @@ function Faq() {
     ["Do I need to connect live systems to try AutonomOS?", "No. Every integration can use sandbox data, and test runs simulate every write."],
     ["Can an agent do something it was not given a tool for?", "No. Each agent has an explicit tool allowlist, and the policy engine checks every write in code before it runs."],
     ["What stops an agent refunding the same order twice?", "Each write carries an idempotency key, so a retried step does not repeat the action."],
-    ["Which AI models are used?", "Google Gemini by default. An administrator can switch to Anthropic or OpenAI models."],
+    ["Which AI models are used?", "Leading commercial AI models, chosen per task. The providers are listed on the Security page."],
     [
       "Where is my data stored?",
       <>
-        In the Supabase project your workspace is deployed with. See <Link href="/security">Security</Link>.
+        In the region your workspace was set up in, the EU or the US. See <Link href="/security">Security</Link>.
       </>,
     ],
     [

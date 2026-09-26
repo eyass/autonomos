@@ -56,6 +56,13 @@ test("demo loop", async ({ page }) => {
     await expect(card.getByText(/Connected/)).toBeVisible();
   }
   await shot(page, "onboarding-connect");
+  // People can go back to the company info and return without losing connections
+  await page.getByRole("link", { name: "Back to company info" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/about$/);
+  await expect(page.getByRole("heading", { name: /Tell us about Acme Furniture/ })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/connect$/);
+  await expect(page.getByTestId("integration-zendesk").getByText(/Connected/)).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 
   // The first inventory is drafted without an interview
@@ -177,6 +184,11 @@ test("demo loop", async ({ page }) => {
     await expect(sheet.getByTestId("directory-zendesk")).toHaveCount(0);
     await expect(sheet.getByTestId("directory-stripe")).toHaveCount(0);
     await expect(sheet.getByTestId("directory-googledocs")).toBeVisible();
+    // Categories narrow the directory
+    await sheet.getByRole("group", { name: "Categories" }).getByRole("button", { name: "Finance & accounting" }).click();
+    await expect(sheet.getByTestId("directory-quickbooks")).toBeVisible({ timeout: 20_000 });
+    await expect(sheet.getByTestId("directory-gmail")).toHaveCount(0);
+    await sheet.getByRole("group", { name: "Categories" }).getByRole("button", { name: "All" }).click();
     await sheet.getByLabel("Search systems").fill("pipedrive");
     await expect(sheet.getByTestId("directory-pipedrive")).toBeVisible({ timeout: 20_000 });
     await page.keyboard.press("Escape");
