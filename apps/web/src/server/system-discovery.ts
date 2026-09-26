@@ -5,7 +5,7 @@ import { describeScan, sandboxHistory, scanSystem, SCANNABLE, type SystemScan } 
 import { SystemProcessProposalSchema, type SystemProcessProposal } from "@autonomos/schemas";
 import { activity, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
-import { companyContext, saveDiscoveredProcesses } from "@/server/processes";
+import { companyContext, rejectedTitles, saveDiscoveredProcesses } from "@/server/processes";
 
 // Discovery from connected systems, as a run the browser drives step by step so people see
 // each system being read: start → scan each system → propose → accept.
@@ -19,15 +19,19 @@ export type RunSystem = {
   sampled?: number;
   itemKind?: string;
   periodDays?: number | null;
+  estimatedTotal?: number | null;
 };
+
+export type ProposalStatus = "pending" | "approved" | "rejected" | "exists";
 
 export type DiscoveryRunView = {
   id: string;
   status: "scanning" | "proposing" | "ready" | "failed";
   systems: RunSystem[];
   summary: string | null;
-  proposals: Array<SystemProcessProposal & { exists: boolean }>;
+  proposals: Array<SystemProcessProposal & { exists: boolean; status: ProposalStatus }>;
   accepted: string[];
+  rejected: string[];
   createdAt: string;
   // Less than a day old.
   recent: boolean;
@@ -58,13 +62,20 @@ async function existingTitles(session: Session) {
 
 function toView(row: Record<string, unknown>, existing: string[]): DiscoveryRunView {
   const known = new Set(existing.map((t) => t.trim().toLowerCase()));
+  const accepted = (row.accepted as string[]) ?? [];
+  const rejected = (row.rejected as string[]) ?? [];
   return {
     id: row.id as string,
     status: row.status as DiscoveryRunView["status"],
     systems: (row.systems as RunSystem[]) ?? [],
     summary: (row.summary as string | null) ?? null,
-    proposals: ((row.proposals as SystemProcessProposal[]) ?? []).map((p) => ({ ...p, exists: known.has(p.title.trim().toLowerCase()) })),
-    accepted: (row.accepted as string[]) ?? [],
+    proposals: ((row.proposals as SystemProcessProposal[]) ?? []).map((p) => {
+      const exists = known.has(p.title.trim().toLowerCase());
+      const status: ProposalStatus = accepted.includes(p.title) ? "approved" : rejected.includes(p.title) ? "rejected" : exists ? "exists" : "pending";
+      return { ...p, exists, status };
+    }),
+    accepted,
+    rejected,
     createdAt: row.created_at as string,
     recent: Date.now() - new Date(row.created_at as string).getTime() < 86_400_000,
     error: (row.error as string | null) ?? null,
@@ -133,7 +144,7 @@ export async function scanRunSystem(session: Session, runId: string, key: string
     });
     updated = scan.unsupported
       ? { ...target, state: "skipped", line: scan.unsupported }
-      : { ...target, state: "done", sampled: scan.sampled, itemKind: scan.itemKind, periodDays: scan.periodDays, line: describeScan(scan, conn.name) };
+      : { ...target, state: "done", sampled: scan.sampled, itemKind: scan.itemKind, periodDays: scan.periodDays, estimatedTotal: scan.estimatedTotal ?? null, line: describeScan(scan, conn.name) };
     if (!scan.unsupported && scan.sampled) sample = { system: conn.name, summary: describeScan(scan, conn.name), periodDays: scan.periodDays, items: scan.items.slice(0, 100) };
   } catch (e) {
     console.error("system scan failed", key, e);
@@ -170,6 +181,7 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
       company: await companyContext(session),
       samples,
       existingProcesses: existing,
+      rejectedProcesses: await rejectedTitles(session),
       onUsage: (u) => recordUsage(session.org.id, u),
     });
     // Samples were only needed for this step; the run keeps counts and proposals.
@@ -213,6 +225,35 @@ export async function acceptProposals(session: Session, runId: string, titles: s
     .update({ accepted: [...new Set([...((run.accepted as string[]) ?? []), ...chosen.map((c) => c.title)])] as never })
     .eq("id", runId);
   return ids;
+}
+
+// "Not something we do": remembered for the workspace, so no later discovery proposes it again.
+export async function rejectProposal(session: Session, runId: string, title: string) {
+  const run = await loadRun(session, runId);
+  const proposal = ((run.proposals as SystemProcessProposal[]) ?? []).find((p) => p.title === title);
+  if (!proposal) throw new HttpError(404, "That proposal is not part of this run");
+  const db = adminDb();
+  const { error } = await db
+    .from("rejected_processes")
+    .upsert({ organization_id: session.org.id, title, department: proposal.department ?? null, rejected_by: session.user.id }, { onConflict: "organization_id,title", ignoreDuplicates: true });
+  if (error) throw new Error(`reject proposal: ${error.message}`);
+  await db
+    .from("discovery_runs")
+    .update({ rejected: [...new Set([...((run.rejected as string[]) ?? []), title])] as never })
+    .eq("organization_id", session.org.id)
+    .eq("id", runId);
+  await track(session, "process_proposal_rejected", { department: proposal.department ?? null });
+}
+
+export async function undoRejectProposal(session: Session, runId: string, title: string) {
+  const run = await loadRun(session, runId);
+  const db = adminDb();
+  await db.from("rejected_processes").delete().eq("organization_id", session.org.id).eq("title", title);
+  await db
+    .from("discovery_runs")
+    .update({ rejected: ((run.rejected as string[]) ?? []).filter((t) => t !== title) as never })
+    .eq("organization_id", session.org.id)
+    .eq("id", runId);
 }
 
 // Evidence lines for prompts elsewhere (opportunities, first inventory). Reads systems

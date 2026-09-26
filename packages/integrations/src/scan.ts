@@ -18,6 +18,8 @@ export type SystemScan = {
   periodDays: number | null;
   stats: Record<string, string | number>;
   items: ScanItem[];
+  // How many records the system holds in the window, when it says (the sample can be smaller).
+  estimatedTotal?: number;
   // Set when the system cannot be read yet; discovery continues without it.
   unsupported?: string;
 };
@@ -32,9 +34,9 @@ export const SCANNABLE = ["zendesk", "gmail", "stripe", "slack"];
 // item cap keeps prompts and API calls bounded.
 export type ScanLimit = { days: number; max: number };
 export const SCAN_LIMITS: Record<string, ScanLimit> = {
-  gmail: { days: 30, max: 100 },
-  outlook: { days: 30, max: 100 },
-  googlecalendar: { days: 30, max: 100 },
+  gmail: { days: 30, max: 250 },
+  outlook: { days: 30, max: 250 },
+  googlecalendar: { days: 30, max: 250 },
   zendesk: { days: 30, max: 100 },
   stripe: { days: 30, max: 100 },
   slack: { days: 30, max: 150 },
@@ -45,6 +47,7 @@ export const SCAN_LIMITS: Record<string, ScanLimit> = {
   jira: { days: 30, max: 100 },
   asana: { days: 30, max: 100 },
   notion: { days: 30, max: 100 },
+  googledrive: { days: 30, max: 150 },
 };
 export const DEFAULT_SCAN_LIMIT: ScanLimit = { days: 30, max: 50 };
 export const scanLimitFor = (integration: string): ScanLimit => SCAN_LIMITS[toolkitFor(integration)] ?? DEFAULT_SCAN_LIMIT;
@@ -217,6 +220,32 @@ function chatScan(integration: string, provider: SystemScan["provider"], raw: Ar
   };
 }
 
+function recordsScan(integration: string, raw: Array<Record<string, unknown>>, limit: ScanLimit, now: Date, itemKind = "records"): SystemScan {
+  const since = now.getTime() - limit.days * 86_400_000;
+  const items = raw
+    .map(genericItem)
+    .filter((i): i is ScanItem => Boolean(i) && (!i!.date || Date.parse(i!.date) >= since))
+    .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
+    .slice(0, limit.max);
+  return {
+    integration,
+    provider: "composio",
+    itemKind,
+    sampled: items.length,
+    periodDays: periodDays(
+      items.map((i) => i.date),
+      now,
+    ),
+    stats: { [itemKind]: items.length, top_labels: top(items.flatMap((i) => i.labels ?? [])) },
+    items,
+  };
+}
+
+// The window is what was read, even when the newest records are the only ones sampled.
+function withTotal(scan: SystemScan, total: number): SystemScan {
+  return total > scan.sampled ? { ...scan, estimatedTotal: total, stats: { ...scan.stats, total_in_window: total } } : scan;
+}
+
 // ---------------------------------------------------------------------------
 // Readers
 // ---------------------------------------------------------------------------
@@ -291,36 +320,131 @@ function firstList(d: unknown, depth = 0): Array<Record<string, unknown>> {
   return [];
 }
 
+// Equal slices of the lookback window, newest first. Reading a few records from each slice
+// covers the whole window, where "newest N" on a busy account covers only its last days.
+export function windowSlices(now: Date, days: number, n: number): Array<{ from: Date; to: Date }> {
+  const span = (days * 86_400_000) / n;
+  return Array.from({ length: n }, (_, i) => ({ from: new Date(now.getTime() - (i + 1) * span), to: new Date(now.getTime() - i * span) }));
+}
+const SLICES = 5;
+const sec = (d: Date) => Math.floor(d.getTime() / 1000);
+
+// Response fields that point at the next page, and the argument names tools take them in.
+const NEXT_FIELDS = ["nextPageToken", "next_page_token", "next_cursor", "nextCursor", "cursor"];
+const TOKEN_PARAMS = ["page_token", "pageToken", "start_cursor", "cursor", "next_page_token", "after"];
+function nextToken(d: Record<string, unknown>): string | null {
+  for (const f of NEXT_FIELDS) if (typeof d[f] === "string" && d[f]) return d[f] as string;
+  const after = (d.paging as { next?: { after?: unknown } } | undefined)?.next?.after;
+  return typeof after === "string" && after ? after : null;
+}
+
+// Calls a list action page by page until it has `max` rows or the pages run out.
+async function paged(
+  ctx: ScanContext,
+  slug: string,
+  args: Record<string, unknown>,
+  tokenParam: string | null,
+  max: number,
+  rows: (d: Record<string, unknown>) => Array<Record<string, unknown>>,
+  version?: string | null,
+) {
+  const out: Array<Record<string, unknown>> = [];
+  let token: string | null = null;
+  for (let page = 0; page < 10 && out.length < max; page++) {
+    const d = await exec(ctx, slug, token && tokenParam ? { ...args, [tokenParam]: token } : args, version);
+    out.push(...rows(d));
+    token = nextToken(d);
+    if (!token || !tokenParam) break;
+  }
+  return out.slice(0, max);
+}
+
 async function scanComposio(integration: string, ctx: ScanContext, limit: ScanLimit, now: Date): Promise<SystemScan> {
   const toolkit = toolkitFor(integration);
   const sinceMs = now.getTime() - limit.days * 86_400_000;
   const sinceSec = Math.floor(sinceMs / 1000);
   if (toolkit === "gmail") {
-    const d = await exec(ctx, "GMAIL_FETCH_EMAILS", { query: `newer_than:${limit.days}d -category:promotions -category:social`, max_results: limit.max, include_payload: false, verbose: false });
-    const messages = arr(d.messages).map((m) => ({
-      subject: m.subject,
-      snippet: (m.preview as { body?: string } | undefined)?.body ?? m.snippet ?? m.messageText,
-      from: m.sender ?? m.from,
-      labels: m.labelIds,
-      received_at: iso(m.messageTimestamp ?? m.internalDate),
-    }));
-    return emailsScan(integration, "composio", messages, limit, now);
+    // A few messages from each slice of the month, and Gmail's own count of the rest.
+    const slices = windowSlices(now, limit.days, SLICES);
+    const per = Math.ceil(limit.max / slices.length);
+    const pages = await Promise.all(
+      slices.map((w) =>
+        exec(ctx, "GMAIL_FETCH_EMAILS", { query: `after:${sec(w.from)} before:${sec(w.to)} -category:promotions -category:social`, max_results: per, include_payload: false, verbose: false }),
+      ),
+    );
+    const messages = pages.flatMap((d) =>
+      arr(d.messages).map((m) => ({
+        subject: m.subject,
+        snippet: (m.preview as { body?: string } | undefined)?.body ?? m.snippet ?? m.messageText,
+        from: m.sender ?? m.from,
+        labels: m.labelIds,
+        received_at: iso(m.messageTimestamp ?? m.internalDate),
+      })),
+    );
+    const total = pages.reduce((n, d) => n + Math.max(Number(d.resultSizeEstimate ?? 0), arr(d.messages).length), 0);
+    return withTotal(emailsScan(integration, "composio", messages, limit, now), total);
   }
   if (toolkit === "outlook") {
-    const d = await exec(ctx, "OUTLOOK_OUTLOOK_LIST_MESSAGES", { top: limit.max });
-    const messages = firstList(d).map((m) => ({
-      subject: m.subject,
-      snippet: m.bodyPreview,
-      from: (m.from as { emailAddress?: { address?: string } } | undefined)?.emailAddress?.address,
-      labels: m.categories,
-      received_at: iso(m.receivedDateTime),
-    }));
+    const slices = windowSlices(now, limit.days, SLICES);
+    const per = Math.ceil(limit.max / slices.length);
+    const pages = await Promise.all(
+      slices.map((w) => exec(ctx, "OUTLOOK_OUTLOOK_LIST_MESSAGES", { top: per, received_date_time_ge: w.from.toISOString(), received_date_time_lt: w.to.toISOString() })),
+    );
+    const messages = pages.flatMap((d) =>
+      (arr(d.value).length ? arr(d.value) : firstList(d)).map((m) => ({
+        subject: m.subject,
+        snippet: m.bodyPreview,
+        from: (m.from as { emailAddress?: { address?: string } } | undefined)?.emailAddress?.address,
+        labels: m.categories,
+        received_at: iso(m.receivedDateTime),
+      })),
+    );
     return emailsScan(integration, "composio", messages, limit, now);
   }
   if (toolkit === "googlecalendar") {
-    const d = await exec(ctx, "GOOGLECALENDAR_FIND_EVENT", { timeMin: new Date(sinceMs).toISOString(), timeMax: now.toISOString(), max_results: limit.max, single_events: true });
-    const events = firstList(d).map((e) => ({ summary: e.summary, description: e.description, start: iso(e.start), recurring: Boolean(e.recurringEventId) }));
-    return eventsScan(integration, "composio", events, limit, now);
+    // Every event of the last 30 days on the main calendar, recurring ones expanded.
+    const events = (
+      await paged(
+        ctx,
+        "GOOGLECALENDAR_EVENTS_LIST",
+        { calendarId: "primary", timeMin: new Date(sinceMs).toISOString(), timeMax: now.toISOString(), singleEvents: true, orderBy: "startTime", maxResults: Math.min(250, limit.max) },
+        "pageToken",
+        limit.max * 4,
+        (d) => arr(d.items),
+      )
+    )
+      .filter((e) => e.status !== "cancelled")
+      .map((e) => ({ summary: e.summary, description: e.description, start: iso(e.start), recurring: Boolean(e.recurringEventId) }));
+    return withTotal(eventsScan(integration, "composio", events, limit, now), events.length);
+  }
+  if (toolkit === "googledrive") {
+    const slices = windowSlices(now, limit.days, SLICES);
+    const per = Math.ceil(limit.max / slices.length);
+    const pages = await Promise.all(
+      slices.map((w) =>
+        exec(ctx, "GOOGLEDRIVE_LIST_FILES", {
+          q: `modifiedTime > '${w.from.toISOString()}' and modifiedTime <= '${w.to.toISOString()}' and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+          orderBy: "modifiedTime desc",
+          pageSize: per,
+          fields: "nextPageToken,files(name,mimeType,modifiedTime,createdTime)",
+        }),
+      ),
+    );
+    return recordsScan(
+      integration,
+      pages.flatMap((d) => arr(d.files)),
+      limit,
+      now,
+      "files",
+    );
+  }
+  if (toolkit === "notion") {
+    // Pages edited most recently first, until the window or the cap runs out.
+    const since = sinceMs;
+    const pages = await paged(ctx, "NOTION_SEARCH_NOTION_PAGE", { query: "", page_size: 100, timestamp: "last_edited_time", direction: "descending" }, "start_cursor", limit.max, (d) =>
+      firstList(d).filter((p) => Date.parse(String(p.last_edited_time ?? "")) >= since || !p.last_edited_time),
+    );
+    return recordsScan(integration, pages, limit, now, "pages");
   }
   if (toolkit === "zendesk") {
     const d = await exec(ctx, "ZENDESK_LIST_ZENDESK_TICKETS", { per_page: limit.max, sort_by: "created_at", sort_order: "desc" });
@@ -415,8 +539,24 @@ function pick(o: Record<string, unknown>, fields: string[]): unknown {
   return undefined;
 }
 
+// Notion keeps a page's title in whichever property has type "title".
+function notionTitle(o: Record<string, unknown>): string | undefined {
+  const props = o.properties;
+  if (!props || typeof props !== "object") return undefined;
+  for (const v of Object.values(props as Record<string, { type?: string; title?: Array<{ plain_text?: string }> }>)) {
+    if (v?.type === "title" && Array.isArray(v.title))
+      return (
+        v.title
+          .map((t) => t.plain_text ?? "")
+          .join("")
+          .trim() || undefined
+      );
+  }
+  return undefined;
+}
+
 export function genericItem(o: Record<string, unknown>): ScanItem | null {
-  const title = pick(o, TITLE_FIELDS);
+  const title = pick(o, TITLE_FIELDS) ?? notionTitle(o);
   if (title === undefined) return null;
   const labels = LABEL_FIELDS.map((f) => pick(o, [f]))
     .filter((v) => typeof v === "string" || typeof v === "number")
@@ -452,12 +592,8 @@ function curatedReads(toolkit: string, sinceIso: string, max: number): Read[] | 
       return [{ slug: "JIRA_SEARCH_FOR_ISSUES_USING_JQL_GET", args: { jql: `created >= -${days}d ORDER BY created DESC`, max_results: max, fields: "summary,status,issuetype,created" } }];
     case "intercom":
       return [{ slug: "INTERCOM_LIST_CONVERSATIONS", args: { per_page: Math.min(max, 150) } }];
-    case "googledrive":
-      return [{ slug: "GOOGLEDRIVE_LIST_FILES", args: { pageSize: max, q: `modifiedTime > '${sinceIso}' and trashed = false`, fields: "files(name,mimeType,modifiedTime,createdTime)" } }];
     case "googlesheets":
       return [{ slug: "GOOGLESHEETS_SEARCH_SPREADSHEETS", args: { max_results: max, modified_after: sinceIso } }];
-    case "notion":
-      return [{ slug: "NOTION_SEARCH_NOTION_PAGE", args: { page_size: max } }];
     default:
       return null;
   }
@@ -474,7 +610,7 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
   let reads = curatedReads(toolkit, sinceIso, limit.max);
   if (!reads && toolkit === "microsoft_teams") return scanTeams(integration, ctx, limit, now);
   if (!reads) {
-    const tools = (await readOnlyTools(toolkit))
+    const tools = (await readOnlyTools(toolkit).catch(() => []))
       .filter((t) => t.required.length === 0 && /(LIST|FETCH|SEARCH|GET_ALL|RECENT)/.test(t.slug) && WORK.test(t.slug) && !CONFIG.test(t.slug.replace(/^[A-Z]+_/, "")))
       .sort((a, b) => rank(a.slug) - rank(b.slug))
       .slice(0, 2);
@@ -493,13 +629,14 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
     return { integration, provider: "composio", itemKind: "records", sampled: 0, periodDays: null, stats: {}, items: [], unsupported: "AutonomOS cannot read this system for discovery yet." };
   }
   const per = Math.ceil(limit.max / reads.length);
+  const meta = await readOnlyTools(toolkit).catch(() => []);
   const items: ScanItem[] = [];
   const used: string[] = [];
   for (const r of reads) {
     try {
-      const rows = firstList(await exec(ctx, r.slug, r.args, r.version))
-        .map(genericItem)
-        .filter((i): i is ScanItem => Boolean(i));
+      const props = meta.find((t) => t.slug === r.slug)?.properties ?? {};
+      const tokenParam = TOKEN_PARAMS.find((p) => props[p]) ?? null;
+      const rows = (await paged(ctx, r.slug, r.args, tokenParam, per * 3, (d) => firstList(d), r.version)).map(genericItem).filter((i): i is ScanItem => Boolean(i));
       const recent = rows.filter((i) => !i.date || Date.parse(i.date) >= Date.parse(sinceIso)).slice(0, per);
       if (recent.length) {
         items.push(...recent);
@@ -555,5 +692,6 @@ export function describeScan(scan: SystemScan, name = scan.integration): string 
     .slice(0, 5)
     .map((i) => `"${i.title}"`)
     .join(", ");
-  return `${name} (${scan.provider === "sandbox" ? "sandbox" : "live"}): ${scan.sampled} ${scan.itemKind}${scan.periodDays ? ` over ${scan.periodDays} days` : ""}. ${stats}${examples ? `. Examples: ${examples}` : ""}`;
+  const total = scan.estimatedTotal && scan.estimatedTotal > scan.sampled ? ` (a sample of about ${scan.estimatedTotal} in that time; scale volumes to the total)` : "";
+  return `${name} (${scan.provider === "sandbox" ? "sandbox" : "live"}): ${scan.sampled} ${scan.itemKind}${scan.periodDays ? ` over ${scan.periodDays} days` : ""}${total}. ${stats}${examples ? `. Examples: ${examples}` : ""}`;
 }

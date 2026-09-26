@@ -362,6 +362,7 @@ export const ANALYTICS_EVENTS = [
   "process_discovery_started",
   "process_created",
   "process_reviewed",
+  "process_proposal_rejected",
   "opportunity_generated",
   "opportunity_approved",
   "agent_created",

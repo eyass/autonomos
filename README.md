@@ -69,9 +69,9 @@ Discover → "From your systems" reads a recent sample from every connected syst
 
   | System | Window | Cap | Composio action |
   | --- | --- | --- | --- |
-  | Gmail | 30 days (promotions and social excluded) | 100 messages | `GMAIL_FETCH_EMAILS` |
-  | Outlook | 30 days | 100 messages | `OUTLOOK_OUTLOOK_LIST_MESSAGES` |
-  | Google Calendar | 30 days | 100 events | `GOOGLECALENDAR_FIND_EVENT` |
+  | Gmail | 30 days, sampled evenly in 5 slices (promotions and social excluded), plus Gmail's count of the total | 250 messages | `GMAIL_FETCH_EMAILS` |
+  | Outlook | 30 days, sampled evenly in 5 slices | 250 messages | `OUTLOOK_OUTLOOK_LIST_MESSAGES` |
+  | Google Calendar | 30 days, every page, recurring events expanded | 250 events | `GOOGLECALENDAR_EVENTS_LIST` |
   | Zendesk | 30 days | 100 tickets | `ZENDESK_LIST_ZENDESK_TICKETS` |
   | Stripe | 30 days | 100 charges plus refunds | `STRIPE_LIST_CHARGES`, `STRIPE_LIST_REFUNDS` |
   | Slack | 30 days, 6 busiest channels | 150 messages | `SLACK_LIST_ALL_CHANNELS`, `SLACK_FETCH_CONVERSATION_HISTORY` |
@@ -79,12 +79,15 @@ Discover → "From your systems" reads a recent sample from every connected syst
   | HubSpot | 30 days | 100 tickets and deals | `HUBSPOT_LIST_TICKETS`, `HUBSPOT_HUBSPOT_LIST_DEALS` |
   | Salesforce | 30 days | 100 cases and opportunities | `SALESFORCE_EXECUTE_SOQL_QUERY` |
   | Jira | 30 days | 100 issues | `JIRA_SEARCH_FOR_ISSUES_USING_JQL_GET` |
-  | Intercom, Notion | 30 days | 100 items | `INTERCOM_LIST_CONVERSATIONS`, `NOTION_SEARCH_NOTION_PAGE` |
-  | Anything else (Asana: 100) | 30 days | 50 items | up to two read-only list actions picked from the toolkit |
+  | Google Drive | 30 days, sampled evenly in 5 slices | 150 files | `GOOGLEDRIVE_LIST_FILES` |
+  | Notion | 30 days, most recently edited first, every page | 100 pages | `NOTION_SEARCH_NOTION_PAGE` |
+  | Intercom | 30 days | 100 conversations | `INTERCOM_LIST_CONVERSATIONS` |
+  | Anything else (Asana: 100) | 30 days | 50 items | up to two read-only list actions picked from the toolkit, followed page by page |
 
   Limits live in `SCAN_LIMITS` and `DEFAULT_SCAN_LIMIT` (`packages/integrations/src/scan.ts`). Sandbox systems get a month of fictional history the first time they are read. Systems whose toolkit has no suitable read action are shown as "cannot read this system for discovery yet".
 - **Privacy:** only subjects, short snippets, tags, dates and amounts are kept. Email addresses become their domain; phone numbers and IBANs are removed before anything reaches the model. The redacted sample is deleted once proposals are made; a run keeps counts and proposals (`discovery_runs`).
 - **Exhaustive by design:** two model passes run side by side. One lists every recurring process the data shows (up to 35, small and infrequent ones included); the other goes department by department and adds work a company like this almost certainly runs but the sample does not show (up to 25). They are merged and deduplicated (at most 60, `DISCOVERY_LIMITS`). Inferred ones are capped at confidence 0.45, listed under "Likely for a company like yours" and not preselected. The first inventory at onboarding drafts 12 to 25 processes.
+- **Review, one at a time:** proposals are shown one by one, evidenced first: "Add to inventory" saves it as a draft, "Not something we do" rejects it, "Decide later" moves it to the end (keys: left, right, down). Rejections are stored per workspace (`rejected_processes`) and passed to every later discovery run and the first inventory, which never propose them or a rewording of them again. A rejection can be undone straight away or restored from the summary.
 - **Output:** each proposal carries evidence ("5 of 15 tickets are about order status") and a volume estimate scaled from the sample. Accepted proposals become draft processes with a "Found in your systems" card.
 - **Interview:** the guided interview opens with what the systems showed for that department and asks about what the data cannot show.
 
