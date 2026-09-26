@@ -1,7 +1,7 @@
 "use client";
 import { CircleAlert, CircleCheck, CircleDashed, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { proposeAction, scanSystemAction, startDiscoveryAction } from "./actions";
+import { getDiscoveryRunAction, startDiscoveryAction } from "./actions";
 import { ProposalReview } from "./proposal-review";
 import type { DiscoveryRunView, RunSystem } from "@/server/system-discovery";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,14 +11,28 @@ import { Spinner } from "@/components/ui/spinner";
 
 type Phase = "idle" | "reading" | "proposing" | "ready" | "error";
 
-// Reads every connected system, one at a time so progress is real, then proposes processes
-// with the evidence behind each. Starts on its own when there is no recent result.
+// Reads every connected system on the server, one at a time so progress is real, then
+// proposes processes with the evidence behind each. Starts on its own when there is no
+// recent result, and picks up a run already in progress after a reload.
+const phaseOf = (run: DiscoveryRunView | null): Phase => (!run ? "idle" : run.status === "ready" ? "ready" : run.status === "failed" ? "error" : run.status === "proposing" ? "proposing" : "reading");
+
 export function SystemDiscovery({ initialRun, autoStart }: { initialRun: DiscoveryRunView | null; autoStart: boolean }) {
   const [run, setRun] = useState<DiscoveryRunView | null>(initialRun?.status === "ready" ? initialRun : null);
   const [systems, setSystems] = useState<RunSystem[]>(initialRun?.systems ?? []);
-  const [phase, setPhase] = useState<Phase>(initialRun?.status === "ready" ? "ready" : "idle");
+  const [phase, setPhase] = useState<Phase>(initialRun?.status === "failed" ? "idle" : phaseOf(initialRun));
   const [error, setError] = useState<string | null>(null);
+  // The run being followed. Discovery runs on the server; the page only watches it, so
+  // closing or reloading the page does not stop it.
+  const [watching, setWatching] = useState<string | null>(initialRun && (initialRun.status === "scanning" || initialRun.status === "proposing") ? initialRun.id : null);
   const started = useRef(false);
+
+  const show = (view: DiscoveryRunView) => {
+    setSystems(view.systems);
+    setPhase(phaseOf(view));
+    if (view.status === "ready") setRun(view);
+    if (view.status === "failed") setError(view.error ?? "Reading failed. Read again to start over.");
+    if (view.status === "ready" || view.status === "failed") setWatching(null);
+  };
 
   const go = async () => {
     setError(null);
@@ -29,30 +43,35 @@ export function SystemDiscovery({ initialRun, autoStart }: { initialRun: Discove
       setPhase("error");
       return setError(r.error);
     }
-    let list = r.data.systems;
-    setSystems(list);
-    for (const s of list.filter((x) => x.state === "pending")) {
-      const res = await scanSystemAction(r.data.id, s.key);
-      const next = res.ok ? res.data : { ...s, state: "failed" as const, line: res.error };
-      list = list.map((x) => (x.key === s.key ? next : x));
-      setSystems(list);
-    }
-    setPhase("proposing");
-    const p = await proposeAction(r.data.id);
-    if (!p.ok) {
-      setPhase("error");
-      return setError(p.error);
-    }
-    setRun(p.data);
-    setPhase("ready");
+    show(r.data);
+    setWatching(r.data.id);
   };
 
   useEffect(() => {
-    if (!autoStart || started.current) return;
+    if (!watching) return;
+    let stop = false;
+    const tick = async () => {
+      if (stop) return;
+      const r = await getDiscoveryRunAction(watching);
+      if (stop) return;
+      if (r.ok) show(r.data);
+      if (!r.ok || r.data.status === "scanning" || r.data.status === "proposing") setTimeout(() => void tick(), 2000);
+    };
+    const t = setTimeout(() => void tick(), 1500);
+    return () => {
+      stop = true;
+      clearTimeout(t);
+    };
+    // show only uses state setters.
+  }, [watching]);
+
+  useEffect(() => {
+    if (!autoStart || started.current || watching) return;
     started.current = true;
     const t = setTimeout(() => void go(), 0);
     return () => clearTimeout(t);
     // Runs once on mount; go only uses state setters and server actions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart]);
 
   const busy = phase === "reading" || phase === "proposing";
@@ -63,6 +82,7 @@ export function SystemDiscovery({ initialRun, autoStart }: { initialRun: Discove
           <CardTitle>{busy ? "Reading your connected systems" : "What your systems show"}</CardTitle>
           <CardDescription>
             AutonomOS reads a recent sample from each connected system and proposes the recurring work it finds. Personal details are removed first, and nothing changes in your systems.
+            {busy ? " This runs in the background: you can leave this page and come back." : ""}
           </CardDescription>
           {phase === "ready" || phase === "error" || phase === "idle" ? (
             <CardAction>
