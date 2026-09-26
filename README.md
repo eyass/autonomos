@@ -59,7 +59,7 @@ AutonomOS asks for as little as possible and drafts the rest for review:
 
 ### Adding systems
 
-Integrations → "Add systems" (and the same button in onboarding) lists the 20 most connected systems first (Gmail, Google Calendar, Outlook, Slack, Teams, Stripe, HubSpot, Salesforce, Zendesk, Intercom, Notion, Google Drive, Google Sheets, Facebook, Instagram, LinkedIn, Jira, Asana, Airtable, Mailchimp) and searches the whole Composio directory (about 1,500 toolkits, cached for an hour, `packages/integrations/src/directory.ts`). Connecting one adds it to the workspace (`integrations.source = 'directory'`) and opens its sign-in. Toolkits without Composio-managed sign-in show "Needs setup": add an auth config in Composio and list it in `COMPOSIO_AUTH_CONFIGS`.
+Integrations → "Add systems" (and the same button in onboarding) lists 20 popular systems first (Gmail, Google Calendar, Outlook, Slack, Teams, Stripe, HubSpot, Salesforce, Zendesk, Intercom, Notion, Google Drive, Google Sheets, Facebook, Instagram, LinkedIn, Jira, Asana, Airtable, Mailchimp). Systems the workspace has already connected are left out and replaced by the next most common ones (`POPULAR_BACKFILL`: Google Docs, OneDrive, Zoom, Google Meet, QuickBooks, Trello and so on). Search covers the whole Composio directory (about 1,500 toolkits, cached for an hour, `packages/integrations/src/directory.ts`). Connecting one adds it to the workspace (`integrations.source = 'directory'`) and opens its sign-in. Toolkits without Composio-managed sign-in show "Needs setup": add an auth config in Composio and list it in `COMPOSIO_AUTH_CONFIGS`.
 
 ### Discovery from connected systems
 

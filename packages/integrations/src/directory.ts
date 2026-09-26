@@ -36,6 +36,35 @@ export const POPULAR_TOOLKITS = [
   "mailchimp",
 ] as const;
 
+// Next most common, in order. They take the place of popular systems a workspace has already
+// connected, so the popular list always shows 20 systems still to connect.
+export const POPULAR_BACKFILL = [
+  "googledocs",
+  "one_drive",
+  "zoom",
+  "googlemeet",
+  "quickbooks",
+  "trello",
+  "monday",
+  "clickup",
+  "dropbox",
+  "github",
+  "calendly",
+  "typeform",
+  "confluence",
+  "linear",
+  "whatsapp",
+  "youtube",
+  "zoho",
+  "gitlab",
+  "discord",
+  "figma",
+  "canva",
+  "miro",
+  "todoist",
+  "basecamp",
+] as const;
+
 // AutonomOS integration keys that differ from the Composio toolkit slug.
 export const TOOLKIT_TO_KEY: Record<string, string> = { googledrive: "google_drive" };
 export const KEY_TO_TOOLKIT: Record<string, string> = Object.fromEntries(Object.entries(TOOLKIT_TO_KEY).map(([t, k]) => [k, t]));
@@ -97,15 +126,22 @@ export async function listDirectory(): Promise<DirectoryToolkit[]> {
   return items;
 }
 
-export async function popularToolkits(): Promise<DirectoryToolkit[]> {
+// The 20 most common systems, skipping the ones already connected (toolkit slugs).
+export async function popularToolkits(exclude: ReadonlySet<string> = new Set(), count = POPULAR_TOOLKITS.length): Promise<DirectoryToolkit[]> {
   const all = await listDirectory();
-  return POPULAR_TOOLKITS.map((slug) => all.find((t) => t.slug === slug)).filter((t): t is DirectoryToolkit => Boolean(t));
+  const bySlug = new Map(all.map((t) => [t.slug, t]));
+  return [...POPULAR_TOOLKITS, ...POPULAR_BACKFILL]
+    .filter((slug) => !exclude.has(slug))
+    .map((slug) => bySlug.get(slug))
+    .filter((t): t is DirectoryToolkit => Boolean(t))
+    .slice(0, count);
 }
 
 // Name matches first, then slug, then description.
-export async function searchDirectory(query: string, limit = 30): Promise<DirectoryToolkit[]> {
+// An empty query gives the popular list, without the systems in `connected` (toolkit slugs).
+export async function searchDirectory(query: string, limit = 30, connected: ReadonlySet<string> = new Set()): Promise<DirectoryToolkit[]> {
   const q = query.trim().toLowerCase();
-  if (!q) return popularToolkits();
+  if (!q) return popularToolkits(connected);
   const all = await listDirectory();
   const score = (t: DirectoryToolkit) => {
     const name = t.name.toLowerCase();

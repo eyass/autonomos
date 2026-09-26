@@ -148,6 +148,10 @@ test("demo loop", async ({ page }) => {
     const sheet = page.getByRole("dialog", { name: "Add systems" });
     await expect(sheet.getByTestId("directory-gmail")).toBeVisible({ timeout: 20_000 });
     await expect(sheet.getByRole("list", { name: "Systems" }).getByRole("listitem")).toHaveCount(20);
+    // Zendesk and Stripe are connected, so the next most common systems take their place
+    await expect(sheet.getByTestId("directory-zendesk")).toHaveCount(0);
+    await expect(sheet.getByTestId("directory-stripe")).toHaveCount(0);
+    await expect(sheet.getByTestId("directory-googledocs")).toBeVisible();
     await sheet.getByLabel("Search systems").fill("pipedrive");
     await expect(sheet.getByTestId("directory-pipedrive")).toBeVisible({ timeout: 20_000 });
     await page.keyboard.press("Escape");
