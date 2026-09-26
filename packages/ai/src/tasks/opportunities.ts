@@ -78,7 +78,7 @@ export async function generateAgentDraft(input: {
       "Pick the smallest set of tools the agent needs from availableTools. Never suggest a tool key that is not in the list.",
       "Write instructions as operating procedure: objective, business context, must-follow rules, expected steps, when to escalate, how completion is determined.",
       "Escalation conditions must include missing data, ambiguous policy and suspected fraud where relevant.",
-      "Use plain business language, not agent jargon.",
+      "Use plain business language, not agent jargon. Name the agent after the work it does, for example \"Refund handling\", never with words like Agent, Bot, Ops or AI.",
     ],
     sections: [
       section("company_context", input.company),

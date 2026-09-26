@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.63",
+    "@ai-sdk/google": "^4.0.82",
     "@ai-sdk/openai": "^4.0.75",
     "@autonomos/schemas": "workspace:*",
     "ai": "^7.0.114",

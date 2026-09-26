@@ -176,6 +176,14 @@ export const OpportunityGenerationSchema = z.object({
 // Agent configuration (PRD sections 31-35, 101)
 // ---------------------------------------------------------------------------
 
+export const INTEGRATION_EVENTS = [
+  { key: "zendesk.ticket.created", label: "Zendesk ticket created", integration: "zendesk" },
+  { key: "stripe.payment.failed", label: "Stripe payment failed", integration: "stripe" },
+  { key: "hubspot.deal.stage_changed", label: "HubSpot deal stage changed", integration: "hubspot" },
+] as const;
+
+export const IntegrationEventKey = z.enum(INTEGRATION_EVENTS.map((e) => e.key) as [string, ...string[]]);
+
 export const TriggerConfigSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("manual") }),
   z.object({
@@ -185,16 +193,11 @@ export const TriggerConfigSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("integration_event"),
-    event: z.string().min(3),
+    event: IntegrationEventKey,
   }),
 ]);
 export type TriggerConfig = z.infer<typeof TriggerConfigSchema>;
 
-export const INTEGRATION_EVENTS = [
-  { key: "zendesk.ticket.created", label: "Zendesk ticket created", integration: "zendesk" },
-  { key: "stripe.payment.failed", label: "Stripe payment failed", integration: "stripe" },
-  { key: "hubspot.deal.stage_changed", label: "HubSpot deal stage changed", integration: "hubspot" },
-] as const;
 
 export const InstructionsSchema = z.object({
   objective: z.string().min(1),

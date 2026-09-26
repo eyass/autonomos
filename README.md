@@ -64,17 +64,19 @@ pnpm dev                             # http://localhost:3000
 
 ### Running agents (Trigger.dev)
 
-Agents only run on the durable runtime. Without `TRIGGER_SECRET_KEY` the app refuses to start runs and says so.
+Agents only run on the durable runtime. Without `TRIGGER_SECRET_KEY` the app refuses to start runs and says so. The project (`proj_xytjychoihbtmbxoztql`) is set in `packages/workflows/trigger.config.ts`; tasks live in `packages/workflows/src/trigger`.
 
-1. Set `TRIGGER_SECRET_KEY` (dev key) and `TRIGGER_PROJECT_REF` in `.env.local`.
-2. `npx trigger.dev@latest login` once, then `pnpm trigger:dev` to run the worker locally.
-3. For production, `pnpm --filter @autonomos/workflows deploy` and set the same environment variables in Trigger.dev (Supabase URL, service role key, model and Composio keys).
+1. Put your dev secret key in `.env.local` as `TRIGGER_SECRET_KEY`.
+2. `npx trigger.dev@latest login` once, then `pnpm trigger:dev`. The script loads the root `.env.local` into the worker, because `trigger dev` only reads env files from its own directory.
+3. Deploy with `pnpm --filter @autonomos/workflows deploy`. It passes the root `.env.local` to the CLI and the `syncEnvVars` build extension copies the runtime variables (Supabase, model, Composio and email keys) into the Trigger.dev environment. Deploy from an env file that holds production values, not your local Supabase URL. Set the production `TRIGGER_SECRET_KEY` in your web host (for example Vercel).
 
 ### Models
 
-Set `ANTHROPIC_API_KEY`. Defaults: FAST `claude-haiku-4-5`, SMART and AGENT `claude-opus-5`. Override with `AI_FAST_MODEL`, `AI_SMART_MODEL`, `AI_AGENT_MODEL`, or switch provider with `AI_PROVIDER=openai`. Without a key, every AI step runs in a deterministic mock mode that follows the refund template, so the whole product works offline. Settings shows which mode is active.
+Gemini is the default provider. Set `GOOGLE_GENERATIVE_AI_API_KEY`. Defaults: FAST `gemini-3.5-flash-lite`, SMART and AGENT `gemini-3.8-flash`. Override any class with `AI_FAST_MODEL`, `AI_SMART_MODEL` or `AI_AGENT_MODEL`, or switch provider with `AI_PROVIDER=anthropic` (Claude) or `AI_PROVIDER=openai`. Without a key, every AI step runs in a deterministic mock mode that follows the refund template, so the whole product works offline. Settings shows which models and mode are active.
 
-Costs are recorded per call using Anthropic list prices (Haiku 4.5 $1 / $5, Opus 5 $5 / $25 per million input / output tokens, cache reads at 0.1× input). Add other models with `AI_MODEL_PRICING`. OpenAI models have no built-in price table, so their cost records as 0 until you add one.
+Measured on Gemini 3.8 Flash: a full refund run (read ticket, find customer, payments and refunds, refund, reply, close) takes about 26 seconds and costs about $0.036; discovery, opportunity and agent drafting together cost about $0.03.
+
+Costs are recorded per call from a price table in `packages/ai/src/models.ts` (Gemini paid tier as of 2026-09-26, Anthropic list prices). Gemini 3.7 and 3.8 Flash prices are introductory and double on 2027-01-01. Override or add models with `AI_MODEL_PRICING`. OpenAI models have no built-in price table, so their cost records as 0 until you add one.
 
 ### Integrations
 
@@ -115,7 +117,7 @@ The Playwright suite points the SDK at a local Trigger.dev test double (`apps/we
 
 ## Known limits
 
-- The Trigger.dev worker was not run in the build environment (it needs a personal access token and project ref); the task code is exercised through the engine tests and the Playwright test double. One enqueue against the real Trigger.dev API succeeded.
+- The Trigger.dev worker was not run in the build environment (the CLI needs an interactive login). The task files bundle cleanly with esbuild and the task code is exercised through the engine tests and the Playwright test double. One enqueue against the real Trigger.dev API succeeded.
 - The Composio provider has not executed actions against live Zendesk or Stripe accounts; slugs and argument names are verified, response parsing is defensive.
 - The rate limiter is in memory per instance.
 - Microsoft sign-in, Slack approvals, reusable organisation-wide policies and the lead qualification and weekly reporting templates are not built yet. The run engine and tool catalog support them.
