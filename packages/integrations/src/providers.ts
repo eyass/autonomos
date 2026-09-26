@@ -305,7 +305,7 @@ export function getComposio(): Composio {
 
 async function runComposio(def: ToolDefinition, args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<unknown> {
   const mapping = COMPOSIO_MAPPINGS[def.key];
-  if (!mapping) throw new ToolError("not_connected", `${def.key} is not available through Composio yet`);
+  if (!mapping) throw new ToolError("not_connected", `${def.key} cannot be connected to a live account yet`);
   if (!ctx.connection?.externalAccountId) throw new ToolError("not_connected", `${def.integration} has no connected account`);
   try {
     const response = await getComposio().tools.execute(mapping.slug, {

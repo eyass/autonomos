@@ -1,5 +1,5 @@
 import "server-only";
-import { composioConfigured, getComposio, getToolkit, integrationKeyFor, sandboxSeed, searchDirectory, startComposioConnection, toolkitFor } from "@autonomos/integrations";
+import { composioConfigured, directoryGroups, getComposio, getToolkit, integrationKeyFor, sandboxSeed, searchDirectory, startComposioConnection, toolkitFor } from "@autonomos/integrations";
 import { sandboxStore } from "@autonomos/db";
 import { audit, activity, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
@@ -18,12 +18,17 @@ export function canUseComposio() {
 
 export type DirectoryEntry = { slug: string; key: string; name: string; description: string; logo: string | null; category: string; managedAuth: boolean; connected: boolean };
 
-export async function searchIntegrationDirectory(session: Session, query: string): Promise<DirectoryEntry[]> {
+export async function directoryCategories() {
+  if (!composioConfigured()) return [];
+  return directoryGroups();
+}
+
+export async function searchIntegrationDirectory(session: Session, query: string, group: string | null = null): Promise<DirectoryEntry[]> {
   if (!composioConfigured()) return [];
   const { data: conns } = await adminDb().from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected");
   const connected = new Set((conns ?? []).map((c) => c.integration_key));
   // Popular systems already connected are replaced by the next most common ones.
-  const results = await searchDirectory(query.slice(0, 80), 30, new Set([...connected].map(toolkitFor)));
+  const results = await searchDirectory(query.slice(0, 80), group ? 100 : 30, new Set([...connected].map(toolkitFor)), group);
   const custom = new Set(Object.keys(safeAuthConfigs()));
   return results.map((t) => {
     const key = integrationKeyFor(t.slug);
@@ -51,15 +56,12 @@ function safeAuthConfigs(): Record<string, string> {
 // Adds a directory toolkit to the catalogue (once), then starts its sign-in.
 export async function connectFromDirectory(session: Session, slug: string, appUrl: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
-  if (!composioConfigured()) throw new HttpError(400, "Composio is not configured");
+  if (!composioConfigured()) throw new HttpError(400, "Connecting live systems is not available in this workspace yet.");
   const toolkit = await getToolkit(slug);
-  if (!toolkit) throw new HttpError(404, "That system is not in the Composio directory");
+  if (!toolkit) throw new HttpError(404, "That system is not available to connect.");
   const key = integrationKeyFor(toolkit.slug);
   if (!toolkit.managedAuth && !safeAuthConfigs()[key]) {
-    throw new HttpError(
-      409,
-      `${toolkit.name} needs its own sign-in app in Composio before it can be connected. An admin adds it once in the Composio dashboard (Auth configs) and sets COMPOSIO_AUTH_CONFIGS.`,
-    );
+    throw new HttpError(409, `${toolkit.name} needs a one-time sign-in setup before it can be connected. Contact support and we will enable it for your workspace.`);
   }
   const db = adminDb();
   await db.from("integrations").upsert(
@@ -67,7 +69,7 @@ export async function connectFromDirectory(session: Session, slug: string, appUr
       key,
       name: toolkit.name,
       category: toolkit.category,
-      description: toolkit.description.slice(0, 300) || `${toolkit.name} through Composio.`,
+      description: toolkit.description.slice(0, 300) || `${toolkit.name}.`,
       permissions: [`Read ${toolkit.name} data for process discovery`, `Act in ${toolkit.name} only through actions you allow an agent`],
       priority: 99,
       sort_order: 1000,
@@ -89,7 +91,7 @@ async function permissionsFor(key: string) {
 // Connecting is an admin action and shows permissions before connection (PRD sections 55, 71).
 export async function connectSandbox(session: Session, key: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
-  if (!SANDBOX_INTEGRATIONS.includes(key)) throw new HttpError(400, "Sandbox mode is not available for this integration");
+  if (!SANDBOX_INTEGRATIONS.includes(key)) throw new HttpError(400, "Sample data is not available for this system.");
   const integration = await permissionsFor(key);
   const db = adminDb();
   const { data, error } = await db
@@ -124,11 +126,11 @@ export async function connectSandbox(session: Session, key: string) {
 
 export async function startOAuthConnection(session: Session, key: string, appUrl: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
-  if (!canUseComposio()) throw new HttpError(400, "Composio is not configured for this integration");
+  if (!canUseComposio()) throw new HttpError(400, "Connecting a live account is not available for this system yet.");
   await permissionsFor(key);
   const callback = `${appUrl}/api/integrations/callback?integration=${encodeURIComponent(key)}`;
   const { redirectUrl } = await startComposioConnection(session.org.id, key, callback);
-  if (!redirectUrl) throw new HttpError(502, "Composio did not return an authorisation URL");
+  if (!redirectUrl) throw new HttpError(502, "The sign-in page could not be opened. Try again in a minute.");
   return redirectUrl;
 }
 
@@ -156,7 +158,7 @@ export async function completeOAuthConnection(session: Session, key: string, con
         integration_key: key,
         provider: "composio",
         status: "connected",
-        account_label: `${integration.name} (Composio)`,
+        account_label: integration.name,
         external_account_id: account.id,
         granted_permissions: integration.permissions,
         connected_by: session.user.id,

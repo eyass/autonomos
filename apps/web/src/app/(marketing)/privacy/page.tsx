@@ -35,7 +35,7 @@ export default function PrivacyPage() {
             <strong>Usage analytics:</strong> product events, such as signing up or activating an agent, to understand how the product is used.
           </li>
         </ul>
-        <p>We do not store OAuth tokens for live integrations; Composio holds them and we keep only the connected account id.</p>
+        <p>We do not store sign-in tokens for live systems; our connection partner holds them and we keep only the connected account id.</p>
 
         <h2>Why we process it</h2>
         <ul>
@@ -46,16 +46,13 @@ export default function PrivacyPage() {
         </ul>
 
         <h2>AI models</h2>
-        <p>
-          Text from your workspace, including integration data an agent is working on, is sent to the configured model provider to generate drafts and decide on actions. Google Gemini is the default;
-          Anthropic or OpenAI are used only if selected.
-        </p>
+        <p>Text from your workspace, including data an agent is working on, is sent to an AI model provider to generate drafts and decide on actions. The providers we use are listed below.</p>
 
         <h2>Subprocessors</h2>
         <SubprocessorTable />
 
         <h2>Where data is stored</h2>
-        <p>Your data lives in the Supabase project the workspace is deployed with. The region of that project decides whether it is stored in the EU or the US.</p>
+        <p>Your data is stored in the region your workspace was set up in, the EU or the US.</p>
 
         <h2>How long we keep it</h2>
         <p>

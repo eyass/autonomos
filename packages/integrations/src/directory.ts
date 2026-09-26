@@ -7,6 +7,8 @@ export type DirectoryToolkit = {
   description: string;
   logo: string | null;
   category: string;
+  // Business-friendly groups (DIRECTORY_GROUPS keys) this toolkit belongs to.
+  groups: string[];
   // Composio can run the sign-in for this toolkit without a custom OAuth app.
   managedAuth: boolean;
   version: string | null;
@@ -65,6 +67,30 @@ export const POPULAR_BACKFILL = [
   "basecamp",
 ] as const;
 
+// Composio's 80-odd categories folded into groups a business person recognises. A toolkit
+// can sit in several groups (Zendesk is both Customer support and Sales & CRM).
+export const DIRECTORY_GROUPS: Array<{ key: string; label: string; categories: string[] }> = [
+  { key: "support", label: "Customer support", categories: ["customer support", "help desk", "ai chatbots", "live chat"] },
+  { key: "sales", label: "Sales & CRM", categories: ["crm", "sales & crm", "ai sales tools", "contact management", "proposal & invoice management"] },
+  { key: "finance", label: "Finance & accounting", categories: ["accounting", "payment processing", "fundraising", "invoices", "expense management", "taxes", "banking"] },
+  {
+    key: "marketing",
+    label: "Marketing",
+    categories: ["marketing automation", "marketing", "social media marketing", "email newsletters", "social media accounts", "url shortener", "ads & conversion", "seo"],
+  },
+  { key: "ecommerce", label: "E-commerce", categories: ["ecommerce", "commerce", "inventory management"] },
+  { key: "communication", label: "Email & chat", categories: ["email", "team chat", "communication", "phone & sms", "video & audio", "notifications", "transactional email", "video conferencing"] },
+  { key: "productivity", label: "Documents & files", categories: ["documents", "notes", "file management & storage", "spreadsheets", "signatures", "productivity", "team collaboration"] },
+  { key: "projects", label: "Projects & tasks", categories: ["project management", "task management", "time tracking software"] },
+  { key: "scheduling", label: "Calendar & scheduling", categories: ["scheduling & booking", "calendar", "event management"] },
+  { key: "hr", label: "HR & recruiting", categories: ["human resources", "hr talent & recruitment", "payroll"] },
+  { key: "forms", label: "Forms & surveys", categories: ["forms & surveys"] },
+  { key: "analytics", label: "Analytics & data", categories: ["analytics", "business intelligence", "databases", "ai web scraping", "ai document extraction"] },
+  { key: "it", label: "IT & developer", categories: ["developer tools", "server monitoring", "security & identity tools", "it operations", "internet of things", "model context protocol"] },
+];
+const GROUP_OF = new Map(DIRECTORY_GROUPS.flatMap((g) => g.categories.map((c) => [c, g.key] as const)));
+export const groupLabel = (key: string) => DIRECTORY_GROUPS.find((g) => g.key === key)?.label ?? "Other";
+
 // AutonomOS integration keys that differ from the Composio toolkit slug.
 export const TOOLKIT_TO_KEY: Record<string, string> = { googledrive: "google_drive" };
 export const KEY_TO_TOOLKIT: Record<string, string> = Object.fromEntries(Object.entries(TOOLKIT_TO_KEY).map(([t, k]) => [k, t]));
@@ -84,12 +110,15 @@ type RawToolkit = {
 };
 
 function shape(t: RawToolkit): DirectoryToolkit {
+  const cats = (t.meta?.categories ?? []).map((c) => c.name.toLowerCase());
+  const groups = [...new Set(cats.map((c) => GROUP_OF.get(c)).filter((g): g is string => Boolean(g)))];
   return {
     slug: t.slug,
     name: t.name,
     description: t.meta?.description ?? "",
     logo: t.meta?.logo ?? null,
-    category: titleCase(t.meta?.categories?.[0]?.name ?? "Other"),
+    category: groups[0] ? groupLabel(groups[0]) : titleCase(t.meta?.categories?.[0]?.name ?? "Other"),
+    groups,
     managedAuth: Boolean(t.no_auth) || (t.composio_managed_auth_schemes?.length ?? 0) > 0,
     version: t.meta?.version ?? null,
   };
@@ -137,12 +166,17 @@ export async function popularToolkits(exclude: ReadonlySet<string> = new Set(), 
     .slice(0, count);
 }
 
-// Name matches first, then slug, then description.
+const POPULARITY = new Map<string, number>([...POPULAR_TOOLKITS, ...POPULAR_BACKFILL].map((slug, i) => [slug, i]));
+
 // An empty query gives the popular list, without the systems in `connected` (toolkit slugs).
-export async function searchDirectory(query: string, limit = 30, connected: ReadonlySet<string> = new Set()): Promise<DirectoryToolkit[]> {
+// With a group, only that group is searched; an empty query then lists the whole group,
+// best known systems first.
+export async function searchDirectory(query: string, limit = 30, connected: ReadonlySet<string> = new Set(), group?: string | null): Promise<DirectoryToolkit[]> {
   const q = query.trim().toLowerCase();
-  if (!q) return popularToolkits(connected);
-  const all = await listDirectory();
+  if (!q && !group) return popularToolkits(connected);
+  const all = (await listDirectory()).filter((t) => !group || t.groups.includes(group));
+  const known = (t: DirectoryToolkit) => POPULARITY.get(t.slug) ?? 999;
+  if (!q) return all.sort((a, b) => known(a) - known(b) || Number(b.managedAuth) - Number(a.managedAuth) || a.name.localeCompare(b.name)).slice(0, limit);
   const score = (t: DirectoryToolkit) => {
     const name = t.name.toLowerCase();
     if (name === q || t.slug === q) return 0;
@@ -155,9 +189,15 @@ export async function searchDirectory(query: string, limit = 30, connected: Read
   return all
     .map((t) => ({ t, s: score(t) }))
     .filter((x) => x.s < 9)
-    .sort((a, b) => a.s - b.s || a.t.name.localeCompare(b.t.name))
+    .sort((a, b) => a.s - b.s || known(a.t) - known(b.t) || a.t.name.localeCompare(b.t.name))
     .slice(0, limit)
     .map((x) => x.t);
+}
+
+// How many systems each group holds, for the category filter.
+export async function directoryGroups(): Promise<Array<{ key: string; label: string; count: number }>> {
+  const all = await listDirectory();
+  return DIRECTORY_GROUPS.map((g) => ({ key: g.key, label: g.label, count: all.filter((t) => t.groups.includes(g.key)).length })).filter((g) => g.count > 0);
 }
 
 export async function getToolkit(slug: string): Promise<DirectoryToolkit | null> {

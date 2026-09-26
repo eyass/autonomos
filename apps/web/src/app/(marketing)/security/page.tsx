@@ -11,11 +11,11 @@ export const metadata: Metadata = {
 };
 
 const FLOW = [
-  { from: "Your browser", to: "AutonomOS web app on Vercel", note: "HTTPS" },
-  { from: "Web app", to: "Supabase Postgres and authentication", note: "Your data lives in the Supabase project the workspace is deployed with" },
-  { from: "Web app", to: "Trigger.dev workers", note: "Agent runs execute as durable jobs" },
-  { from: "Workers and web app", to: "Model provider", note: "Google Gemini by default; Anthropic or OpenAI if selected" },
-  { from: "Workers", to: "Composio, then your live systems", note: "Only for integrations connected to a live account" },
+  { from: "Your browser", to: "the AutonomOS app", note: "Encrypted with HTTPS" },
+  { from: "The app", to: "your workspace database", note: "Stored in the region your workspace was set up in, EU or US" },
+  { from: "The app", to: "the agent runner", note: "Runs keep going through restarts and can wait for approvals" },
+  { from: "The app and agent runner", to: "the AI model", note: "Only the text needed for the task" },
+  { from: "The agent runner", to: "your live systems", note: "Only for systems connected to a live account, through a secure connection partner" },
 ];
 
 export default function SecurityPage() {
@@ -38,10 +38,10 @@ export default function SecurityPage() {
           ))}
         </ol>
         <ul>
-          <li>Your data lives in the Supabase project the workspace is deployed with. The region of that project decides whether data is stored in the EU or the US.</li>
-          <li>Agent runs execute on Trigger.dev workers, so a run survives restarts and waits for approvals without holding a server open.</li>
-          <li>Model calls go to the configured provider: Google Gemini by default, Anthropic or OpenAI if selected.</li>
-          <li>Live integrations connect through Composio. OAuth tokens are held by Composio; AutonomOS stores only the connected account id.</li>
+          <li>Your data is stored in the region your workspace was set up in, the EU or the US.</li>
+          <li>Agent runs keep going through restarts and wait for approvals without anything left open.</li>
+          <li>AI models receive only the text needed for the task at hand.</li>
+          <li>Sign-in tokens for live systems are held by our connection partner; AutonomOS stores only the connected account id.</li>
           <li>Webhook signing secrets are stored in a table without row level security policies, so only the server, using the service role, can read them.</li>
         </ul>
 

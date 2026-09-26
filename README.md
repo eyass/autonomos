@@ -59,7 +59,7 @@ AutonomOS asks for as little as possible and drafts the rest for review:
 
 ### Adding systems
 
-Integrations → "Add systems" (and the same button in onboarding) lists 20 popular systems first (Gmail, Google Calendar, Outlook, Slack, Teams, Stripe, HubSpot, Salesforce, Zendesk, Intercom, Notion, Google Drive, Google Sheets, Facebook, Instagram, LinkedIn, Jira, Asana, Airtable, Mailchimp). Systems the workspace has already connected are left out and replaced by the next most common ones (`POPULAR_BACKFILL`: Google Docs, OneDrive, Zoom, Google Meet, QuickBooks, Trello and so on). Search covers the whole Composio directory (about 1,500 toolkits, cached for an hour, `packages/integrations/src/directory.ts`). Connecting one adds it to the workspace (`integrations.source = 'directory'`) and opens its sign-in. Toolkits without Composio-managed sign-in show "Needs setup": add an auth config in Composio and list it in `COMPOSIO_AUTH_CONFIGS`.
+Integrations → "Add systems" (and the same button in onboarding) lists 20 popular systems first (Gmail, Google Calendar, Outlook, Slack, Teams, Stripe, HubSpot, Salesforce, Zendesk, Intercom, Notion, Google Drive, Google Sheets, Facebook, Instagram, LinkedIn, Jira, Asana, Airtable, Mailchimp). Systems the workspace has already connected are left out and replaced by the next most common ones (`POPULAR_BACKFILL`: Google Docs, OneDrive, Zoom, Google Meet, QuickBooks, Trello and so on). Category chips (Customer support, Sales & CRM, Finance & accounting, Marketing, E-commerce, Email & chat, Documents & files, Projects & tasks, Calendar & scheduling, HR & recruiting, Forms & surveys, Analytics & data, IT & developer) fold Composio's 80-odd categories into groups a business person recognises (`DIRECTORY_GROUPS`). Search covers the whole Composio directory (about 1,500 toolkits, cached for an hour, `packages/integrations/src/directory.ts`). Connecting one adds it to the workspace (`integrations.source = 'directory'`) and opens its sign-in. Toolkits without Composio-managed sign-in show "Needs setup": add an auth config in Composio and list it in `COMPOSIO_AUTH_CONFIGS`.
 
 ### Discovery from connected systems
 
@@ -96,6 +96,8 @@ Discover → "From your systems" reads a recent sample from every connected syst
 `Σ(process monthly minutes × coefficient) / Σ(process monthly minutes)` with L1 0, L2 0.2, L3 0.4, L4 0.75, L5 1. A process counts at the level of its best active agent.
 
 ## Brand
+
+- **Product copy never names the stack.** Screens, errors, docs and the security page describe what happens ("runs keep going through restarts", "our connection partner holds sign-in tokens") without naming vendors. The one exception is the subprocessor table on the privacy and security pages, which is a legal disclosure.
 
 - **Brand teal `#0E5E5A`** (`--brand`, also `--primary`): logo, primary buttons, links, focus rings, active navigation, the autonomy score.
 - **Signal orange `#E8552D`** (`--highlight`): agent and AI activity and anything that needs attention: the pending-approvals count, AI-drafted alerts (`<Alert variant="agent">`), running and live states (`<Badge variant="agent">`), agent entries in Activity. Use `--highlight-strong` (`#B53D17`) for orange text on light backgrounds. Keep it rare so it keeps its meaning.
