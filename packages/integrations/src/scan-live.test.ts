@@ -64,3 +64,26 @@ describe("live readers cover the whole lookback window", () => {
     expect(scan.periodDays).toBeGreaterThanOrEqual(24);
   });
 });
+
+describe("BigQuery", () => {
+  it("reads the shape of the warehouse, not its rows", async () => {
+    respond = (_slug, args) => {
+      const q = String(args.query);
+      if (q.includes("region-eu") && q.includes("TABLE_STORAGE"))
+        return {
+          rows: [
+            { table_schema: "marketplace", table_name: "orders", total_rows: 120000, storage_last_modified_time: daysAgo(1) },
+            { f: [{ v: "ads" }, { v: "google_ads_daily" }, { v: "9000" }, { v: daysAgo(40) }] },
+          ],
+        };
+      if (q.includes("COLUMNS")) return { rows: [{ table_schema: "marketplace", table_name: "orders", columns: "order_id, buyer_email, amount, created_at" }] };
+      return { rows: [] };
+    };
+    const scan = await scanSystem("googlebigquery", ctx("googlebigquery"));
+    expect(calls.every((c) => /INFORMATION_SCHEMA/.test(String(c.args.query)))).toBe(true);
+    expect(scan.itemKind).toBe("warehouse tables");
+    expect(scan.items.map((i) => i.title)).toEqual(["marketplace.orders (120,000 rows)", "ads.google_ads_daily (9,000 rows)"]);
+    expect(scan.items[0]!.detail).toContain("amount");
+    expect(scan.stats.updated_in_last_30_days).toBe(1);
+  });
+});

@@ -48,6 +48,7 @@ export const SCAN_LIMITS: Record<string, ScanLimit> = {
   asana: { days: 30, max: 100 },
   notion: { days: 30, max: 100 },
   googledrive: { days: 30, max: 150 },
+  googlebigquery: { days: 30, max: 200 },
 };
 export const DEFAULT_SCAN_LIMIT: ScanLimit = { days: 30, max: 50 };
 export const scanLimitFor = (integration: string): ScanLimit => SCAN_LIMITS[toolkitFor(integration)] ?? DEFAULT_SCAN_LIMIT;
@@ -438,6 +439,7 @@ async function scanComposio(integration: string, ctx: ScanContext, limit: ScanLi
       "files",
     );
   }
+  if (toolkit === "googlebigquery") return scanBigQuery(integration, ctx, limit, now);
   if (toolkit === "notion") {
     // Pages edited most recently first, until the window or the cap runs out.
     const since = sinceMs;
@@ -626,7 +628,16 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
     });
   }
   if (!reads.length) {
-    return { integration, provider: "composio", itemKind: "records", sampled: 0, periodDays: null, stats: {}, items: [], unsupported: "AutonomOS cannot read this system for discovery yet." };
+    return {
+      integration,
+      provider: "composio",
+      itemKind: "records",
+      sampled: 0,
+      periodDays: null,
+      stats: {},
+      items: [],
+      unsupported: "Its data cannot be read yet. AutonomOS proposes work for it from what the system is used for.",
+    };
   }
   const per = Math.ceil(limit.max / reads.length);
   const meta = await readOnlyTools(toolkit).catch(() => []);
@@ -658,6 +669,62 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
     stats: { records: items.length, read_from: used.join(", "), top_labels: top(items.flatMap((i) => i.labels ?? [])) },
     items: items.slice(0, limit.max),
   };
+}
+
+// BigQuery: the shape of the warehouse, never its rows. Table names, columns, row counts and
+// when each table last changed tell discovery what the business measures and which reports
+// or analyses an agent could run on it.
+const BQ_REGIONS = ["region-eu", "region-us"];
+
+async function scanBigQuery(integration: string, ctx: ScanContext, limit: ScanLimit, now: Date): Promise<SystemScan> {
+  const rows = async (query: string, names: string[]) => arr((await exec(ctx, "GOOGLEBIGQUERY_QUERY", { query })).rows).map((r) => bqRow(r, names));
+  let tables: Array<Record<string, unknown>> = [];
+  let columns: Array<Record<string, unknown>> = [];
+  for (const region of BQ_REGIONS) {
+    try {
+      tables = await rows(
+        `SELECT table_schema, table_name, total_rows, storage_last_modified_time FROM \`${region}\`.INFORMATION_SCHEMA.TABLE_STORAGE WHERE deleted = FALSE ORDER BY storage_last_modified_time DESC LIMIT ${limit.max}`,
+        ["table_schema", "table_name", "total_rows", "storage_last_modified_time"],
+      );
+      if (!tables.length) continue;
+      columns = await rows(
+        `SELECT table_schema, table_name, STRING_AGG(column_name, ', ' ORDER BY ordinal_position LIMIT 30) AS columns FROM \`${region}\`.INFORMATION_SCHEMA.COLUMNS GROUP BY table_schema, table_name LIMIT ${limit.max * 2}`,
+        ["table_schema", "table_name", "columns"],
+      ).catch(() => []);
+      break;
+    } catch (e) {
+      console.error("bigquery metadata failed", region, e);
+    }
+  }
+  const colsOf = new Map(columns.map((c) => [`${c.table_schema}.${c.table_name}`, String(c.columns ?? "")]));
+  const items: ScanItem[] = tables.map((t) => {
+    const name = `${t.table_schema}.${t.table_name}`;
+    const count = Number(t.total_rows ?? 0);
+    return {
+      title: `${name} (${count.toLocaleString("en")} rows)`,
+      detail: redact(colsOf.get(name) ?? "", 220),
+      date: iso(t.storage_last_modified_time),
+      labels: [String(t.table_schema)],
+    };
+  });
+  const datasets = [...new Set(items.map((i) => i.labels![0]!))];
+  const fresh = items.filter((i) => i.date && Date.parse(i.date) >= now.getTime() - limit.days * 86_400_000).length;
+  return {
+    integration,
+    provider: "composio",
+    itemKind: "warehouse tables",
+    sampled: items.length,
+    periodDays: null,
+    stats: { tables: items.length, datasets: datasets.join(", "), updated_in_last_30_days: fresh },
+    items,
+    ...(items.length ? {} : { unsupported: "Could not read the table list. Check that the connected account can view the project's datasets." }),
+  };
+}
+
+// BigQuery rows come either as plain objects or in the API's { f: [{ v }] } form.
+export function bqRow(r: Record<string, unknown>, names: string[]): Record<string, unknown> {
+  if (!Array.isArray(r.f)) return r;
+  return Object.fromEntries(names.map((n, i) => [n, ((r.f as Array<{ v?: unknown }>)[i] ?? {}).v]));
 }
 
 // Microsoft Teams: the most recent chats, then the last month of messages in each.

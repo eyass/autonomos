@@ -172,7 +172,9 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
   const samples = (run.samples as SystemSample[]) ?? [];
   const existing = await existingTitles(session);
   const db = adminDb();
-  if (!samples.length) {
+  // With nothing read, the analyst still proposes work from what is connected (for example
+  // an ad account that cannot be read yet); only a run with no systems at all stops here.
+  if (!samples.length && !((run.systems as RunSystem[]) ?? []).length) {
     const { data } = await db
       .from("discovery_runs")
       .update({ status: "ready", samples: null, summary: "There was nothing to read yet in the connected systems.", updated_at: new Date().toISOString() })
