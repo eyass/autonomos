@@ -120,6 +120,9 @@ test("demo loop", async ({ page }) => {
   await page.goto("/processes?status=draft");
   await page.getByRole("link", { name: "Order status enquiries" }).click();
   await expect(page.getByText("Found in your systems")).toBeVisible();
+  // The agent action proposed in discovery is kept with the process.
+  await expect(page.getByText("What an agent would do")).toBeVisible();
+  await expect(page.getByText(/an agent takes these steps/)).toBeVisible();
   await page.goto("/processes");
 
   // Approving a process finds its automation opportunities straight away

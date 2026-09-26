@@ -21,6 +21,8 @@ export type ProcessForAnalysis = {
   steps: Array<{ title: string; system?: string | null; performedBy?: string | null; requiresJudgement?: boolean }>;
   exceptions: string[];
   decisionPoints: string[];
+  // What discovery proposed an agent should do, when the process came from discovery.
+  proposedAutomation?: string | null;
 };
 
 export type ToolSummary = { key: string; description: string; access: "read" | "write"; integration: string };
@@ -45,6 +47,7 @@ export async function generateOpportunities(input: {
       "Prefer starting at autonomy level 3 for anything involving money, customers or deletion. Financial actions must keep a human approval above a threshold.",
       "futureStateSteps describe the proposed agent-led process: which steps the agent does, where a human approves, and where systems act.",
       "Only require systems the process actually uses or that are listed as connected.",
+      "When the process has a proposedAutomation, make it the first opportunity and build on it: keep its trigger and systems, and sharpen it rather than replacing it.",
       "evidence: two to five concrete facts that show why this opportunity exists, each with its source (Process inventory for volume, minutes and steps; the system name for facts from connected systems). Quote numbers exactly as given; never invent them.",
     ],
     sections: [

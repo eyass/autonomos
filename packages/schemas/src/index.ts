@@ -408,6 +408,7 @@ export const SystemProcessProposalSchema = DiscoveredProcessSchema.extend({
     .string()
     .optional()
     .describe("What an AutonomOS agent would do, concretely, with its trigger or schedule, e.g. 'Every Monday at 9:00, pull last week's refunds from Stripe and post a summary in #finance'"),
+  combines: z.array(z.string()).optional().describe("Titles of the single-system findings this process brings together, when it combines several"),
 });
 export type SystemProcessProposal = z.infer<typeof SystemProcessProposalSchema>;
 

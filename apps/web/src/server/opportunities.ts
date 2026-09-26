@@ -40,6 +40,7 @@ export async function loadProcessForAnalysis(session: Session, processId: string
     steps: steps.map((s) => ({ title: s.title, system: s.system, performedBy: s.performed_by, requiresJudgement: s.requires_judgement })),
     exceptions: p.exceptions,
     decisionPoints: p.decision_points,
+    proposedAutomation: p.proposed_automation,
   };
   const hourlyCost = dept?.hourly_labour_cost === null || dept?.hourly_labour_cost === undefined ? session.org.defaultHourlyCost : Number(dept.hourly_labour_cost);
   return { row: p, analysis, hourlyCost };
