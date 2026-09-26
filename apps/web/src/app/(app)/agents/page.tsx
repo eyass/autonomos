@@ -35,16 +35,13 @@ export default async function AgentsPage() {
           <thead>
             <tr>
               <Th>Agent</Th>
-              <Th>Process</Th>
-              <Th>Department</Th>
-              <Th>Autonomy</Th>
-              <Th>Status</Th>
-              <Th>Runs</Th>
-              <Th>Success rate</Th>
-              <Th>Human intervention</Th>
-              <Th>Hours saved</Th>
-              <Th>Cost</Th>
-              <Th />
+              <Th className="hidden md:table-cell">Autonomy</Th>
+              <Th className="hidden sm:table-cell">Runs</Th>
+              <Th className="hidden md:table-cell">Success</Th>
+              <Th className="hidden lg:table-cell">Hours saved</Th>
+              <Th className="hidden lg:table-cell">AI cost</Th>
+              <Th className="text-right sm:text-left">Status</Th>
+              <Th className="hidden md:table-cell" />
             </tr>
           </thead>
           <tbody>
@@ -57,38 +54,37 @@ export default async function AgentsPage() {
                     <Link href={`/agents/${a.id}`} className="font-medium hover:underline">
                       {a.name}
                     </Link>
+                    <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted">
+                      <span>{proc?.title}</span>
+                      <span className="md:hidden">L{a.autonomy_level}</span>
+                      <span className="sm:hidden">
+                        {s?.runs ?? 0} run{s?.runs === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </Td>
-                  <Td className="text-muted">{proc?.title}</Td>
-                  <Td className="text-muted">{proc?.departments?.name ?? "–"}</Td>
-                  <Td>
+                  <Td className="hidden md:table-cell">
                     <AutonomyLadder current={a.autonomy_level} size="sm" />
                   </Td>
-                  <Td>
-                    <StatusBadge status={a.status} />
-                  </Td>
-                  <Td className="tabular-nums">
+                  <Td className="hidden tabular-nums sm:table-cell">
                     {s?.runs ?? 0}
                     {s?.testRuns ? <span className="text-xs text-muted"> +{s.testRuns} test</span> : null}
                   </Td>
-                  <Td>{pct(s?.successRate)}</Td>
-                  <Td>{pct(s?.humanInterventionRate)}</Td>
-                  <Td>{hours((s?.hoursSaved ?? 0) * 60)}</Td>
-                  <Td>{usd(s?.aiCost ?? 0)}</Td>
-                  <Td className="whitespace-nowrap">
-                    <span className="flex gap-1">
-                      <Link href={`/agents/${a.id}#test`} className="rounded px-2 py-1 text-xs hover:bg-surface-muted">
-                        Test
-                      </Link>
-                      {a.status === "active" ? (
-                        <ActionButton size="sm" variant="ghost" action={pauseAction.bind(null, a.id)}>
-                          Pause
-                        </ActionButton>
-                      ) : (
-                        <ActionButton size="sm" variant="ghost" action={activateAction.bind(null, a.id)}>
-                          Activate
-                        </ActionButton>
-                      )}
-                    </span>
+                  <Td className="hidden md:table-cell">{pct(s?.successRate)}</Td>
+                  <Td className="hidden lg:table-cell">{hours((s?.hoursSaved ?? 0) * 60)}</Td>
+                  <Td className="hidden lg:table-cell">{usd(s?.aiCost ?? 0)}</Td>
+                  <Td className="text-right sm:text-left">
+                    <StatusBadge status={a.status} />
+                  </Td>
+                  <Td className="hidden whitespace-nowrap text-right md:table-cell">
+                    {a.status === "active" ? (
+                      <ActionButton size="sm" variant="ghost" action={pauseAction.bind(null, a.id)}>
+                        Pause
+                      </ActionButton>
+                    ) : (
+                      <ActionButton size="sm" variant="ghost" action={activateAction.bind(null, a.id)}>
+                        Activate
+                      </ActionButton>
+                    )}
                   </Td>
                 </tr>
               );

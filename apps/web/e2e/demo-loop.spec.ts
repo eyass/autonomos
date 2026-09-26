@@ -57,10 +57,13 @@ test("demo loop", async ({ page }) => {
   // Review the refund process and generate an opportunity
   await expect(page).toHaveURL(/\/processes/);
   await page.getByRole("link", { name: "Refund request handling" }).click();
+  await expect(page).toHaveURL(/\/processes\/[0-9a-f-]+/);
+  const processUrl = page.url();
   await page.getByRole("button", { name: "Approve process" }).click();
   await page.getByRole("button", { name: "Create automation opportunity" }).click();
   await expect(page).toHaveURL(/\/opportunities\/[0-9a-f-]+/);
   await expect(page.getByText("Proposed", { exact: true })).toBeVisible();
+  const opportunityUrl = page.url();
 
   // Create the agent through the wizard
   await page.getByRole("link", { name: "Create agent" }).click();
@@ -102,4 +105,20 @@ test("demo loop", async ({ page }) => {
   await page.getByRole("button", { name: "Pause all agents" }).click();
   await expect(page.getByText(/All agents are paused/)).toBeVisible();
   await page.getByRole("button", { name: "Resume all agents" }).click();
+  await expect(page.getByRole("button", { name: "Pause all agents" })).toBeVisible();
+
+  // Phone layout: every page fits the screen width and the menu reaches every section
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pages = ["/", "/approvals", "/approvals?view=resolved", "/processes", processUrl, "/opportunities", opportunityUrl, "/agents", agentUrl, "/activity", runUrl, "/discover", "/integrations", "/settings"];
+  for (const url of pages) {
+    await page.goto(url);
+    await page.waitForLoadState("networkidle");
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, `${url} is wider than the screen`).toBeLessThanOrEqual(0);
+    if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/${url.replace(/^https?:\/\/[^/]+/, "").replace(/[^a-z0-9]+/gi, "_") || "_"}.png`, fullPage: true });
+  }
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Agents" }).click();
+  await expect(page).toHaveURL(/\/agents$/);
+  await expect(page.getByRole("dialog", { name: "Menu" })).toHaveCount(0);
 });

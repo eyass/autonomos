@@ -16,9 +16,9 @@ export function OpportunityMatrix({ points }: { points: Point[] }) {
     return { ...p, x: p.difficulty + n * 0.12, y: p.value + n * 0.08, z: Math.max(p.hours, 1) };
   });
   return (
-    <div className="h-80 w-full">
+    <div className="h-64 w-full sm:h-80">
       <ResponsiveContainer>
-        <ScatterChart margin={{ top: 16, right: 24, bottom: 24, left: 8 }}>
+        <ScatterChart margin={{ top: 12, right: 12, bottom: 24, left: 0 }}>
           <ReferenceArea x1={0.5} x2={3} y1={3} y2={5.5} fill="var(--accent-soft)" fillOpacity={0.6} label={{ value: "Quick wins", position: "insideTopLeft", fill: "var(--accent)", fontSize: 11 }} />
           <CartesianGrid stroke="var(--border)" />
           <XAxis type="number" dataKey="x" domain={[0.5, 5.5]} ticks={[1, 2, 3, 4, 5]} name="Difficulty" label={{ value: "Difficulty", position: "bottom", offset: 4, fontSize: 12, fill: "var(--muted)" }} tick={{ fontSize: 11, fill: "var(--muted)" }} />

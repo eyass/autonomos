@@ -47,9 +47,9 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
   const approvalReasons = a.checks.filter((c) => c.effect === "require_approval");
 
   return (
-    <Card className="p-5" data-testid="approval-card">
+    <Card className="p-4 sm:p-5" data-testid="approval-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <div className="text-base font-semibold">{a.title}</div>
           <div className="mt-0.5 text-sm text-muted">
             Agent: <a className="hover:underline" href={`/agents/${a.agentId}`}>{a.agentName}</a>
@@ -88,10 +88,10 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
       {error ? <Notice tone="danger" className="mt-3">{error}</Notice> : null}
 
       {canApprove ? (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {mode === "idle" ? (
             <>
-              <Button disabled={pending} onClick={() => act(() => approveAction(a.id))}>
+              <Button className="col-span-2 h-10 sm:h-9" disabled={pending} onClick={() => act(() => approveAction(a.id))}>
                 Approve
               </Button>
               <Button variant="secondary" disabled={pending} onClick={() => setMode("reject")}>
@@ -131,7 +131,7 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
         {open ? "Hide details" : "Evidence, policy and tool data"}
       </button>
       {open ? (
-        <div className="mt-3 grid gap-4 text-sm md:grid-cols-2">
+        <div className="mt-3 grid gap-4 text-sm md:grid-cols-2 [&>*]:min-w-0">
           <div>
             <div className="mb-1 text-xs font-medium text-muted">Evidence</div>
             <ul className="space-y-1">
@@ -156,7 +156,7 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
               ))}
             </ul>
             <div className="mb-1 mt-3 text-xs font-medium text-muted">Proposed action</div>
-            <pre className="overflow-x-auto rounded-md bg-surface-muted p-2 text-xs">{JSON.stringify(a.proposed, null, 2)}</pre>
+            <pre className="max-w-full overflow-x-auto rounded-md bg-surface-muted p-2 text-xs">{JSON.stringify(a.proposed, null, 2)}</pre>
             <a href={`/activity/${a.runId}`} className="mt-2 inline-block text-xs text-accent hover:underline">
               Full run history and tool data
             </a>

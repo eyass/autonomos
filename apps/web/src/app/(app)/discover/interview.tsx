@@ -61,10 +61,10 @@ export function Interview({ departments }: { departments: string[] }) {
     return (
       <Card>
         <CardHeader title="Guided interview" description="Answer a few questions about how a team works. AutonomOS turns the answers into structured processes." />
-        <CardBody className="flex flex-wrap items-end gap-3">
+        <CardBody className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
           <div>
             <div className="mb-1 text-sm font-medium">Start with</div>
-            <Select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-56">
+            <Select value={department} onChange={(e) => setDepartment(e.target.value)} aria-label="Department" className="sm:w-56">
               {departments.map((d) => (
                 <option key={d}>{d}</option>
               ))}
@@ -83,9 +83,9 @@ export function Interview({ departments }: { departments: string[] }) {
     <div className="grid gap-6 lg:grid-cols-5">
       <Card className="flex flex-col lg:col-span-2">
         <CardHeader title={`${department} interview`} action={<button className="text-xs text-muted hover:text-foreground" onClick={() => setSessionId(null)}>Restart</button>} />
-        <div className="max-h-[28rem] flex-1 space-y-3 overflow-y-auto px-5 py-4">
+        <div className="max-h-[50vh] flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5 lg:max-h-[28rem]">
           {messages.map((m, i) => (
-            <div key={i} className={m.role === "user" ? "ml-8 rounded-lg bg-accent-soft px-3 py-2 text-sm" : "mr-8 rounded-lg bg-surface-muted px-3 py-2 text-sm"}>
+            <div key={i} className={m.role === "user" ? "ml-6 rounded-lg bg-accent-soft px-3 py-2 text-sm sm:ml-8" : "mr-6 rounded-lg bg-surface-muted px-3 py-2 text-sm sm:mr-8"}>
               {m.content}
             </div>
           ))}
@@ -106,7 +106,7 @@ export function Interview({ departments }: { departments: string[] }) {
             rows={3}
             placeholder="Answer tickets, approve refunds, investigate account problems, review flagged listings…"
           />
-          <div className="mt-2 flex items-center justify-between">
+          <div className="mt-2 flex items-center justify-between gap-3">
             <span className="text-xs text-muted">Enter to send. Say &quot;done&quot; when you have covered the main work.</span>
             <Button size="sm" onClick={send} disabled={pending || !draft.trim()}>
               Send
@@ -116,7 +116,7 @@ export function Interview({ departments }: { departments: string[] }) {
         </div>
       </Card>
       <div className="space-y-3 lg:col-span-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Processes found ({processes.length})</h2>
           <Button size="sm" onClick={save} disabled={pending || selected.size === 0}>
             Save {selected.size} to inventory
@@ -139,7 +139,7 @@ export function Interview({ departments }: { departments: string[] }) {
                     setSelected(next);
                   }}
                 />
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-medium">{p.title}</span>
                     <AutonomyLadder current={p.currentAutonomyLevel} target={p.potentialAutonomyLevel} size="sm" />

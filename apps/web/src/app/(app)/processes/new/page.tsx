@@ -12,7 +12,7 @@ export default async function NewProcessPage() {
   const names = [...new Set([...(data ?? []).map((d) => d.name), ...DEPARTMENTS])];
   return (
     <>
-      <PageHeader title="Add process" description="Describe a recurring process. You can refine every field after it is created." />
+      <PageHeader back={{ href: "/processes", label: "Processes" }} title="Add process" description="Describe a recurring process. You can refine every field after it is created." />
       <NewProcessForm departments={names} />
     </>
   );

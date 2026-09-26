@@ -12,7 +12,7 @@ export default async function EditAgentPage({ params }: { params: Promise<{ id: 
   const connected = await connectedIntegrationKeys(session);
   return (
     <>
-      <PageHeader title={`Edit ${agent.name}`} description={`Currently version ${version.version}. Saving creates version ${version.version + 1}; past runs keep pointing at the version they used.`} />
+      <PageHeader back={{ href: `/agents/${id}`, label: agent.name }} title={`Edit ${agent.name}`} description={`Currently version ${version.version}. Saving creates version ${version.version + 1}; past runs keep pointing at the version they used.`} />
       <EditAgentForm agentId={id} initial={config} tools={toolOptions(connected)} />
     </>
   );

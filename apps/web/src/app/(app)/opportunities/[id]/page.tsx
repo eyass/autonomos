@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { AutonomyLadder, BeforeAfter, ScorePill, StatusBadge } from "@/components/domain";
+import { BeforeAfter, LevelChange, Scores, StatusBadge } from "@/components/domain";
 import { Badge, ButtonLink, Card, CardBody, CardHeader, Notice, PageHeader, Stat } from "@/components/ui";
 import { money, num } from "@/lib/format";
 import { requireSession } from "@/lib/session";
@@ -28,19 +28,15 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <div className="mb-2 text-sm">
-        <Link href="/opportunities" className="text-muted hover:text-foreground">
-          Opportunities
-        </Link>
-      </div>
       <PageHeader
+        back={{ href: "/opportunities", label: "Opportunities" }}
         title={o.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={o.status} />
             <Link href={`/processes/${proc.id}`} className="hover:underline">
               {proc.title}
             </Link>
-            <StatusBadge status={o.status} />
           </span>
         }
         actions={
@@ -48,6 +44,7 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
             <ButtonLink href={`/agents/${agent.id}`}>Open {agent.name}</ButtonLink>
           ) : (
             <>
+              <ButtonLink href={`/agents/new?opportunity=${id}`}>Create agent</ButtonLink>
               {o.status === "suggested" ? (
                 <ActionButton variant="secondary" action={setOpportunityStatusAction.bind(null, id, "approved")}>
                   Approve
@@ -62,33 +59,40 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
                   Reopen
                 </ActionButton>
               )}
-              <ButtonLink href={`/agents/new?opportunity=${id}`}>Create agent</ButtonLink>
             </>
           )
         }
       />
 
+      {missing.length ? (
+        <Notice tone="warn" className="mb-4">
+          Connect {missing.join(" and ")} in <Link className="underline" href="/integrations">Integrations</Link> before the agent can act.
+        </Notice>
+      ) : null}
+
       <p className="mb-6 max-w-3xl text-sm">{o.description}</p>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="Estimated hours saved" value={`${num(Number(o.estimated_hours_saved_monthly ?? 0))} h`} hint="per month, estimate" />
-        <Stat label="Estimated value" value={money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)} hint="per month, at your labour cost" />
-        <Stat label="Business value" value={<ScorePill kind="value" value={o.business_value_score} />} />
-        <Stat label="Difficulty" value={<ScorePill kind="difficulty" value={o.automation_difficulty_score} />} hint={o.estimated_build_complexity ?? undefined} />
-        <Stat label="Risk" value={<ScorePill kind="risk" value={o.risk_score} />} />
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Hours saved" value={`${num(Number(o.estimated_hours_saved_monthly ?? 0))} h`} hint="per month, estimate" />
+        <Stat label="Estimated value" value={money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)} hint="per month" />
+        <Stat label="Autonomy" value={<LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />} hint="today → target" />
+        <Card className="px-4 py-3">
+          <div className="mb-2 text-xs font-medium text-muted">Scores</div>
+          <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} className="flex-col items-start gap-1.5" />
+        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="What is being automated" description={o.problem} />
+            <CardHeader title="What changes" description={o.problem} />
             <CardBody>
               <BeforeAfter today={today} proposed={(o.future_state_steps as FutureStep[]) ?? []} />
               <p className="mt-4 text-sm text-muted">{o.proposed_future_state}</p>
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="How the agent will operate" />
+            <CardHeader title="The proposed agent" />
             <CardBody className="space-y-3 text-sm">
               <div className="font-medium">{agentSpec.name}</div>
               <p className="text-muted">{agentSpec.objective}</p>
@@ -97,38 +101,29 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
                   <li key={r}>{r}</li>
                 ))}
               </ul>
+              {o.rationale ? (
+                <div>
+                  <div className="mb-1 text-xs font-medium text-muted">Why it is worth it</div>
+                  <p className="text-muted">{o.rationale}</p>
+                </div>
+              ) : null}
             </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Why it is valuable" />
-            <CardBody className="text-sm text-muted">{o.rationale}</CardBody>
           </Card>
         </div>
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Autonomy" />
-            <CardBody className="space-y-2 text-sm">
-              <AutonomyLadder current={o.current_autonomy_level} target={o.target_autonomy_level} />
-              <p className="text-muted">
-                From L{o.current_autonomy_level} today to L{o.target_autonomy_level}.
-              </p>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="What still needs humans" />
-            <CardBody>
-              <ul className="list-inside list-disc text-sm">
-                {o.human_involvement.map((h) => (
-                  <li key={h}>{h}</li>
-                ))}
-              </ul>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Risk and controls" />
-            <CardBody className="space-y-3 text-sm">
+            <CardHeader title="Humans and controls" />
+            <CardBody className="space-y-4 text-sm">
               <div>
-                <div className="mb-1 text-xs font-medium text-muted">Approval rules</div>
+                <div className="mb-1 text-xs font-medium text-muted">Still done by people</div>
+                <ul className="list-inside list-disc">
+                  {o.human_involvement.map((h) => (
+                    <li key={h}>{h}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted">Needs approval</div>
                 <ul className="list-inside list-disc">
                   {o.required_approvals.map((a) => (
                     <li key={a}>{a}</li>
@@ -147,7 +142,7 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="Required tools" />
+            <CardHeader title="Systems needed" />
             <CardBody className="flex flex-wrap gap-1.5">
               {o.required_integrations.map((s) => (
                 <Badge key={s} tone={connectedNames.includes(s.toLowerCase()) ? "ok" : "warn"}>
@@ -156,11 +151,6 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
               ))}
             </CardBody>
           </Card>
-          {missing.length ? (
-            <Notice tone="warn">
-              Connect {missing.join(" and ")} in <Link className="underline" href="/integrations">Integrations</Link> before the agent can act.
-            </Notice>
-          ) : null}
         </div>
       </div>
     </>

@@ -52,17 +52,22 @@ export function CompanyForm({ org, disabled }: { org: { name: string; industry: 
   );
 }
 
-export function DepartmentForm({ dept, disabled }: { dept?: { id: string; name: string; hourly_labour_cost: number | null }; disabled: boolean }) {
+export function DepartmentForm({ dept, disabled, extra }: { dept?: { id: string; name: string; hourly_labour_cost: number | null }; disabled: boolean; extra?: React.ReactNode }) {
   const [state, action, pending] = useActionState(saveDepartmentAction, null);
   return (
-    <form action={action} className="flex flex-wrap items-end gap-2">
+    <form action={action} className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2 sm:flex sm:flex-wrap sm:items-center">
       {dept ? <input type="hidden" name="id" value={dept.id} /> : null}
-      <Input name="name" defaultValue={dept?.name} placeholder="Department" className="w-48" disabled={disabled} required />
-      <Input name="hourlyLabourCost" type="number" min={1} step="0.01" defaultValue={dept?.hourly_labour_cost ?? ""} placeholder="Hourly cost (optional)" className="w-44" disabled={disabled} />
-      <Button size="sm" variant="secondary" type="submit" disabled={disabled || pending}>
-        {dept ? "Save" : "Add department"}
-      </Button>
-      <Result state={state} success="Saved" />
+      <Input name="name" defaultValue={dept?.name} placeholder="Department" aria-label="Department name" className="sm:w-48" disabled={disabled} required />
+      <Input name="hourlyLabourCost" type="number" min={1} step="0.01" defaultValue={dept?.hourly_labour_cost ?? ""} placeholder="Cost / hour" aria-label="Hourly cost" className="sm:w-32" disabled={disabled} />
+      <div className="col-span-2 flex items-center gap-1 sm:col-span-1">
+        <Button size="sm" variant="secondary" type="submit" disabled={disabled || pending}>
+          {dept ? "Save" : "Add department"}
+        </Button>
+        {extra}
+      </div>
+      <div className="col-span-2 sm:col-span-1">
+        <Result state={state} success="Saved" />
+      </div>
     </form>
   );
 }
@@ -70,16 +75,18 @@ export function DepartmentForm({ dept, disabled }: { dept?: { id: string; name: 
 export function InviteForm({ disabled }: { disabled: boolean }) {
   const [state, action, pending] = useActionState(inviteAction, null);
   return (
-    <form action={action} className="flex flex-wrap items-end gap-2">
-      <Input name="email" type="email" placeholder="colleague@company.com" className="w-64" disabled={disabled} required />
-      <Select name="role" className="w-32" disabled={disabled}>
+    <form action={action} className="grid grid-cols-[1fr_7rem] gap-2 sm:flex sm:flex-wrap sm:items-center">
+      <Input name="email" type="email" placeholder="colleague@company.com" aria-label="Email" className="col-span-2 sm:w-64" disabled={disabled} required />
+      <Select name="role" aria-label="Role" className="sm:w-32" disabled={disabled}>
         <option value="member">Member</option>
         <option value="admin">Admin</option>
       </Select>
-      <Button size="sm" type="submit" disabled={disabled || pending}>
+      <Button type="submit" className="h-10 sm:h-8" disabled={disabled || pending}>
         Invite
       </Button>
-      <Result state={state} success="Invite saved. They join when they sign up with this email." />
+      <div className="col-span-2 sm:w-full">
+        <Result state={state} success="Invite saved. They join when they sign up with this email." />
+      </div>
     </form>
   );
 }

@@ -24,9 +24,9 @@ export function Notifications({ items, markRead }: { items: Item[]; markRead: ()
         {unread ? <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-warn" /> : null}
       </button>
       {open ? (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-lg border border-border bg-surface shadow-lg">
+        <div className="fixed inset-x-4 top-14 z-40 mt-1 rounded-lg border border-border bg-surface shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
           <div className="border-b border-border px-4 py-2 text-sm font-semibold">Notifications</div>
-          <ul className="max-h-96 overflow-y-auto">
+          <ul className="max-h-[70vh] overflow-y-auto sm:max-h-96">
             {items.length === 0 ? <li className="px-4 py-6 text-center text-sm text-muted">Nothing yet</li> : null}
             {items.map((n) => (
               <li key={n.id} className={cn("border-b border-border px-4 py-3 text-sm last:border-0", !n.read_at && "bg-warn-soft/40")}>

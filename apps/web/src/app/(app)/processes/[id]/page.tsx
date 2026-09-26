@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { AutonomyLadder, ScorePill, StatusBadge } from "@/components/domain";
-import { Badge, Card, CardBody, CardHeader, Notice, PageHeader, Stat } from "@/components/ui";
+import { LevelChange, Scores, StatusBadge } from "@/components/domain";
+import { Badge, Card, CardBody, CardHeader, Notice, PageHeader, RowLink, Stat } from "@/components/ui";
 import { FREQUENCY_LABEL, hours, money, num, pct } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -45,18 +44,14 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
 
   return (
     <>
-      <div className="mb-2 text-sm">
-        <Link href="/processes" className="text-muted hover:text-foreground">
-          Processes
-        </Link>
-      </div>
       <PageHeader
+        back={{ href: "/processes", label: "Processes" }}
         title={p.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <span>{dept?.name ?? "No department"}</span>
             <StatusBadge status={p.status} />
-            {p.confidence !== null ? <Badge tone={Number(p.confidence) < 0.6 ? "warn" : "neutral"}>AI confidence {pct(Number(p.confidence))}</Badge> : null}
+            <span>{dept?.name ?? "No department"}</span>
+            {p.confidence !== null && Number(p.confidence) < 0.6 ? <Badge tone="warn">AI confidence {pct(Number(p.confidence))}</Badge> : null}
           </span>
         }
         actions={
@@ -83,12 +78,12 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
       />
 
       {p.status === "draft" ? (
-        <Notice tone="info" className="mb-6">
-          AI-generated processes are drafts until someone who knows the work reviews them. Check the steps and numbers, edit anything that is wrong, then approve.
+        <Notice tone="info" className="mb-4">
+          AI-generated processes are drafts until someone who knows the work reviews them. Check the steps and numbers, fix anything wrong, then approve.
         </Notice>
       ) : null}
       {p.missing_information.length ? (
-        <Notice tone="warn" className="mb-6">
+        <Notice tone="warn" className="mb-4">
           <div className="font-medium">Missing information</div>
           <ul className="mt-1 list-inside list-disc">
             {p.missing_information.map((m) => (
@@ -98,38 +93,33 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
         </Notice>
       ) : null}
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Frequency" value={FREQUENCY_LABEL[p.frequency]} hint={p.estimated_occurrences_per_month ? `${num(Number(p.estimated_occurrences_per_month))} / month` : "Unknown volume"} />
-        <Stat label="Monthly human time" value={hours(monthlyMinutes)} hint={p.estimated_minutes_per_occurrence ? `${num(Number(p.estimated_minutes_per_occurrence))} min each` : undefined} />
-        <Stat label="Estimated cost" value={money((monthlyMinutes / 60) * rate, session.org.currency)} hint={`at ${money(rate, session.org.currency)}/h`} />
-        <Stat label="Business value" value={<ScorePill kind="value" value={p.business_value} />} />
-        <Stat label="Difficulty" value={<ScorePill kind="difficulty" value={p.automation_difficulty} />} />
-        <Stat label="Risk" value={<ScorePill kind="risk" value={p.risk_level} />} />
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat
+          label="Human time"
+          value={`${hours(monthlyMinutes)}`}
+          hint={p.estimated_occurrences_per_month ? `${num(Number(p.estimated_occurrences_per_month))}× a month${p.estimated_minutes_per_occurrence ? `, ${num(Number(p.estimated_minutes_per_occurrence))} min each` : ""}` : FREQUENCY_LABEL[p.frequency]}
+        />
+        <Stat label="Estimated cost" value={money((monthlyMinutes / 60) * rate, session.org.currency)} hint={`per month at ${money(rate, session.org.currency)}/h`} />
+        <Stat label="Autonomy" value={<LevelChange from={effective} to={p.potential_autonomy_level} />} hint={activeAgent ? `with ${activeAgent.name}` : "now → potential"} />
+        <Card className="px-4 py-3">
+          <div className="mb-2 text-xs font-medium text-muted">Scores</div>
+          <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} className="flex-col items-start gap-1.5" />
+        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <Card>
-            <CardHeader title="Autonomy" description="Current level, including any live agent, and the potential level." />
-            <CardBody className="flex flex-wrap items-center gap-6">
-              <div>
-                <div className="mb-1 text-xs text-muted">Current</div>
-                <AutonomyLadder current={effective} target={p.potential_autonomy_level} />
-              </div>
-              <div className="text-sm text-muted">Potential L{p.potential_autonomy_level}</div>
-            </CardBody>
-          </Card>
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <Card>
             <CardHeader title="Workflow" description={p.trigger ? `Starts when: ${p.trigger}` : "How the work is done today"} />
             <CardBody>
               {steps.length ? (
-                <ol className="space-y-2">
+                <ol className="space-y-3">
                   {steps.map((s) => (
                     <li key={s.id} className="flex gap-3 text-sm">
                       <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-muted text-xs tabular-nums">{s.position}</span>
-                      <div>
+                      <div className="min-w-0">
                         <div>{s.title}</div>
-                        <div className="flex flex-wrap gap-1.5 text-xs text-muted">
+                        <div className="mt-0.5 flex flex-wrap gap-1.5 text-xs text-muted">
                           {s.performed_by ? <span>{s.performed_by}</span> : null}
                           {s.system ? <Badge>{s.system}</Badge> : null}
                           {s.requires_judgement ? <Badge tone="warn">judgement</Badge> : null}
@@ -167,9 +157,22 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
           />
         </div>
         <div className="space-y-6">
+          {opportunities?.length || agents?.length ? (
+            <Card>
+              <CardHeader title="Opportunities and agents" />
+              <div>
+                {(agents ?? []).map((a) => (
+                  <RowLink key={a.id} href={`/agents/${a.id}`} title={a.name} meta={<span>Agent · L{a.autonomy_level}</span>} aside={<StatusBadge status={a.status} />} />
+                ))}
+                {(opportunities ?? []).map((o) => (
+                  <RowLink key={o.id} href={`/opportunities/${o.id}`} title={o.title} meta={<span>Opportunity · target L{o.target_autonomy_level}</span>} aside={<StatusBadge status={o.status} />} />
+                ))}
+              </div>
+            </Card>
+          ) : null}
           <Card>
-            <CardHeader title="Dependencies" />
-            <CardBody className="space-y-3 text-sm">
+            <CardHeader title="Details" />
+            <CardBody className="space-y-4 text-sm">
               <div>
                 <div className="mb-1 text-xs font-medium text-muted">Systems used</div>
                 <div className="flex flex-wrap gap-1">{systems.length ? systems.map((s) => <Badge key={s}>{s}</Badge>) : <span className="text-muted">–</span>}</div>
@@ -177,18 +180,6 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
               <div>
                 <div className="mb-1 text-xs font-medium text-muted">Roles involved</div>
                 <div className="flex flex-wrap gap-1">{roles.length ? roles.map((r) => <Badge key={r}>{r}</Badge>) : <span className="text-muted">–</span>}</div>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted">Policies used</div>
-                {policies.length ? (
-                  <ul className="list-inside list-disc text-muted">
-                    {policies.map((r) => (
-                      <li key={r}>{r}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-muted">Defined when an agent is configured</span>
-                )}
               </div>
               {p.exceptions.length ? (
                 <div>
@@ -200,31 +191,23 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
                   </ul>
                 </div>
               ) : null}
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Source" />
-            <CardBody className="text-sm">
-              {SOURCE_LABEL[p.discovery_source]}
-              {(p.documents as unknown as { title: string } | null)?.title ? <div className="text-muted">{(p.documents as unknown as { title: string }).title}</div> : null}
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Opportunities and agents" />
-            <CardBody className="space-y-2 text-sm">
-              {(opportunities ?? []).map((o) => (
-                <Link key={o.id} href={`/opportunities/${o.id}`} className="flex items-center justify-between gap-2 hover:underline">
-                  <span>{o.title}</span>
-                  <StatusBadge status={o.status} />
-                </Link>
-              ))}
-              {(agents ?? []).map((a) => (
-                <Link key={a.id} href={`/agents/${a.id}`} className="flex items-center justify-between gap-2 hover:underline">
-                  <span>Agent: {a.name}</span>
-                  <StatusBadge status={a.status} />
-                </Link>
-              ))}
-              {!opportunities?.length && !agents?.length ? <p className="text-muted">None yet.</p> : null}
+              {policies.length ? (
+                <div>
+                  <div className="mb-1 text-xs font-medium text-muted">Policies used by agents</div>
+                  <ul className="list-inside list-disc text-muted">
+                    {policies.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted">Source</div>
+                <div>
+                  {SOURCE_LABEL[p.discovery_source]}
+                  {(p.documents as unknown as { title: string } | null)?.title ? <span className="text-muted"> · {(p.documents as unknown as { title: string }).title}</span> : null}
+                </div>
+              </div>
             </CardBody>
           </Card>
         </div>

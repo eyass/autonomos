@@ -6,7 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { AutonomyLadder, OutcomeBadge, StatusBadge } from "@/components/domain";
-import { Badge, ButtonLink, Card, CardBody, CardHeader, Notice, PageHeader, Stat, Table, Td, Th } from "@/components/ui";
+import { Badge, ButtonLink, Card, CardBody, CardHeader, Notice, PageHeader, RowLink, Stat } from "@/components/ui";
 import { dateTime, hours, money, pct, relative, usd } from "@/lib/format";
 import { adminDb, HttpError, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -55,21 +55,19 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
 
   return (
     <>
-      <div className="mb-2 text-sm">
-        <Link href="/agents" className="text-muted hover:text-foreground">
-          Agents
-        </Link>
-      </div>
       <PageHeader
+        back={{ href: "/agents", label: "Agents" }}
         title={agent.name}
         description={
-          <span className="flex flex-wrap items-center gap-2">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <StatusBadge status={agent.status} />
-            <AutonomyLadder current={agent.autonomy_level} size="sm" />
-            <span>
-              runs <Link className="hover:underline" href={`/processes/${process?.id}`}>{process?.title}</Link>
-            </span>
-            <Badge>version {version.version}</Badge>
+            <span>L{agent.autonomy_level}</span>
+            <span>·</span>
+            <Link className="hover:underline" href={`/processes/${process?.id}`}>
+              {process?.title}
+            </Link>
+            <span>·</span>
+            <span>v{version.version}</span>
           </span>
         }
         actions={
@@ -89,17 +87,16 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
       />
 
       {created ? (
-        <Notice tone="ok" className="mb-6">
-          Agent created in draft. Run a test below to see exactly what it would do, then activate it.
+        <Notice tone="ok" className="mb-4">
+          Agent created in draft. Run a test to see exactly what it would do, then activate it.
         </Notice>
-      ) : null}
-      {agent.status !== "active" && !hasCompletedTest ? (
-        <Notice tone="info" className="mb-6">
+      ) : agent.status !== "active" && !hasCompletedTest ? (
+        <Notice tone="info" className="mb-4">
           This agent is not live. Run at least one test before activating it.
         </Notice>
       ) : null}
       {recommendation ? (
-        <Notice tone={recommendation.direction === "increase" ? "ok" : "warn"} className="mb-6">
+        <Notice tone={recommendation.direction === "increase" ? "ok" : "warn"} className="mb-4">
           <div className="font-medium">{recommendation.message}</div>
           <div className="mt-1 text-xs">{recommendation.evidence.join(" · ")}</div>
           <a href="#autonomy" className="mt-2 inline-block text-xs font-medium underline">
@@ -108,66 +105,62 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
         </Notice>
       ) : null}
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-7">
-        <Stat label="Runs" value={stats?.runs ?? 0} hint={stats?.testRuns ? `${stats.testRuns} test runs` : undefined} />
-        <Stat label="Success rate" value={pct(stats?.successRate)} />
-        <Stat label="Automation rate" value={pct(stats?.automationRate)} hint="no human needed" />
-        <Stat label="Human intervention" value={pct(stats?.humanInterventionRate)} />
-        <Stat label="Hours saved" value={hours((stats?.hoursSaved ?? 0) * 60)} hint="estimate" />
-        <Stat label="Estimated value" value={money(stats?.estimatedValue ?? 0, session.org.currency)} />
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Runs" value={stats?.runs ?? 0} hint={stats?.testRuns ? `+ ${stats.testRuns} test` : undefined} />
+        <Stat label="Success rate" value={pct(stats?.successRate)} hint={`${pct(stats?.humanInterventionRate)} needed a human`} />
+        <Stat label="Hours saved" value={hours((stats?.hoursSaved ?? 0) * 60)} hint={`${money(stats?.estimatedValue ?? 0, session.org.currency)} value`} />
         <Stat label="AI cost" value={usd(stats?.aiCost ?? 0)} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-6 lg:col-start-3 lg:row-start-1">
+          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} />
+          {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
+          <Card id="autonomy">
+            <CardHeader title="Autonomy" />
+            <CardBody>
+              <div className="mb-4">
+                <AutonomyLadder current={agent.autonomy_level} />
+              </div>
+              <AutonomyControl agentId={id} level={agent.autonomy_level} hasMoney={config.tools.includes("stripe.create_refund")} threshold={refundThreshold} canChange={isAdmin(session)} />
+            </CardBody>
+          </Card>
+        </div>
+        <div className="min-w-0 space-y-6 lg:col-span-2 lg:col-start-1 lg:row-start-1">
           <Card>
-            <CardHeader title="Recent runs" />
-            <Table>
-              <thead>
-                <tr>
-                  <Th>When</Th>
-                  <Th>Result</Th>
-                  <Th>Summary</Th>
-                  <Th>Version</Th>
-                  <Th>Saved</Th>
-                  <Th>Cost</Th>
-                </tr>
-              </thead>
-              <tbody>
+            <CardHeader title="Recent runs" action={<Link href={`/activity?agent=${id}`} className="text-xs font-medium text-accent hover:underline">All activity</Link>} />
+            {(runs ?? []).length ? (
+              <div>
                 {(runs ?? []).map((r) => (
-                  <tr key={r.id} className="hover:bg-surface-muted/50">
-                    <Td className="whitespace-nowrap">
-                      <Link href={`/activity/${r.id}`} className="hover:underline">
-                        {relative(r.queued_at)}
-                      </Link>
-                    </Td>
-                    <Td>{r.outcome ? <OutcomeBadge outcome={r.outcome} mode={r.mode} /> : <StatusBadge status={r.status} />}</Td>
-                    <Td className="max-w-xs truncate text-muted">{r.summary ?? "–"}</Td>
-                    <Td>v{(r.agent_versions as unknown as { version: number } | null)?.version}</Td>
-                    <Td>{hours(Number(r.estimated_minutes_saved ?? 0))}</Td>
-                    <Td>{usd(Number(r.model_cost))}</Td>
-                  </tr>
+                  <RowLink
+                    key={r.id}
+                    href={`/activity/${r.id}`}
+                    title={<span className="font-normal">{r.summary ?? "In progress"}</span>}
+                    meta={
+                      <>
+                        {r.outcome ? <OutcomeBadge outcome={r.outcome} mode={r.mode} /> : <StatusBadge status={r.status} />}
+                        <span>{relative(r.queued_at)}</span>
+                        <span>v{(r.agent_versions as unknown as { version: number } | null)?.version}</span>
+                        {Number(r.estimated_minutes_saved ?? 0) > 0 ? <span>{hours(Number(r.estimated_minutes_saved))} saved</span> : null}
+                        <span>{usd(Number(r.model_cost))}</span>
+                      </>
+                    }
+                  />
                 ))}
-                {!runs?.length ? (
-                  <tr>
-                    <Td colSpan={6} className="py-6 text-center text-muted">
-                      No runs yet.
-                    </Td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </Table>
+              </div>
+            ) : (
+              <CardBody>
+                <p className="text-sm text-muted">No runs yet.</p>
+              </CardBody>
+            )}
           </Card>
           <Card>
-            <CardHeader title="Current configuration" description={`Version ${version.version}`} />
+            <CardHeader title="How it works" description={`Configuration version ${version.version}`} />
             <CardBody className="grid gap-5 text-sm md:grid-cols-2">
-              <div>
+              <div className="md:col-span-2">
                 <div className="mb-1 text-xs font-medium text-muted">Objective</div>
                 <p>{config.instructions.objective}</p>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted">Trigger</div>
-                <p>{triggerLabel}</p>
+                <p className="mt-1 text-muted">{triggerLabel}</p>
               </div>
               <div>
                 <div className="mb-1 text-xs font-medium text-muted">What the agent can do</div>
@@ -175,19 +168,11 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                   {config.tools.map((t) => {
                     const def = getTool(t);
                     return (
-                      <li key={t} className="flex items-center gap-2">
+                      <li key={t} className="flex flex-wrap items-center gap-x-2">
                         {def?.label ?? t} {def?.access === "write" ? <Badge tone="info">takes action</Badge> : null}
                       </li>
                     );
                   })}
-                </ul>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted">Rules</div>
-                <ul className="list-inside list-disc">
-                  {config.instructions.rules.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
                 </ul>
               </div>
               <div>
@@ -209,6 +194,14 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 </ul>
               </div>
               <div>
+                <div className="mb-1 text-xs font-medium text-muted">Rules</div>
+                <ul className="list-inside list-disc">
+                  {config.instructions.rules.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
                 <div className="mb-1 text-xs font-medium text-muted">Hands to a human when</div>
                 <ul className="list-inside list-disc">
                   {config.instructions.escalationConditions.map((r) => (
@@ -222,35 +215,25 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 </ul>
               </div>
             </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="Version history" />
-            <Table>
-              <tbody>
+            <details className="border-t border-border px-4 py-3 text-sm sm:px-5">
+              <summary className="cursor-pointer text-xs font-medium text-muted hover:text-foreground">Version history ({(versions ?? []).length})</summary>
+              <ul className="mt-2 space-y-2">
                 {(versions ?? []).map((v) => {
                   const by = v.users as unknown as { first_name: string; last_name: string } | null;
                   return (
-                    <tr key={v.id}>
-                      <Td className="w-16 font-medium">v{v.version}</Td>
-                      <Td>{v.change_note ?? "–"}</Td>
-                      <Td>L{v.autonomy_level}</Td>
-                      <Td className="text-muted">{by ? `${by.first_name} ${by.last_name}` : "–"}</Td>
-                      <Td className="whitespace-nowrap text-muted">{dateTime(v.created_at)}</Td>
-                    </tr>
+                    <li key={v.id} className="flex gap-3">
+                      <span className="w-8 shrink-0 font-medium">v{v.version}</span>
+                      <div className="min-w-0">
+                        <div>{v.change_note ?? "No note"}</div>
+                        <div className="text-xs text-muted">
+                          L{v.autonomy_level} · {by ? `${by.first_name} ${by.last_name}` : "–"} · {dateTime(v.created_at)}
+                        </div>
+                      </div>
+                    </li>
                   );
                 })}
-              </tbody>
-            </Table>
-          </Card>
-        </div>
-        <div className="space-y-6">
-          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} />
-          {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
-          <Card id="autonomy">
-            <CardHeader title="Autonomy" />
-            <CardBody>
-              <AutonomyControl agentId={id} level={agent.autonomy_level} hasMoney={config.tools.includes("stripe.create_refund")} threshold={refundThreshold} canChange={isAdmin(session)} />
-            </CardBody>
+              </ul>
+            </details>
           </Card>
         </div>
       </div>
