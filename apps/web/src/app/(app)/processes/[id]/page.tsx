@@ -26,7 +26,7 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
     .eq("id", id)
     .maybeSingle();
   if (!p) notFound();
-  const [{ data: departments }, { data: opportunities }, { data: agents }] = await Promise.all([
+  const [{ data: departments }, { data: opportunities }, { data: agents }, { data: catalog }, { data: connected }, { data: knownSystems }, { data: knownRoles }] = await Promise.all([
     supabase.from("departments").select("id, name").eq("organization_id", session.org.id).is("archived_at", null).order("name"),
     supabase
       .from("automation_opportunities")
@@ -35,6 +35,10 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
       .eq("process_id", id)
       .order("created_at"),
     supabase.from("agents").select("id, name, status, autonomy_level, active_version_id").eq("organization_id", session.org.id).eq("process_id", id),
+    supabase.from("integrations").select("key, name"),
+    supabase.from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected"),
+    supabase.from("process_systems").select("system").eq("organization_id", session.org.id).limit(300),
+    supabase.from("process_people").select("role").eq("organization_id", session.org.id).limit(300),
   ]);
   const dept = p.departments as unknown as { id: string; name: string; hourly_labour_cost: number | null } | null;
   const steps = (
@@ -50,6 +54,17 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
   ).sort((a, b) => a.position - b.position);
   const systems = ((p.process_systems as unknown as Array<{ system: string }>) ?? []).map((s) => s.system);
   const roles = ((p.process_people as unknown as Array<{ role: string }>) ?? []).map((r) => r.role);
+  // Structured picks for the editor: connected systems first, then what other processes use.
+  const connectedKeys = new Set((connected ?? []).map((c) => c.integration_key));
+  const systemOptions = uniqueOptions([
+    ...(catalog ?? []).filter((i) => connectedKeys.has(i.key)).map((i) => ({ value: i.name, hint: "Connected" })),
+    ...(knownSystems ?? []).map((s) => ({ value: s.system, hint: "Used in another process" })),
+    ...(session.org.detectedTools ?? []).map((t) => ({ value: t, hint: "Found on your website" })),
+  ]);
+  const roleOptions = uniqueOptions([
+    ...(knownRoles ?? []).map((r) => ({ value: r.role, hint: "Used in another process" })),
+    ...(departments ?? []).map((d) => ({ value: `${d.name} team`, hint: "Department" })),
+  ]);
   const monthlyMinutes = Number(p.estimated_occurrences_per_month ?? 0) * Number(p.estimated_minutes_per_occurrence ?? 0);
   const rate = dept?.hourly_labour_cost ? Number(dept.hourly_labour_cost) : session.org.defaultHourlyCost;
   const activeAgent = (agents ?? []).filter((a) => a.status === "active").sort((a, b) => b.autonomy_level - a.autonomy_level)[0];
@@ -170,6 +185,8 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
           <ProcessEditor
             id={id}
             departments={departments ?? []}
+            systemOptions={systemOptions}
+            roleOptions={roleOptions}
             initial={{
               title: p.title,
               description: p.description,
@@ -272,4 +289,16 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
       </div>
     </>
   );
+}
+
+function uniqueOptions(options: Array<{ value: string; hint: string }>) {
+  const seen = new Set<string>();
+  return options
+    .filter((o) => {
+      const k = o.value.trim().toLowerCase();
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 12);
 }

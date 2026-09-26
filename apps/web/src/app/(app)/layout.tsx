@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/shell/nav";
 import { Notifications } from "@/components/shell/notifications";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { markNotificationsRead } from "./shell-actions";
@@ -13,10 +14,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await requireSession();
   if (!session.org.onboardingCompletedAt) redirect(session.org.onboardingStep === "connect" ? "/onboarding/connect" : "/onboarding/about");
   const supabase = await createClient();
-  const [{ count: pending }, { data: notifications }] = await Promise.all([
+  const [{ count: pending }, { data: notifications }, { data: connections }] = await Promise.all([
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "pending"),
     supabase.from("notifications").select("id, title, body, link, created_at, read_at").eq("organization_id", session.org.id).order("created_at", { ascending: false }).limit(15),
+    supabase.from("integration_connections").select("provider").eq("organization_id", session.org.id).eq("status", "connected"),
   ]);
+  // Which world agents act in: sample data only, real accounts, or both.
+  const providers = new Set((connections ?? []).map((c) => c.provider));
+  const mode = !providers.size ? null : providers.size === 1 && providers.has("sandbox") ? "sandbox" : providers.has("sandbox") ? "mixed" : "live";
   const defaultOpen = (await cookies()).get("sidebar_state")?.value !== "false";
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
@@ -28,7 +33,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/" className="text-sm font-semibold tracking-tight md:hidden">
             AutonomOS
           </Link>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-2">
+            {mode ? (
+              <Link href="/settings#environment" title="Where agents act. Change it per system in Integrations.">
+                <Badge variant={mode === "live" ? "success" : mode === "mixed" ? "info" : "warning"}>{mode === "live" ? "Live systems" : mode === "mixed" ? "Sandbox + live" : "Sandbox"}</Badge>
+              </Link>
+            ) : null}
             <Notifications items={notifications ?? []} markRead={markNotificationsRead} />
           </div>
         </header>

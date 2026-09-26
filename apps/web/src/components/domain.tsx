@@ -119,6 +119,7 @@ const STATUS_TONES: Record<string, "secondary" | "outline" | "success" | "warnin
 
 const STATUS_LABELS: Record<string, string> = {
   waiting_for_approval: "Needs your approval",
+  reviewing: "On hold",
   event_driven: "When it happens",
 };
 

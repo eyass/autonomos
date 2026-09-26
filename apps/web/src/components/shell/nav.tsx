@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Bot, CheckCircle2, ChevronsUpDown, LayoutDashboard, Lightbulb, LogOut, Plug, Settings, Workflow } from "lucide-react";
+import { Activity, Bot, CheckCircle2, ChevronsUpDown, LayoutDashboard, LifeBuoy, Lightbulb, LogOut, Plug, Settings, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -30,6 +30,7 @@ const MAIN = [
 const ADMIN = [
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/docs", label: "Help", icon: LifeBuoy },
 ];
 
 function isActive(path: string, href: string) {

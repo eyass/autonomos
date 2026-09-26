@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 type Sample = { key: string; label: string };
 
-export function TestPanel({ agentId, ticketDriven, samples }: { agentId: string; ticketDriven: boolean; samples: Sample[] }) {
+export function TestPanel({ agentId, ticketDriven, samples, blockedReason }: { agentId: string; ticketDriven: boolean; samples: Sample[]; blockedReason?: string | null }) {
   const [sample, setSample] = useState(samples[0]?.key ?? "");
   const [json, setJson] = useState("{}");
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +61,8 @@ export function TestPanel({ agentId, ticketDriven, samples }: { agentId: string;
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
-        <Button onClick={run} disabled={pending}>
+        {blockedReason ? <p className="text-xs text-muted-foreground">{blockedReason}</p> : null}
+        <Button onClick={run} disabled={pending || Boolean(blockedReason)}>
           {pending ? "Starting…" : "Run test"}
         </Button>
       </CardContent>

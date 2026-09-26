@@ -83,7 +83,7 @@ Agents only run on the durable runtime. Without `TRIGGER_SECRET_KEY` the app ref
 
 ### Models
 
-Gemini is the default provider. Set `GOOGLE_GENERATIVE_AI_API_KEY`. Defaults: FAST `gemini-3.5-flash-lite`, SMART and AGENT `gemini-3.8-flash`. Override any class with `AI_FAST_MODEL`, `AI_SMART_MODEL` or `AI_AGENT_MODEL`, or switch provider with `AI_PROVIDER=anthropic` (Claude) or `AI_PROVIDER=openai`. Without a key, every AI step runs in a deterministic mock mode that follows the refund template, so the whole product works offline. Settings shows which models and mode are active.
+Gemini is the default provider. Set `GOOGLE_GENERATIVE_AI_API_KEY`. Defaults: FAST `gemini-3.5-flash-lite`, SMART and AGENT `gemini-3.8-flash`. Override any class with `AI_FAST_MODEL`, `AI_SMART_MODEL` or `AI_AGENT_MODEL`, or switch provider with `AI_PROVIDER=anthropic` (Claude) or `AI_PROVIDER=openai`. Without a key, every AI step runs in a deterministic mock mode that follows the refund template, so the whole product works offline. Settings → Execution shows a plain ready / not ready checklist; admins can open Technical details to see which models are in use.
 
 Measured on Gemini 3.8 Flash: a full refund run (read ticket, find customer, payments and refunds, refund, reply, close) takes about 26 seconds and costs about $0.036; discovery, opportunity and agent drafting together cost about $0.03.
 
@@ -101,7 +101,10 @@ Integration events arrive at `POST /api/webhooks/:connectionId` with `X-AutonomO
 - **Database:** every production build runs `apps/web/scripts/migrate.mjs` before `next build`. It applies pending migrations with `supabase db push`, using `POSTGRES_URL_NON_POOLING` from the integration. Preview builds skip it.
 - **Worker:** `.github/workflows/trigger-deploy.yml` deploys `packages/workflows` to Trigger.dev on pushes to `main` once these repository secrets exist: `TRIGGER_ACCESS_TOKEN` (a Trigger.dev personal access token), `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` and optionally `COMPOSIO_API_KEY`. The deploy syncs them into the Trigger.dev production environment.
 - **Connecting the two:** set `TRIGGER_SECRET_KEY` in Vercel to the Trigger.dev **production** secret key (`tr_prod_...`), so the app enqueues runs where the deployed worker listens.
-- **Auth redirects:** in Supabase → Authentication → URL Configuration, set the Site URL to the production URL and add `https://autonom-ten.vercel.app/auth/callback` to the redirect URLs.
+- **Readiness gate:** tests and activation are blocked until the runtime is connected, the systems an agent uses are connected and (for activation) someone can approve and a test has finished. A run that cannot be enqueued is recorded as failed with the reason and appears in Activity, instead of sitting in "queued".
+- **Previews:** Supabase variables exist only for Production. A preview deployment without them returns a 503 page that says so instead of crashing. Previews are also behind Vercel Deployment Protection; before an external review, share a Protection Bypass link (Project → Settings → Deployment Protection) or review on the production URL.
+- **Public pages:** signed-out visitors at `/` see the landing page. `/security`, `/docs`, `/terms` and `/privacy` are public. Terms and Privacy are drafts and need legal review before real customers sign up.
+- **Auth redirects:** in Supabase → Authentication → URL Configuration, set the Site URL to the production URL and add `https://autonom-ten.vercel.app/auth/callback**` to the redirect URLs. The wildcard matters: password reset links go to `/auth/callback?next=/reset-password`.
 
 ## The 10-minute demo
 

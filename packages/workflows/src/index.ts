@@ -6,7 +6,8 @@ import type { agentRunTask } from "./trigger/agent-run";
 
 export class TriggerNotConfiguredError extends Error {
   constructor() {
-    super("Trigger.dev is not configured. Set TRIGGER_SECRET_KEY to run agents.");
+    // Shown to customers: no environment variable names here (see Docs, Running agents).
+    super("The agent runtime is not connected yet, so agents cannot run. An administrator connects it once.");
     this.name = "TriggerNotConfiguredError";
   }
 }

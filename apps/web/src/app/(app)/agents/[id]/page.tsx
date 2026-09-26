@@ -12,6 +12,9 @@ import { dateTime, hours, money, pct, relative, usd } from "@/lib/format";
 import { adminDb, HttpError, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { loadAgentConfig } from "@/server/agents";
+import { agentReadiness } from "@/server/readiness";
+import { diffVersions, type VersionSnapshot } from "@/lib/version-diff";
+import { ReadinessChecklist } from "@/components/app/readiness-checklist";
 import { activateAction, pauseAction } from "../actions";
 import { AutonomyControl, LivePanel, TestPanel } from "./controls";
 import { ButtonLink } from "@/components/app/button-link";
@@ -21,6 +24,16 @@ import { StatCard } from "@/components/app/stat-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+function snapshot(v: { autonomy_level: number; instructions: unknown; trigger_config: unknown; policy_config: unknown; agent_tools: unknown }): VersionSnapshot {
+  return {
+    autonomy_level: v.autonomy_level,
+    instructions: v.instructions as VersionSnapshot["instructions"],
+    trigger_config: v.trigger_config as VersionSnapshot["trigger_config"],
+    policy_config: v.policy_config as VersionSnapshot["policy_config"],
+    tools: ((v.agent_tools as Array<{ tool_key: string }> | null) ?? []).map((t) => t.tool_key).sort(),
+  };
+}
 
 export default async function AgentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   const { id } = await params;
@@ -46,7 +59,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
       .limit(15),
     supabase
       .from("agent_versions")
-      .select("id, version, autonomy_level, change_note, created_at, users:created_by(first_name, last_name)")
+      .select("id, version, autonomy_level, change_note, created_at, instructions, trigger_config, policy_config, agent_tools(tool_key), users:created_by(first_name, last_name)")
       .eq("organization_id", session.org.id)
       .eq("agent_id", id)
       .order("version", { ascending: false }),
@@ -54,6 +67,8 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
     computeOrgMetrics(adminDb(), session.org.id, new Date(0)),
   ]);
   const stats = metrics.perAgent.get(id);
+  const readiness = await agentReadiness(session, id, config.tools, agent.status === "active" ? "test" : "activate");
+  const runtimeReady = readiness.checks.find((c) => c.key === "runtime")?.ok ?? false;
   const recommendation = stats ? autonomyRecommendation(agent.autonomy_level, stats, agent.name) : null;
   const ticketDriven = config.tools.includes("zendesk.read_ticket");
   const samples = SAMPLE_TICKETS.map((s) => ({ key: s.key, label: s.label }));
@@ -93,7 +108,9 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 Pause
               </ActionButton>
             ) : isAdmin(session) ? (
-              <ActionButton action={activateAction.bind(null, id)}>Activate agent</ActionButton>
+              <ActionButton action={activateAction.bind(null, id)} disabled={!readiness.ready}>
+                Activate agent
+              </ActionButton>
             ) : null}
           </>
         }
@@ -129,7 +146,18 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-start-3 lg:row-start-1">
-          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} />
+          {agent.status !== "active" || !readiness.ready ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{agent.status === "active" ? "Needs attention" : readiness.ready ? "Ready to go live" : "Before going live"}</CardTitle>
+                <CardDescription>{readiness.ready ? "Everything this agent needs is in place." : "Activate is available once these are done."}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ReadinessChecklist checks={readiness.checks} />
+              </CardContent>
+            </Card>
+          ) : null}
+          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} blockedReason={runtimeReady ? null : "Tests start once the agent runtime is connected."} />
           {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
           <Card id="autonomy">
             <CardHeader>
@@ -248,8 +276,10 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <ul className="mt-2 space-y-2">
-                  {(versions ?? []).map((v) => {
+                  {(versions ?? []).map((v, i, all) => {
                     const by = v.users as unknown as { first_name: string; last_name: string } | null;
+                    const prev = all[i + 1];
+                    const changes = prev ? diffVersions(snapshot(prev), snapshot(v)) : [];
                     return (
                       <li key={v.id} className="flex gap-3">
                         <span className="w-8 shrink-0 font-medium">v{v.version}</span>
@@ -258,6 +288,17 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                           <div className="text-xs text-muted-foreground">
                             L{v.autonomy_level} · {by ? `${by.first_name} ${by.last_name}` : "–"} · {dateTime(v.created_at)}
                           </div>
+                          {prev ? (
+                            changes.length ? (
+                              <ul className="mt-1 list-inside list-disc text-xs text-muted-foreground">
+                                {changes.map((c) => (
+                                  <li key={c}>{c}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="mt-1 text-xs text-muted-foreground">No configuration changes from v{prev.version}.</div>
+                            )
+                          ) : null}
                         </div>
                       </li>
                     );

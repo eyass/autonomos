@@ -146,6 +146,16 @@ test("demo loop", async ({ page }) => {
     await page.goto(url);
     await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    if (overflow > 0 && process.env.E2E_DEBUG)
+      console.log(
+        url,
+        await page.evaluate(() =>
+          [...document.querySelectorAll("body *")]
+            .filter((e) => e.getBoundingClientRect().right > window.innerWidth + 0.5)
+            .slice(0, 8)
+            .map((e) => `${e.tagName}.${String(e.className).slice(0, 120)} r=${e.getBoundingClientRect().right}`),
+        ),
+      );
     expect(overflow, `${url} is wider than the screen`).toBeLessThanOrEqual(0);
     if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/${url.replace(/^https?:\/\/[^/]+/, "").replace(/[^a-z0-9]+/gi, "_") || "_"}.png`, fullPage: true });
   }

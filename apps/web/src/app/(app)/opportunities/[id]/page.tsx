@@ -31,12 +31,13 @@ export default async function OpportunityPage({ params, searchParams }: { params
   if (!o) notFound();
   const [{ data: connections }, { data: agent }] = await Promise.all([
     supabase.from("integration_connections").select("integration_key, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected"),
-    supabase.from("agents").select("id, name, status").eq("organization_id", session.org.id).eq("opportunity_id", id).maybeSingle(),
+    supabase.from("agents").select("id, name, status, autonomy_level").eq("organization_id", session.org.id).eq("opportunity_id", id).maybeSingle(),
   ]);
   const proc = o.processes as unknown as { id: string; title: string; description: string; process_steps: Array<{ position: number; title: string; performed_by: string | null }> };
   const today = [...(proc.process_steps ?? [])].sort((a, b) => a.position - b.position).map((s) => ({ title: s.title, performedBy: s.performed_by }));
   const connectedNames = (connections ?? []).map((c) => ((c.integrations as unknown as { name: string } | null)?.name ?? c.integration_key).toLowerCase());
   const agentSpec = o.proposed_agent as { name?: string; objective?: string; responsibilities?: string[] };
+  const evidence = (o.evidence as Array<{ source: string; detail: string }> | null) ?? [];
   const missing = o.required_integrations.filter((s) => !connectedNames.includes(s.toLowerCase()));
 
   return (
@@ -83,6 +84,80 @@ export default async function OpportunityPage({ params, searchParams }: { params
         }
       />
 
+      {agent ? (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>
+              {o.status === "live"
+                ? `Live: ${agent.name} handles this work at L${agent.autonomy_level}`
+                : o.status === "rejected"
+                  ? "Rejected"
+                  : o.status === "archived"
+                    ? "Done"
+                    : o.status === "reviewing"
+                      ? "On hold"
+                      : `Building: ${agent.name} was created from this opportunity`}
+            </CardTitle>
+            <CardDescription>
+              {o.status === "live"
+                ? "It stays live until the agent is paused. Rejecting or putting this on hold pauses the agent too."
+                : o.status === "rejected" || o.status === "archived"
+                  ? "Reopen it to continue working on the agent."
+                  : o.status === "reviewing"
+                    ? "The agent is paused while this is on hold."
+                    : "The agent is being set up and tested with simulated actions. This opportunity goes live when the agent is activated."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <ButtonLink href={`/agents/${agent.id}`} size="sm">
+              Open {agent.name}
+            </ButtonLink>
+            {o.status === "rejected" || o.status === "archived" || o.status === "reviewing" ? (
+              <ActionButton size="sm" variant="outline" action={setOpportunityStatusAction.bind(null, id, "building")}>
+                Reopen
+              </ActionButton>
+            ) : (
+              <>
+                <ActionButton size="sm" variant="outline" action={setOpportunityStatusAction.bind(null, id, "archived")} confirm="Mark this opportunity as done?" confirmLabel="Mark done">
+                  Mark done
+                </ActionButton>
+                <ActionButton
+                  size="sm"
+                  variant="ghost"
+                  action={setOpportunityStatusAction.bind(null, id, "reviewing")}
+                  confirm="Put this opportunity on hold? A live agent is paused."
+                  confirmLabel="Put on hold"
+                >
+                  Put on hold
+                </ActionButton>
+                <ActionButton size="sm" variant="ghost" action={setOpportunityStatusAction.bind(null, id, "rejected")} confirm="Reject this opportunity? A live agent is paused." confirmLabel="Reject">
+                  Reject
+                </ActionButton>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+      {evidence.length ? (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Why this opportunity</CardTitle>
+            <CardDescription>The facts it is based on.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm">
+              {evidence.map((e, i) => (
+                <li key={i} className="flex gap-2">
+                  <Badge variant="secondary" className="shrink-0">
+                    {e.source}
+                  </Badge>
+                  <span>{e.detail}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
       {found && !agent ? (
         <Alert variant="success" className="mb-4">
           <Sparkles />

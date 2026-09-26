@@ -345,13 +345,27 @@ export const COMPOSIO_TOOLKITS: Record<string, string> = {
 export async function startComposioConnection(organizationId: string, integration: string, callbackUrl: string) {
   const toolkit = COMPOSIO_TOOLKITS[integration];
   if (!toolkit) throw new ToolError("invalid_data", `No Composio toolkit for ${integration}`);
-  const authConfigs = safeJson<Record<string, string>>(process.env.COMPOSIO_AUTH_CONFIGS) ?? {};
-  const authConfigId = authConfigs[integration];
   const composio = getComposio();
-  const request = authConfigId
-    ? await composio.connectedAccounts.link(organizationId, authConfigId, { callbackUrl })
-    : await composio.toolkits.authorize(organizationId, toolkit);
+  const authConfigId = await resolveAuthConfigId(toolkit, integration);
+  // connectedAccounts.link is the supported flow; the legacy initiate endpoint (which
+  // toolkits.authorize still uses) is retired for Composio-managed OAuth.
+  const request = await composio.connectedAccounts.link(organizationId, authConfigId, { callbackUrl });
   return { redirectUrl: (request as { redirectUrl?: string | null }).redirectUrl ?? null, connectionId: (request as { id: string }).id };
+}
+
+// The auth config to connect through: an explicit one from COMPOSIO_AUTH_CONFIGS, else the
+// account's Composio-managed config for the toolkit, created on first use.
+const authConfigCache = new Map<string, string>();
+async function resolveAuthConfigId(toolkit: string, integration: string): Promise<string> {
+  const explicit = (safeJson<Record<string, string>>(process.env.COMPOSIO_AUTH_CONFIGS) ?? {})[integration];
+  if (explicit) return explicit;
+  const cached = authConfigCache.get(toolkit);
+  if (cached) return cached;
+  const composio = getComposio();
+  const existing = await composio.authConfigs.list({ toolkit, isComposioManaged: true });
+  const id = existing.items[0]?.id ?? (await composio.authConfigs.create(toolkit, { type: "use_composio_managed_auth" })).id;
+  authConfigCache.set(toolkit, id);
+  return id;
 }
 
 function safeJson<T>(raw: string | undefined): T | null {

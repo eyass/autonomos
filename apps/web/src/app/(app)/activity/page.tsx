@@ -20,14 +20,15 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const supabase = await createClient();
   let q = supabase
     .from("activity_events")
-    .select("id, occurred_at, actor_type, action_type, status, title, agent_id, agent_run_id, process_id, department_id, agents(name), users:actor_user_id(first_name, last_name)")
+    .select("id, occurred_at, actor_type, action_type, status, title, detail, agent_id, agent_run_id, process_id, department_id, agents(name), users:actor_user_id(first_name, last_name)")
     .eq("organization_id", session.org.id)
     .order("occurred_at", { ascending: false })
     .limit(200);
   if (f.department) q = q.eq("department_id", f.department);
   if (f.agent) q = q.eq("agent_id", f.agent);
   if (f.status) q = q.eq("status", f.status);
-  if (f.type) q = q.ilike("action_type", `%${f.type}%`);
+  if (f.type === "test") q = q.eq("detail->>mode", "test");
+  else if (f.type) q = q.ilike("action_type", `%${f.type}%`);
   if (f.date) q = q.gte("occurred_at", `${f.date}T00:00:00Z`).lte("occurred_at", `${f.date}T23:59:59Z`);
   const [{ data: events }, { data: agents }, { data: departments }] = await Promise.all([
     q,
@@ -65,6 +66,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               <NativeSelectOption value="approval">Approvals</NativeSelectOption>
               <NativeSelectOption value="escalation">Escalations</NativeSelectOption>
               <NativeSelectOption value="run">Runs</NativeSelectOption>
+              <NativeSelectOption value="test">Test runs</NativeSelectOption>
             </NativeSelect>
             <NativeSelect name="status" defaultValue={f.status ?? ""} aria-label="Status">
               <NativeSelectOption value="">Any status</NativeSelectOption>
@@ -110,6 +112,11 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                         <div className="text-xs font-medium text-muted-foreground">{who}</div>
                         <div>{e.title}</div>
                       </div>
+                      {(e.detail as { mode?: string } | null)?.mode === "test" ? (
+                        <Badge variant="secondary" className="shrink-0">
+                          Test
+                        </Badge>
+                      ) : null}
                       {e.status !== "info" && e.status !== "success" ? (
                         <Badge variant={TONES[e.status] ?? "secondary"} className="shrink-0 capitalize">
                           {e.status}

@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { createServiceClient } from "@autonomos/db";
+import { createServiceClient, isPaused } from "@autonomos/db";
 import type { CompanyProfile } from "@autonomos/schemas";
 import { createClient } from "./supabase/server";
 
@@ -28,6 +28,7 @@ export type Session = {
     currency: string;
     defaultHourlyCost: number;
     agentsPaused: boolean;
+    agentsPausedUntil: string | null;
     onboardingStep: string;
     detectedTools: string[];
     websiteProfile: WebsiteProfile | null;
@@ -83,7 +84,9 @@ export const getSession = cache(async (): Promise<Session | null> => {
       improvementAreas: org.improvement_areas,
       currency: org.currency,
       defaultHourlyCost: Number(org.default_hourly_cost),
-      agentsPaused: org.agents_paused,
+      // A time-boxed pause whose end has passed is no longer in force.
+      agentsPaused: isPaused(org),
+      agentsPausedUntil: isPaused(org) ? org.agents_paused_until : null,
       onboardingStep: org.onboarding_step,
       detectedTools: org.detected_tools ?? [],
       websiteProfile: (org.website_profile as WebsiteProfile | null) ?? null,

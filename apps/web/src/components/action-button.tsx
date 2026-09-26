@@ -19,6 +19,7 @@ export function ActionButton({
   pendingLabel,
   onDone,
   className,
+  disabled,
 }: {
   action: () => Promise<Result>;
   children: ReactNode;
@@ -29,6 +30,7 @@ export function ActionButton({
   pendingLabel?: string;
   onDone?: (data: unknown) => void;
   className?: string;
+  disabled?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [asking, setAsking] = useState(false);
@@ -45,7 +47,7 @@ export function ActionButton({
     });
   return (
     <>
-      <Button type="button" variant={variant} size={size} className={className} disabled={pending} onClick={() => (confirm ? setAsking(true) : run())}>
+      <Button type="button" variant={variant} size={size} className={className} disabled={pending || disabled} onClick={() => (confirm ? setAsking(true) : run())}>
         {pending ? <Spinner /> : null}
         {pending ? (pendingLabel ?? children) : children}
       </Button>

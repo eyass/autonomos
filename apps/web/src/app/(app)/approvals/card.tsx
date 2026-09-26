@@ -72,7 +72,24 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {a.reason ? <p>{a.reason}</p> : null}
+        {a.reason ? (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground">Why the agent wants to do this</div>
+            <p className="mt-0.5">{a.reason}</p>
+          </div>
+        ) : null}
+        {a.evidence.length ? (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground">Based on</div>
+            <ul className="mt-0.5 space-y-0.5">
+              {a.evidence.slice(0, 3).map((e, i) => (
+                <li key={i}>
+                  <Badge variant="secondary">{e.source}</Badge> {e.description}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {approvalReasons.length ? <p className="text-xs text-muted-foreground">Needs approval because: {approvalReasons.map((c) => c.detail ?? c.rule).join("; ")}</p> : null}
         {mode === "modify" ? (
           <FieldGroup className="grid gap-3 sm:grid-cols-2">

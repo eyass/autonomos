@@ -1,13 +1,6 @@
+import { isPaused } from "./services";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  emptyRunState,
-  type ActionRecord,
-  type ApprovalRecord,
-  type RunContext,
-  type RunState,
-  type RunStore,
-  type StepRecord,
-} from "@autonomos/agents";
+import { emptyRunState, type ActionRecord, type ApprovalRecord, type RunContext, type RunState, type RunStore, type StepRecord } from "@autonomos/agents";
 import type { ConnectionInfo, KnowledgeSearch, SandboxRecord, SandboxStore } from "@autonomos/integrations";
 import type { ModelUsageRecord } from "@autonomos/ai";
 import { PolicyConfigSchema, InstructionsSchema, TriggerConfigSchema, type AutonomyLevel } from "@autonomos/schemas";
@@ -43,13 +36,8 @@ export class SupabaseRunStore implements RunStore {
       this.db.from("agents").select("id, name, status").eq("organization_id", org).eq("id", run.agent_id).single(),
       this.db.from("agent_versions").select("*").eq("organization_id", org).eq("id", run.agent_version_id).single(),
       this.db.from("agent_tools").select("tool_key").eq("organization_id", org).eq("agent_version_id", run.agent_version_id),
-      this.db
-        .from("processes")
-        .select("id, title, description, department_id, estimated_minutes_per_occurrence")
-        .eq("organization_id", org)
-        .eq("id", run.process_id)
-        .single(),
-      this.db.from("organizations").select("id, name, description, industry, agents_paused").eq("id", org).single(),
+      this.db.from("processes").select("id, title, description, department_id, estimated_minutes_per_occurrence").eq("organization_id", org).eq("id", run.process_id).single(),
+      this.db.from("organizations").select("id, name, description, industry, agents_paused, agents_paused_until").eq("id", org).single(),
     ]);
     const a = must(agent, "load agent");
     const v = must(version, "load version");
@@ -92,7 +80,7 @@ export class SupabaseRunStore implements RunStore {
         departmentId: p.department_id,
         estimatedMinutesPerOccurrence: p.estimated_minutes_per_occurrence === null ? null : Number(p.estimated_minutes_per_occurrence),
       },
-      organization: { id: o.id, name: o.name, description: o.description, industry: o.industry, paused: o.agents_paused },
+      organization: { id: o.id, name: o.name, description: o.description, industry: o.industry, paused: isPaused(o) },
     };
   }
 
@@ -171,12 +159,7 @@ export class SupabaseRunStore implements RunStore {
   }
 
   async getActionByKey(ctx: RunContext, key: string): Promise<ActionRecord | null> {
-    const { data, error } = await this.db
-      .from("agent_actions")
-      .select("id, status, result")
-      .eq("organization_id", ctx.run.organizationId)
-      .eq("idempotency_key", key)
-      .maybeSingle();
+    const { data, error } = await this.db.from("agent_actions").select("id, status, result").eq("organization_id", ctx.run.organizationId).eq("idempotency_key", key).maybeSingle();
     if (error) throw new Error(`get action: ${error.message}`);
     return data ? { id: data.id, status: data.status, result: data.result } : null;
   }
@@ -190,7 +173,7 @@ export class SupabaseRunStore implements RunStore {
           result: patch.result === undefined ? undefined : json(patch.result),
           error: patch.error,
           approval_request_id: patch.approvalRequestId,
-          arguments: patch.args ? (json(patch.args)) : undefined,
+          arguments: patch.args ? json(patch.args) : undefined,
           finished_at: patch.status === "pending" ? null : new Date().toISOString(),
         })
         .eq("organization_id", ctx.run.organizationId)
@@ -241,12 +224,7 @@ export class SupabaseRunStore implements RunStore {
   }
 
   async getApproval(ctx: RunContext, id: string): Promise<ApprovalRecord | null> {
-    const { data, error } = await this.db
-      .from("approval_requests")
-      .select("id, status, decision, comment, resolved_by")
-      .eq("organization_id", ctx.run.organizationId)
-      .eq("id", id)
-      .maybeSingle();
+    const { data, error } = await this.db.from("approval_requests").select("id, status, decision, comment, resolved_by").eq("organization_id", ctx.run.organizationId).eq("id", id).maybeSingle();
     if (error) throw new Error(`get approval: ${error.message}`);
     if (!data) return null;
     return { id: data.id, status: data.status, decision: data.decision as ApprovalRecord["decision"], comment: data.comment, resolvedBy: data.resolved_by };
@@ -269,10 +247,7 @@ export class SupabaseRunStore implements RunStore {
   }
 
   async sumInterventionMinutes(ctx: RunContext) {
-    const rows = must(
-      await this.db.from("human_interventions").select("minutes_spent").eq("organization_id", ctx.run.organizationId).eq("agent_run_id", ctx.run.id),
-      "sum interventions",
-    );
+    const rows = must(await this.db.from("human_interventions").select("minutes_spent").eq("organization_id", ctx.run.organizationId).eq("agent_run_id", ctx.run.id), "sum interventions");
     return rows.reduce((s, r) => s + Number(r.minutes_spent), 0);
   }
 
@@ -338,15 +313,12 @@ export class SupabaseRunStore implements RunStore {
   }
 
   async isOrganizationPaused(ctx: RunContext) {
-    const o = must(await this.db.from("organizations").select("agents_paused").eq("id", ctx.run.organizationId).single(), "org paused");
-    return o.agents_paused;
+    const o = must(await this.db.from("organizations").select("agents_paused, agents_paused_until").eq("id", ctx.run.organizationId).single(), "org paused");
+    return isPaused(o);
   }
 
   async getAgentStatus(ctx: RunContext) {
-    const a = must(
-      await this.db.from("agents").select("status").eq("organization_id", ctx.run.organizationId).eq("id", ctx.run.agentId).single(),
-      "agent status",
-    );
+    const a = must(await this.db.from("agents").select("status").eq("organization_id", ctx.run.organizationId).eq("id", ctx.run.agentId).single(), "agent status");
     return a.status;
   }
 
@@ -373,32 +345,19 @@ export class SupabaseRunStore implements RunStore {
 export function sandboxStore(db: Client, organizationId: string): SandboxStore {
   return {
     async get(system, kind, id) {
-      const { data, error } = await db
-        .from("sandbox_records")
-        .select("data")
-        .eq("organization_id", organizationId)
-        .eq("system", system)
-        .eq("kind", kind)
-        .eq("external_id", id)
-        .maybeSingle();
+      const { data, error } = await db.from("sandbox_records").select("data").eq("organization_id", organizationId).eq("system", system).eq("kind", kind).eq("external_id", id).maybeSingle();
       if (error) throw new Error(`sandbox get: ${error.message}`);
       return (data?.data as SandboxRecord | undefined) ?? null;
     },
     async list(system, kind) {
-      const rows = must(
-        await db.from("sandbox_records").select("data").eq("organization_id", organizationId).eq("system", system).eq("kind", kind).order("created_at"),
-        "sandbox list",
-      );
+      const rows = must(await db.from("sandbox_records").select("data").eq("organization_id", organizationId).eq("system", system).eq("kind", kind).order("created_at"), "sandbox list");
       return rows.map((r) => r.data as SandboxRecord);
     },
     async put(system, kind, record) {
       check(
         await db
           .from("sandbox_records")
-          .upsert(
-            { organization_id: organizationId, system, kind, external_id: record.id, data: json(record) },
-            { onConflict: "organization_id,system,kind,external_id" },
-          ),
+          .upsert({ organization_id: organizationId, system, kind, external_id: record.id, data: json(record) }, { onConflict: "organization_id,system,kind,external_id" }),
         "sandbox put",
       );
     },
@@ -408,12 +367,7 @@ export function sandboxStore(db: Client, organizationId: string): SandboxStore {
 export function knowledgeSearch(db: Client, organizationId: string): KnowledgeSearch {
   return {
     async search(query) {
-      const { data, error } = await db
-        .from("documents")
-        .select("title, content")
-        .eq("organization_id", organizationId)
-        .textSearch("search", query, { type: "websearch", config: "english" })
-        .limit(5);
+      const { data, error } = await db.from("documents").select("title, content").eq("organization_id", organizationId).textSearch("search", query, { type: "websearch", config: "english" }).limit(5);
       if (error) throw new Error(`knowledge search: ${error.message}`);
       return (data ?? []).map((d) => ({ title: d.title, excerpt: excerpt(d.content, query) }));
     },
@@ -421,8 +375,15 @@ export function knowledgeSearch(db: Client, organizationId: string): KnowledgeSe
 }
 
 function excerpt(content: string, query: string) {
-  const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+  const words = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
   const lower = content.toLowerCase();
-  const idx = words.map((w) => lower.indexOf(w)).filter((i) => i >= 0).sort((a, b) => a - b)[0] ?? 0;
+  const idx =
+    words
+      .map((w) => lower.indexOf(w))
+      .filter((i) => i >= 0)
+      .sort((a, b) => a - b)[0] ?? 0;
   return content.slice(Math.max(0, idx - 200), idx + 600);
 }

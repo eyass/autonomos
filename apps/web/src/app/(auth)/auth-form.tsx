@@ -11,6 +11,19 @@ import { Field, FieldDescription, FieldGroup, FieldSeparator } from "@/component
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Turns Supabase auth errors into messages a person can act on.
+function friendly(message: string) {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login credentials")) return "The email or password is incorrect.";
+  if (m.includes("email not confirmed")) return "Confirm your email address first. Check your inbox for the link.";
+  if (m.includes("already registered") || m.includes("already been registered")) return "An account with this email already exists. Sign in instead.";
+  if (m.includes("rate limit") || m.includes("too many")) return "Too many attempts. Wait a minute and try again.";
+  if (m.includes("password should be")) return "Choose a longer password: at least 8 characters.";
+  return message;
+}
+
 // "eve.tester@acme.com" -> Eve / Tester. Only a starting point; the fields stay editable.
 function namesFromEmail(email: string) {
   const local = email.split("@")[0] ?? "";
@@ -40,10 +53,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     try {
+      if (!email) throw new Error("Enter your work email.");
+      if (!EMAIL_PATTERN.test(email)) throw new Error("Enter a valid email address, like name@company.com.");
+      if (mode === "signup" || usePassword) {
+        if (!password) throw new Error("Enter your password.");
+        if (mode === "signup" && password.length < 8) throw new Error("Your password needs at least 8 characters.");
+      }
       if (mode === "signup") {
         const firstName = String(form.get("firstName") ?? "").trim();
         const lastName = String(form.get("lastName") ?? "").trim();
-        if (!firstName || !lastName) throw new Error("First and last name are required");
+        if (!firstName || !lastName) throw new Error("Enter your first and last name.");
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -70,7 +89,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       router.push(next);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? friendly(e.message) : "Something went wrong. Try again.");
     } finally {
       setPending(false);
     }
@@ -89,7 +108,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <CardDescription>{mode === "signup" ? "Start mapping what your company can automate" : "Sign in with Google or your work email"}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={submit}>
+        <form action={submit} noValidate>
           <FieldGroup>
             <Field>
               <Button type="button" variant="outline" className="w-full" onClick={google}>
@@ -124,9 +143,18 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               </div>
             ) : null}
             {mode === "signup" || usePassword ? (
-              <FormField label="Password" htmlFor="password" hint={mode === "signup" ? "At least 8 characters" : undefined}>
-                <Input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
-              </FormField>
+              <div>
+                <FormField label="Password" htmlFor="password" hint={mode === "signup" ? "At least 8 characters" : undefined}>
+                  <Input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
+                </FormField>
+                {mode === "login" ? (
+                  <div className="mt-1.5 text-right">
+                    <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
             {error ? (
               <Alert variant="destructive">
@@ -147,6 +175,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 <Button type="button" variant="link" size="sm" className="text-muted-foreground" onClick={() => setUsePassword((v) => !v)}>
                   {usePassword ? "Use a magic link instead" : "Use a password instead"}
                 </Button>
+              ) : null}
+              {mode === "signup" ? (
+                <FieldDescription className="text-center text-xs">
+                  By continuing you agree to the <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy Policy</Link>.
+                </FieldDescription>
               ) : null}
               <FieldDescription className="text-center">
                 {mode === "signup" ? (

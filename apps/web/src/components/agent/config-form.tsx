@@ -44,18 +44,27 @@ function ListField({ label, hint, value, onChange }: { label: string; hint?: str
   );
 }
 
+function triggerLabel(t: AgentConfig["trigger"]) {
+  if (t.type === "manual") return "run manually";
+  if (t.type === "schedule") return `on a schedule (${t.cron}, ${t.timezone})`;
+  return `when ${INTEGRATION_EVENTS.find((e) => e.key === t.event)?.label ?? t.event}`;
+}
+
 export function AgentConfigForm({
   initial,
   tools,
   submitLabel,
   onSubmit,
   showNote,
+  origin = "opportunity",
 }: {
   initial: AgentConfig;
   tools: ToolOption[];
   submitLabel: string;
   onSubmit: (config: AgentConfig, note: string) => Promise<{ ok: false; error: string } | { ok: true; data?: unknown } | undefined>;
   showNote?: boolean;
+  // Where the starting configuration came from, for the "this differs" callouts on Review.
+  origin?: "opportunity" | "current version";
 }) {
   const [step, setStep] = useState(0);
   const [c, setC] = useState<AgentConfig>(initial);
@@ -334,6 +343,21 @@ export function AgentConfigForm({
           ) : null}
           {step === 5 ? (
             <div className="space-y-4 text-sm">
+              {triggerLabel(c.trigger) !== triggerLabel(initial.trigger) ? (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    The trigger differs from the {origin === "opportunity" ? "opportunity's suggestion" : "current version"}: {triggerLabel(initial.trigger)} → {triggerLabel(c.trigger)}. Check that
+                    the agent still does the work {origin === "opportunity" ? "the opportunity describes" : "it was set up for"}.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {c.autonomyLevel > initial.autonomyLevel ? (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    Autonomy is higher than {origin === "opportunity" ? "suggested" : "before"}: L{initial.autonomyLevel} → L{c.autonomyLevel}. The agent will act without approval more often.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-base font-semibold">{c.name}</div>
                 <AutonomyLadder current={c.autonomyLevel} />

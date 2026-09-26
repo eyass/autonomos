@@ -1,7 +1,10 @@
 "use client";
 import { EMPLOYEE_COUNTS, INDUSTRIES } from "@autonomos/schemas";
-import { useActionState } from "react";
-import { inviteAction, saveDepartmentAction, updateCompanyAction } from "./actions";
+import { useActionState, useState } from "react";
+import { ActionButton } from "@/components/action-button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { inviteAction, saveDepartmentAction, setPausedAction, updateCompanyAction, updateProfileAction } from "./actions";
 import { FormField } from "@/components/app/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -121,6 +124,75 @@ export function InviteForm({ disabled }: { disabled: boolean }) {
       <div className="col-span-2 sm:w-full">
         <Result state={state} success="Invite saved. They join when they sign up with this email." />
       </div>
+    </form>
+  );
+}
+
+// Emergency stop with an optional end time. Confirmation happens in the AlertDialog.
+export function PauseControl({ paused, until }: { paused: boolean; until: string | null }) {
+  const [hours, setHours] = useState<string>("");
+  if (paused) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-warning">
+          {until
+            ? `Paused until ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(until))}. Agents resume on their own after that.`
+            : "Paused until an admin resumes."}
+        </p>
+        <ActionButton action={setPausedAction.bind(null, false, null)}>Resume all agents</ActionButton>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <NativeSelect aria-label="Pause for" value={hours} onChange={(e) => setHours(e.target.value)} className="sm:w-56">
+        <NativeSelectOption value="">Until I resume</NativeSelectOption>
+        <NativeSelectOption value="1">For 1 hour</NativeSelectOption>
+        <NativeSelectOption value="4">For 4 hours</NativeSelectOption>
+        <NativeSelectOption value="24">For 24 hours</NativeSelectOption>
+        <NativeSelectOption value="168">For a week</NativeSelectOption>
+      </NativeSelect>
+      <ActionButton variant="destructive" confirm="Pause every agent in the organisation now?" confirmLabel="Pause all agents" action={setPausedAction.bind(null, true, hours ? Number(hours) : null)}>
+        Pause all agents
+      </ActionButton>
+    </div>
+  );
+}
+
+export function ProfileForm({ firstName, lastName, prefs }: { firstName: string; lastName: string; prefs: { approvals: boolean; failures: boolean; weekly_summary: boolean } }) {
+  const [state, action, pending] = useActionState(updateProfileAction, null);
+  const pref = (name: string, label: string, hint: string, checked: boolean) => (
+    <Field orientation="horizontal">
+      <Checkbox id={`pref-${name}`} name={name} defaultChecked={checked} />
+      <FieldContent>
+        <FieldLabel htmlFor={`pref-${name}`}>{label}</FieldLabel>
+        <FieldDescription>{hint}</FieldDescription>
+      </FieldContent>
+    </Field>
+  );
+  return (
+    <form action={action} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="First name">
+          <Input name="firstName" defaultValue={firstName} required />
+        </FormField>
+        <FormField label="Last name">
+          <Input name="lastName" defaultValue={lastName} required />
+        </FormField>
+      </div>
+      <FieldSet>
+        <FieldLegend variant="label">Email me when</FieldLegend>
+        <FieldGroup className="gap-3">
+          {pref("approvals", "An action needs my approval", "Only if you can approve actions.", prefs.approvals)}
+          {pref("failures", "An agent fails or hands work to a person", "Sent to owners and admins.", prefs.failures)}
+          {pref("weeklySummary", "Weekly summary", "What agents did, time saved and cost.", prefs.weekly_summary)}
+        </FieldGroup>
+      </FieldSet>
+      <p className="text-xs text-muted-foreground">In-app notifications always appear.</p>
+      <Button type="submit" disabled={pending}>
+        Save
+      </Button>
+      <Result state={state} success="Saved" />
     </form>
   );
 }

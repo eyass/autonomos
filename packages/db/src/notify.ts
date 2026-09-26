@@ -24,11 +24,14 @@ export async function sendNotification(db: SupabaseClient<Database>, organizatio
 
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) return;
 
-  let query = db.from("organization_members").select("role, can_approve, users(email)").eq("organization_id", organizationId);
+  let query = db.from("organization_members").select("role, can_approve, notification_preferences, users(email)").eq("organization_id", organizationId);
   if (n.kind === "approval_required") query = query.eq("can_approve", true);
   else query = query.in("role", ["owner", "admin"]);
   const { data: members } = await query;
+  // Each member chooses which emails they get; in-app notifications always appear.
+  const pref = n.kind === "approval_required" ? "approvals" : "failures";
   const to = (members ?? [])
+    .filter((m) => (m.notification_preferences as Record<string, boolean> | null)?.[pref] !== false)
     .map((m) => (m.users as unknown as { email?: string } | null)?.email)
     .filter((e): e is string => Boolean(e));
   if (!to.length) return;

@@ -1,8 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { updateProcessAction } from "../actions";
 import { FormField } from "@/components/app/form-field";
+import { TagPicker, type TagOption } from "@/components/app/tag-picker";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,9 +35,34 @@ type Initial = {
 
 const num = (v: string) => (v.trim() === "" ? null : Number(v));
 
-export function ProcessEditor({ id, initial, departments }: { id: string; initial: Initial; departments: Array<{ id: string; name: string }> }) {
+export function ProcessEditor({
+  id,
+  initial,
+  departments,
+  systemOptions,
+  roleOptions,
+}: {
+  id: string;
+  initial: Initial;
+  departments: Array<{ id: string; name: string }>;
+  systemOptions: TagOption[];
+  roleOptions: TagOption[];
+}) {
   const [open, setOpen] = useState(false);
   const [v, setV] = useState(initial);
+  const dirty = open && JSON.stringify(v) !== JSON.stringify(initial);
+  // Leaving the page with unsaved edits asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  const cancel = () => {
+    if (dirty && !window.confirm("Discard your unsaved changes?")) return;
+    setV(initial);
+    setOpen(false);
+  };
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -151,35 +177,9 @@ export function ProcessEditor({ id, initial, departments }: { id: string; initia
             </Button>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Systems" hint="Comma separated">
-            <Input
-              value={v.systems.join(", ")}
-              onChange={(e) =>
-                set(
-                  "systems",
-                  e.target.value
-                    .split(",")
-                    .map((x) => x.trim())
-                    .filter(Boolean),
-                )
-              }
-            />
-          </FormField>
-          <FormField label="Roles" hint="Comma separated">
-            <Input
-              value={v.roles.join(", ")}
-              onChange={(e) =>
-                set(
-                  "roles",
-                  e.target.value
-                    .split(",")
-                    .map((x) => x.trim())
-                    .filter(Boolean),
-                )
-              }
-            />
-          </FormField>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <TagPicker label="Systems" value={v.systems} onChange={(x) => set("systems", x)} options={systemOptions} placeholder="Another system" />
+          <TagPicker label="Roles" value={v.roles} onChange={(x) => set("roles", x)} options={roleOptions} placeholder="Another role" />
         </div>
         <FormField label="Notes">
           <Textarea value={v.notes ?? ""} onChange={(e) => set("notes", e.target.value || null)} rows={2} />
@@ -204,9 +204,10 @@ export function ProcessEditor({ id, initial, departments }: { id: string; initia
           >
             {pending ? "Saving…" : "Save changes"}
           </Button>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
+          <Button variant="ghost" onClick={cancel}>
             Cancel
           </Button>
+          {dirty ? <span className="self-center text-xs text-muted-foreground">Unsaved changes</span> : null}
         </div>
       </CardContent>
     </Card>

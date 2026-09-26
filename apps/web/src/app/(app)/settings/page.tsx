@@ -1,16 +1,19 @@
 import { isMockMode, modelIdFor } from "@autonomos/ai";
-import { triggerConfigured } from "@autonomos/workflows";
+import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { dateTime, num, usd } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, setApprovalAction, setPausedAction } from "./actions";
-import { CompanyForm, DepartmentForm, InviteForm } from "./forms";
+import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
+import { CompanyForm, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
 import { DefinitionList } from "@/components/app/definition-list";
 import { PageHeader } from "@/components/app/page-header";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ReadinessChecklist } from "@/components/app/readiness-checklist";
+import { SettingsSection } from "@/components/app/settings-section";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { executionReadiness } from "@/server/readiness";
 
 export const metadata = { title: "Settings" };
 
@@ -21,7 +24,7 @@ export default async function SettingsPage() {
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
   const [{ data: departments }, { data: members }, { data: invites }, { data: auditRows }, { count: runs }, { count: toolActions }, { data: usage }, { count: activeAgents }] = await Promise.all([
     supabase.from("departments").select("id, name, hourly_labour_cost").eq("organization_id", session.org.id).is("archived_at", null).order("name"),
-    supabase.from("organization_members").select("user_id, role, can_approve, users(first_name, last_name, email)").eq("organization_id", session.org.id),
+    supabase.from("organization_members").select("user_id, role, can_approve, notification_preferences, users(first_name, last_name, email)").eq("organization_id", session.org.id),
     supabase.from("organization_invites").select("email, role, created_at").eq("organization_id", session.org.id).is("accepted_at", null),
     supabase
       .from("audit_events")
@@ -35,60 +38,134 @@ export default async function SettingsPage() {
     supabase.from("agents").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "active"),
   ]);
   const { data: org } = await adminDb().from("organizations").select("plan, subscription_status").eq("id", session.org.id).single();
+  const readiness = await executionReadiness(session);
+  const [{ data: connections }, { data: catalog }] = await Promise.all([
+    supabase.from("integration_connections").select("integration_key, provider, account_label").eq("organization_id", session.org.id).eq("status", "connected"),
+    supabase.from("integrations").select("key, name"),
+  ]);
+  const systemName = (key: string) => catalog?.find((c) => c.key === key)?.name ?? key;
+  const me = (members ?? []).find((m) => m.user_id === session.user.id);
+  const meUser = me?.users as unknown as { first_name: string; last_name: string } | null;
+  const prefs = { approvals: true, failures: true, weekly_summary: false, ...((me?.notification_preferences as Record<string, boolean> | null) ?? {}) };
   const tokens = (usage ?? []).reduce((s, u) => s + u.input_tokens + u.output_tokens, 0);
   const cost = (usage ?? []).reduce((s, u) => s + Number(u.estimated_cost), 0);
+
+  const sections = [
+    ["stop", "Emergency stop"],
+    ["execution", "Execution"],
+    ["environment", "Environment"],
+    ["profile", "Your profile"],
+    ["company", "Company"],
+    ["departments", "Departments"],
+    ["members", "Members"],
+    ["billing", "Billing"],
+    ["audit", "Audit log"],
+  ] as const;
 
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="space-y-6">
-        <Card className={session.org.agentsPaused ? "border-warning" : undefined}>
-          <CardHeader>
-            <CardTitle>Emergency stop</CardTitle>
-            <CardDescription>Immediately stops all agents from taking new actions. Runs in progress stop before their next external action.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {admin ? (
-              session.org.agentsPaused ? (
-                <ActionButton action={setPausedAction.bind(null, false)}>Resume all agents</ActionButton>
-              ) : (
-                <ActionButton variant="destructive" confirm="Pause every agent in the organisation now?" confirmLabel="Pause all agents" action={setPausedAction.bind(null, true)}>
-                  Pause all agents
-                </ActionButton>
-              )
-            ) : (
-              <p className="text-sm text-muted-foreground">Only admins can pause all agents.</p>
-            )}
-          </CardContent>
-        </Card>
+      <nav aria-label="Settings sections" className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <ul className="flex gap-2 pb-1">
+          {sections.map(([id, label]) => (
+            <li key={id} className="shrink-0">
+              <Button asChild size="sm" variant="outline" className="rounded-full">
+                <Link href={`#${id}`}>{label}</Link>
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="space-y-4 md:space-y-6">
+        <SettingsSection
+          id="stop"
+          title="Emergency stop"
+          description="Stops all agents from taking new actions. Runs in progress stop before their next external action."
+          tone={session.org.agentsPaused ? "warning" : undefined}
+          defaultOpen={session.org.agentsPaused}
+        >
+          {admin ? <PauseControl paused={session.org.agentsPaused} until={session.org.agentsPausedUntil} /> : <p className="text-sm text-muted-foreground">Only admins can pause all agents.</p>}
+        </SettingsSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Company</CardTitle>
-            <CardDescription>
-              {session.org.websiteProfile
-                ? `Profile drafted from ${session.org.website ?? "your website"}${session.org.detectedTools.length ? `. Tools found: ${session.org.detectedTools.join(", ")}` : ""}.`
-                : "Add your website to let AutonomOS keep this profile up to date."}
-            </CardDescription>
-            {admin && session.org.website ? (
-              <CardAction>
-                <ActionButton size="sm" variant="outline" action={refreshProfileAction} pendingLabel="Reading website…">
-                  Refresh from website
-                </ActionButton>
-              </CardAction>
-            ) : null}
-          </CardHeader>
-          <CardContent>
-            <CompanyForm org={session.org} disabled={!admin} />
-          </CardContent>
-        </Card>
+        <SettingsSection
+          id="execution"
+          title="Execution"
+          description={readiness.ready ? "Ready. Agents can be tested and go live." : "Not ready yet. Fix the items below before agents can run."}
+          action={<Badge variant={readiness.ready ? "success" : "warning"}>{readiness.ready ? "Ready" : "Not ready"}</Badge>}
+          defaultOpen={!readiness.ready}
+        >
+          <ReadinessChecklist checks={readiness.checks} />
+          {admin ? (
+            <Collapsible className="mt-3">
+              <CollapsibleTrigger asChild>
+                <Button variant="link" size="sm" className="h-auto px-0 text-muted-foreground">
+                  Technical details
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 space-y-1.5 text-xs">
+                {(["FAST_MODEL", "SMART_MODEL", "AGENT_MODEL"] as const).map((c) => (
+                  <div key={c} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="w-24 text-muted-foreground">{{ FAST_MODEL: "Quick tasks", SMART_MODEL: "Analysis", AGENT_MODEL: "Agents" }[c]}</span>
+                    <code className="break-all rounded bg-muted px-2 py-0.5">{isMockMode(c) ? "demo (scripted)" : modelIdFor(c)}</code>
+                  </div>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          ) : null}
+        </SettingsSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Departments</CardTitle>
-            <CardDescription>Hourly cost per department overrides the company default for estimated value.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <SettingsSection
+          id="environment"
+          title="Environment"
+          description="Where agents act. Sandbox systems hold sample data inside AutonomOS, so nothing real changes. Live systems are your real accounts."
+        >
+          {connections?.length ? (
+            <ul className="-mx-6 border-t border-border text-sm">
+              {connections.map((c) => (
+                <li key={c.integration_key} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
+                  <span className="min-w-0 flex-1 truncate font-medium">{systemName(c.integration_key)}</span>
+                  {c.account_label ? <span className="truncate text-xs text-muted-foreground">{c.account_label}</span> : null}
+                  <Badge variant={c.provider === "sandbox" ? "warning" : "success"}>{c.provider === "sandbox" ? "Sandbox" : "Live"}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No systems connected yet.</p>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            To move a system from sandbox to live, disconnect it and connect your real account in{" "}
+            <Link href="/integrations" className="underline">
+              Integrations
+            </Link>
+            . Test runs are always simulated, whichever mode a system is in.
+          </p>
+        </SettingsSection>
+
+        <SettingsSection id="profile" title="Your profile" description="Your name and which emails you get.">
+          <ProfileForm firstName={meUser?.first_name ?? ""} lastName={meUser?.last_name ?? ""} prefs={prefs} />
+        </SettingsSection>
+
+        <SettingsSection
+          id="company"
+          title="Company"
+          description={
+            session.org.websiteProfile
+              ? `Profile drafted from ${session.org.website ?? "your website"}${session.org.detectedTools.length ? `. Tools found: ${session.org.detectedTools.join(", ")}` : ""}.`
+              : "Add your website to let AutonomOS keep this profile up to date."
+          }
+          action={
+            admin && session.org.website ? (
+              <ActionButton size="sm" variant="outline" action={refreshProfileAction} pendingLabel="Reading website…">
+                Refresh from website
+              </ActionButton>
+            ) : null
+          }
+        >
+          <CompanyForm org={session.org} disabled={!admin} />
+        </SettingsSection>
+
+        <SettingsSection id="departments" title="Departments" description="Hourly cost per department overrides the company default for estimated value.">
+          <div className="space-y-3">
             {(departments ?? []).map((d) => (
               <DepartmentForm
                 key={d.id}
@@ -106,104 +183,90 @@ export default async function SettingsPage() {
             <div className="border-t border-border pt-3">
               <DepartmentForm disabled={!admin} />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </SettingsSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Members</CardTitle>
-          </CardHeader>
-          <ul>
+        <SettingsSection id="members" title="Members" description="Who can use AutonomOS, their role, and who can approve agent actions.">
+          <ul className="-mx-6 border-t border-border">
             {(members ?? []).map((m) => {
               const u = m.users as unknown as { first_name: string; last_name: string; email: string } | null;
+              const editable = admin && m.role !== "owner" && m.user_id !== session.user.id;
               return (
-                <li key={m.user_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3 text-sm sm:px-5">
+                <li key={m.user_id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-3 text-sm">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{u ? `${u.first_name} ${u.last_name}` : "–"}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {u?.email} · <span className="capitalize">{m.role}</span>
+                    <div className="truncate font-medium">
+                      {u ? `${u.first_name} ${u.last_name}` : "–"}
+                      {m.user_id === session.user.id ? <span className="font-normal text-muted-foreground"> (you)</span> : null}
                     </div>
+                    <div className="truncate text-xs text-muted-foreground">{u?.email}</div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {admin ? (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge variant="outline" className="capitalize">
+                      {m.role}
+                    </Badge>
+                    <Badge variant={m.can_approve ? "success" : "secondary"}>{m.can_approve ? "Approver" : "No approvals"}</Badge>
+                  </div>
+                  {admin ? (
+                    <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
                       <ActionButton size="sm" variant="ghost" action={setApprovalAction.bind(null, m.user_id, !m.can_approve)}>
-                        {m.can_approve ? "Can approve" : "Cannot approve"}
+                        {m.can_approve ? "Remove approval" : "Allow approvals"}
                       </ActionButton>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">{m.can_approve ? "Can approve" : "Cannot approve"}</span>
-                    )}
-                    {admin && m.role !== "owner" && m.user_id !== session.user.id ? (
-                      <ActionButton size="sm" variant="ghost" confirm="Remove this member?" confirmLabel="Remove" action={removeMemberAction.bind(null, m.user_id)}>
-                        Remove
-                      </ActionButton>
-                    ) : null}
-                  </div>
+                      {editable ? (
+                        <ActionButton size="sm" variant="ghost" action={setMemberRoleAction.bind(null, m.user_id, m.role === "admin" ? "member" : "admin")}>
+                          {m.role === "admin" ? "Make member" : "Make admin"}
+                        </ActionButton>
+                      ) : null}
+                      {editable ? (
+                        <ActionButton size="sm" variant="ghost" confirm="Remove this member?" confirmLabel="Remove" action={removeMemberAction.bind(null, m.user_id)}>
+                          Remove
+                        </ActionButton>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
             {(invites ?? []).map((i) => (
-              <li key={i.email} className="border-b border-border px-4 py-3 text-sm text-muted-foreground sm:px-5">
-                <div className="truncate">{i.email}</div>
-                <div className="text-xs">
-                  Invited · <span className="capitalize">{i.role}</span>
+              <li key={i.email} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">{i.email}</div>
+                  <div className="text-xs text-muted-foreground">Invited {dateTime(i.created_at)}, not joined yet</div>
                 </div>
+                <Badge variant="outline" className="capitalize">
+                  {i.role}
+                </Badge>
+                <Badge variant="warning">Pending</Badge>
+                {admin ? (
+                  <ActionButton size="sm" variant="ghost" confirm={`Revoke the invite for ${i.email}?`} confirmLabel="Revoke" action={revokeInviteAction.bind(null, i.email)}>
+                    Revoke
+                  </ActionButton>
+                ) : null}
               </li>
             ))}
           </ul>
-          <CardContent>
+          <div className="pt-4">
             <InviteForm disabled={!admin} />
-          </CardContent>
-        </Card>
+          </div>
+        </SettingsSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>AI</CardTitle>
-            <CardDescription>Models are selected by class. Change them with environment variables.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {(["FAST_MODEL", "SMART_MODEL", "AGENT_MODEL"] as const).map((c) => (
-              <div key={c} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="w-16 capitalize text-muted-foreground">{c.replace("_MODEL", "").toLowerCase()}</span>
-                <code className="break-all rounded bg-muted px-2 py-0.5 text-xs">{modelIdFor(c)}</code>
-                {isMockMode(c) ? <Badge variant="warning">mock mode, no API key</Badge> : null}
-              </div>
-            ))}
-            {!triggerConfigured() ? (
-              <Alert variant="warning">
-                <AlertDescription>Trigger.dev is not configured, so agents cannot run. Set TRIGGER_SECRET_KEY.</AlertDescription>
-              </Alert>
-            ) : null}
-          </CardContent>
-        </Card>
+        <SettingsSection id="billing" title="Billing and usage" description="Design partners are billed manually. Usage this month:">
+          <DefinitionList
+            className="lg:grid-cols-6"
+            items={[
+              { label: "Plan", value: <span className="capitalize">{org?.plan.replaceAll("_", " ")}</span> },
+              { label: "Agent runs", value: num(runs ?? 0) },
+              { label: "Tool actions", value: num(toolActions ?? 0) },
+              { label: "Model tokens", value: num(tokens) },
+              { label: "AI spend", value: usd(cost) },
+              { label: "Active agents", value: num(activeAgents ?? 0) },
+            ]}
+          />
+        </SettingsSection>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Billing and usage</CardTitle>
-            <CardDescription>Design partners are billed manually. Usage this month:</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DefinitionList
-              className="lg:grid-cols-6"
-              items={[
-                { label: "Plan", value: <span className="capitalize">{org?.plan.replaceAll("_", " ")}</span> },
-                { label: "Agent runs", value: num(runs ?? 0) },
-                { label: "Tool actions", value: num(toolActions ?? 0) },
-                { label: "Model tokens", value: num(tokens) },
-                { label: "Execution cost", value: usd(cost) },
-                { label: "Active agents", value: num(activeAgents ?? 0) },
-              ]}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Audit log</CardTitle>
-            <CardDescription>Append-only record of material actions by people and agents. Latest 50.</CardDescription>
-          </CardHeader>
-          <ul className="text-sm">
+        <SettingsSection id="audit" title="Audit log" description="Append-only record of material actions by people and agents. Latest 50.">
+          <ul className="-mx-6 border-t border-border text-sm">
             {(auditRows ?? []).map((a) => (
-              <li key={a.id} className="flex items-start gap-3 border-b border-border px-4 py-2.5 last:border-0 sm:px-5">
+              <li key={a.id} className="flex items-start gap-3 border-b border-border px-6 py-2.5 last:border-0">
                 <div className="min-w-0 flex-1">
                   <div className="break-words font-mono text-xs">
                     {a.action}
@@ -217,7 +280,7 @@ export default async function SettingsPage() {
               </li>
             ))}
           </ul>
-        </Card>
+        </SettingsSection>
       </div>
     </>
   );
