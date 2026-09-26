@@ -63,7 +63,7 @@ Integrations → "Add systems" (and the same button in onboarding) lists 20 popu
 
 ### Discovery from connected systems
 
-Discover → "From your systems" reads a recent sample from every connected system and proposes the recurring work it shows. It runs on its own when the page opens and there is no result from the last day.
+Discover → "From your systems" reads a recent sample from every connected system and proposes the recurring work it shows. It runs on its own when the page opens and there is no result from the last day. The run happens on the server (`after()` in `startDiscoveryAction`, within the page's 300-second limit) and writes progress to `discovery_runs` after every system; the page only polls it, so closing or reloading the browser does not stop it and a reload picks the run back up. A run that has not moved for six minutes is shown as interrupted and can be started again.
 
 - **What is read, and how far back:** every system is read for the last 30 days, capped per system so a busy account stays fast:
 

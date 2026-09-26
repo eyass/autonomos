@@ -84,6 +84,9 @@ test("demo loop", async ({ page }) => {
 
   // Discovery reads the connected systems on its own and proposes processes with evidence
   await page.goto("/discover");
+  // Discovery runs on the server: reloading while it reads does not stop it.
+  await expect(page.getByText("Reading your connected systems")).toBeVisible();
+  await page.reload();
   await expect(page.getByRole("list", { name: "Systems read" }).getByText(/Read \d+ tickets/)).toBeVisible({ timeout: 60_000 });
   // Proposals come one at a time: add, reject (never suggested again) or decide later
   const review = page.getByTestId("proposal-review");

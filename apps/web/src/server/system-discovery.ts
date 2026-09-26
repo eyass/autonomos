@@ -60,7 +60,12 @@ async function existingTitles(session: Session) {
   return (data ?? []).map((p) => p.title);
 }
 
+// A run that has not moved for this long was cut off (the server stopped); it can be started again.
+const STALE_MS = 6 * 60_000;
+const isStale = (row: Record<string, unknown>) => (row.status === "scanning" || row.status === "proposing") && Date.now() - new Date((row.updated_at ?? row.created_at) as string).getTime() > STALE_MS;
+
 function toView(row: Record<string, unknown>, existing: string[]): DiscoveryRunView {
+  if (isStale(row)) row = { ...row, status: "failed", error: "Reading was interrupted. Read again to start over." };
   const known = new Set(existing.map((t) => t.trim().toLowerCase()));
   const accepted = (row.accepted as string[]) ?? [];
   const rejected = (row.rejected as string[]) ?? [];
@@ -176,7 +181,7 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
       .single();
     return toView(data!, existing);
   }
-  await db.from("discovery_runs").update({ status: "proposing" }).eq("id", runId);
+  await db.from("discovery_runs").update({ status: "proposing", updated_at: new Date().toISOString() }).eq("id", runId);
   try {
     const result = await proposeProcessesFromSystems({
       company: await companyContext(session),
@@ -197,10 +202,38 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
   } catch (e) {
     await db
       .from("discovery_runs")
-      .update({ status: "failed", samples: null, error: e instanceof Error ? e.message.slice(0, 300) : "failed" })
+      .update({ status: "failed", samples: null, error: e instanceof Error ? e.message.slice(0, 300) : "failed", updated_at: new Date().toISOString() })
       .eq("id", runId);
     throw e;
   }
+}
+
+// The whole run on the server, so closing or reloading the page does not stop it. Progress
+// is written to the run after every system, and the page polls it.
+export async function runDiscovery(session: Session, runId: string) {
+  try {
+    const run = await loadRun(session, runId);
+    for (const s of ((run.systems as RunSystem[]) ?? []).filter((x) => x.state === "pending")) await scanRunSystem(session, runId, s.key);
+    await proposeFromRun(session, runId);
+  } catch (e) {
+    console.error("discovery run failed", runId, e);
+    await adminDb()
+      .from("discovery_runs")
+      .update({ status: "failed", samples: null, error: e instanceof Error ? e.message.slice(0, 300) : "failed", updated_at: new Date().toISOString() })
+      .eq("organization_id", session.org.id)
+      .eq("id", runId)
+      .neq("status", "ready");
+  }
+}
+
+export async function getDiscoveryRun(session: Session, runId: string): Promise<DiscoveryRunView> {
+  return toView(await loadRun(session, runId), await existingTitles(session));
+}
+
+// Only one run at a time: a run still in progress is picked up instead of starting another.
+export async function activeDiscoveryRun(session: Session): Promise<DiscoveryRunView | null> {
+  const latest = await latestDiscoveryRun(session);
+  return latest && (latest.status === "scanning" || latest.status === "proposing") ? latest : null;
 }
 
 export async function acceptProposals(session: Session, runId: string, titles: string[]) {

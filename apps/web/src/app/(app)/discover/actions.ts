@@ -1,11 +1,12 @@
 "use server";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { runAction } from "@/lib/actions";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireSessionOrThrow } from "@/lib/session";
 import { z } from "zod";
 import { answerInterview, DocumentImportSchema, finishInterview, importDocument, startInterview } from "@/server/processes";
-import { acceptProposals, proposeFromRun, rejectProposal, scanRunSystem, startDiscoveryRun, undoRejectProposal } from "@/server/system-discovery";
+import { acceptProposals, activeDiscoveryRun, getDiscoveryRun, rejectProposal, runDiscovery, startDiscoveryRun, undoRejectProposal } from "@/server/system-discovery";
 
 export async function startInterviewAction(department: string) {
   return runAction(async () => startInterview(await requireSessionOrThrow(), department));
@@ -32,24 +33,21 @@ export async function importDocumentAction(input: { title: string; content: stri
 }
 
 // Discovery from connected systems, driven step by step so the page shows each system being read.
+// Starts discovery on the server and returns at once; the page polls getDiscoveryRunAction.
 export async function startDiscoveryAction() {
   return runAction(async () => {
     const session = await requireSessionOrThrow();
+    const active = await activeDiscoveryRun(session);
+    if (active) return active;
     rateLimit(`ai:${session.user.id}`, 30, 60_000);
-    return startDiscoveryRun(session);
+    const run = await startDiscoveryRun(session);
+    after(() => runDiscovery(session, run.id));
+    return run;
   });
 }
 
-export async function scanSystemAction(runId: string, key: string) {
-  return runAction(async () => scanRunSystem(await requireSessionOrThrow(), z.string().uuid().parse(runId), z.string().min(1).parse(key)));
-}
-
-export async function proposeAction(runId: string) {
-  return runAction(async () => {
-    const session = await requireSessionOrThrow();
-    rateLimit(`ai:${session.user.id}`, 30, 60_000);
-    return proposeFromRun(session, z.string().uuid().parse(runId));
-  });
+export async function getDiscoveryRunAction(runId: string) {
+  return runAction(async () => getDiscoveryRun(await requireSessionOrThrow(), z.string().uuid().parse(runId)));
 }
 
 export async function acceptProposalsAction(runId: string, titles: string[]) {
