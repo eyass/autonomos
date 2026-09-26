@@ -391,3 +391,18 @@ export type PlanKey = keyof typeof PLANS;
 export function planFor(key: string | null | undefined) {
   return PLANS[(key ?? "design_partner") as PlanKey] ?? PLANS.design_partner;
 }
+
+// Processes proposed from what discovery read in connected systems, each with its evidence.
+export const SystemProcessProposalSchema = DiscoveredProcessSchema.extend({
+  evidence: z
+    // No min/max here: Gemini rejects array limits in this schema. Limits are applied in code.
+    .array(z.object({ source: z.string().describe("The system, e.g. Gmail or Zendesk"), detail: z.string().describe("What in the data shows this work, with counts") }))
+    .describe("One to five pieces of evidence"),
+});
+export type SystemProcessProposal = z.infer<typeof SystemProcessProposalSchema>;
+
+export const SystemDiscoverySchema = z.object({
+  summary: z.string().describe("Two sentences on what the data shows about how the company works"),
+  processes: z.array(SystemProcessProposalSchema).describe("At most eight processes"),
+});
+export type SystemDiscovery = z.infer<typeof SystemDiscoverySchema>;

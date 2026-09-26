@@ -14,6 +14,8 @@ const alertVariants = cva(
         info: "border-info/20 bg-info-soft text-info *:data-[slot=alert-description]:text-info",
         warning: "border-warning/20 bg-warning-soft text-warning *:data-[slot=alert-description]:text-warning",
         success: "border-success/20 bg-success-soft text-success *:data-[slot=alert-description]:text-success",
+        // Something an agent or the AI did or found (signal orange).
+        agent: "border-highlight/25 bg-highlight-soft text-foreground [&>svg]:text-highlight *:data-[slot=alert-description]:text-foreground/80",
       },
     },
     defaultVariants: {

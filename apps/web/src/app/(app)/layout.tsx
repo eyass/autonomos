@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { listWorkspaces } from "@/server/platform";
 import { createSampleWorkspaceAction, markNotificationsRead, switchWorkspaceAction } from "./shell-actions";
+import { Logo } from "@/components/brand/logo";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
@@ -41,8 +42,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 sm:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
-          <Link href="/" className="text-sm font-semibold tracking-tight md:hidden">
-            AutonomOS
+          <Link href="/" className="md:hidden" aria-label="AutonomOS home">
+            <Logo markClassName="size-6" />
           </Link>
           <div className="ml-auto flex items-center gap-2">
             {mode ? (

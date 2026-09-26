@@ -4,7 +4,6 @@ import { blendScore, deterministicBusinessValue, deterministicDifficulty, determ
 import { DEPARTMENTS, DiscoveredProcessSchema, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
-import { sandboxStore } from "@autonomos/db";
 import { adminDb, HttpError, type Session } from "@/lib/session";
 
 export async function companyContext(session: Session): Promise<CompanyContext> {
@@ -262,25 +261,43 @@ export async function setProcessStatus(session: Session, id: string, status: "re
 // Guided interview (PRD section 16)
 // ---------------------------------------------------------------------------
 
-export function openingQuestion(department: string) {
+export function openingQuestion(department: string, findings: string[] = []) {
+  if (findings.length) {
+    return `I read your connected systems. For ${department} they show: ${findings.slice(0, 3).join("; ")}. Is that right? Walk me through what happens in the first one, and tell me what else the team does that is not in these systems.`;
+  }
   return `Let's start with ${department}. What are the main things your team repeatedly does each week?`;
 }
 
+// What the latest system discovery found for a department.
+async function foundFor(session: Session, department: string) {
+  const { latestDiscoveryRun } = await import("@/server/system-discovery");
+  const run = await latestDiscoveryRun(session);
+  if (!run || run.status !== "ready") return [];
+  return run.proposals.filter((p) => p.department.toLowerCase() === department.toLowerCase());
+}
+
+// The same, as short lines for questions and prompts.
+async function findingsFor(session: Session, department: string): Promise<string[]> {
+  return (await foundFor(session, department)).map((p) => `${p.title.toLowerCase()} (${p.evidence[0] ? `${p.evidence[0].source}: ${p.evidence[0].detail}` : "seen in your data"})`);
+}
+
 export async function startInterview(session: Session, department: string) {
+  const findings = await findingsFor(session, department);
+  const opening = openingQuestion(department, findings);
   const { data, error } = await adminDb()
     .from("discovery_sessions")
     .insert({
       organization_id: session.org.id,
       method: "interview",
       department_name: department,
-      messages: [{ role: "assistant", content: openingQuestion(department) }],
+      messages: [{ role: "assistant", content: opening }],
       created_by: session.user.id,
     })
     .select("id")
     .single();
   if (error || !data) throw new Error(`interview: ${error?.message}`);
   await track(session, "process_discovery_started", { method: "interview", department });
-  return { id: data.id, suggestions: await interviewSuggestions(session, department, [{ role: "assistant", content: openingQuestion(department) }]) };
+  return { id: data.id, opening, suggestions: await interviewSuggestions(session, department, [{ role: "assistant", content: opening }]) };
 }
 
 // One-tap answers for the interview, grounded in the company profile. Never blocks the interview.
@@ -290,7 +307,7 @@ async function interviewSuggestions(session: Session, department: string, messag
       company: await companyContext(session),
       department,
       messages,
-      likelyProcesses: session.org.websiteProfile?.likelyProcesses ?? [],
+      likelyProcesses: [...(await foundFor(session, department)).map((p) => ({ title: p.title, department: p.department })), ...(session.org.websiteProfile?.likelyProcesses ?? [])],
       onUsage: usageSink(session),
     });
   } catch (e) {
@@ -310,6 +327,7 @@ export async function answerInterview(session: Session, sessionId: string, answe
     department: s.department_name ?? "Operations",
     messages,
     existingProcesses: (s.extracted as DiscoveredProcess[]) ?? [],
+    systemFindings: await findingsFor(session, s.department_name ?? "Operations"),
     onUsage: usageSink(session),
   });
   const next = turn.done || !turn.nextQuestion ? "That gives me a good picture. Review the processes below and save them to your inventory." : turn.nextQuestion;
@@ -361,54 +379,23 @@ export async function importDocument(session: Session, input: z.infer<typeof Doc
 }
 
 // ---------------------------------------------------------------------------
-// Integration-assisted discovery (PRD section 18). Supporting evidence only:
-// samples metadata from connected systems, never claims comprehensive mining.
+// Integration-assisted discovery (PRD section 18). Reads a recent, redacted sample of each
+// connected system (sandbox or live) and describes it; see server/system-discovery.ts.
 // ---------------------------------------------------------------------------
 
 export async function connectedSystemEvidence(session: Session): Promise<string[]> {
-  const db = adminDb();
-  const { data: connections } = await db.from("integration_connections").select("integration_key, provider").eq("organization_id", session.org.id).eq("status", "connected");
-  const sandbox = sandboxStore(db, session.org.id);
-  const evidence: string[] = [];
-  for (const c of connections ?? []) {
-    if (c.provider !== "sandbox") {
-      evidence.push(`${c.integration_key} is connected (live account). Detailed sampling for live accounts is not enabled yet.`);
-      continue;
-    }
-    if (c.integration_key === "zendesk") {
-      const tickets = await sandbox.list("zendesk", "ticket");
-      const tags = new Map<string, number>();
-      for (const t of tickets) for (const tag of (t.tags as string[]) ?? []) tags.set(tag, (tags.get(tag) ?? 0) + 1);
-      evidence.push(
-        `Zendesk: ${tickets.length} tickets sampled. Tags: ${[...tags.entries()].map(([k, v]) => `${k} (${v})`).join(", ") || "none"}. ` +
-          `Example subjects: ${
-            tickets
-              .slice(-5)
-              .map((t) => `"${String(t.subject)}"`)
-              .join("; ") || "none"
-          }. Support handles refund requests from customers.`,
-      );
-    }
-    if (c.integration_key === "stripe") {
-      const [refunds, payments] = await Promise.all([sandbox.list("stripe", "refund"), sandbox.list("stripe", "payment")]);
-      evidence.push(`Stripe: ${payments.length} recent payments and ${refunds.length} refunds. Refunds are issued manually after checking the payment.`);
-    }
-    if (c.integration_key === "slack") evidence.push("Slack is connected: teams post updates and weekly reports to channels.");
-  }
-  return evidence;
+  const { readConnectedSystems } = await import("@/server/system-discovery");
+  return readConnectedSystems(session);
 }
 
+// One-shot version for the API: read every system, propose, and keep the confident proposals.
 export async function discoverFromIntegrations(session: Session) {
-  const evidence = await connectedSystemEvidence(session);
-  if (!evidence.length) throw new HttpError(409, "Connect at least one integration first");
-  await track(session, "process_discovery_started", { method: "integration" });
-  const processes = await extractProcessesFromDocument({
-    company: await companyContext(session),
-    title: "Evidence from connected systems",
-    content: `The following is sampled metadata from connected systems. Infer only recurring work that it clearly supports.\n\n${evidence.join("\n")}`,
-    onUsage: usageSink(session),
-  });
-  return saveDiscoveredProcesses(session, processes, "integration");
+  const { acceptProposals, proposeFromRun, scanRunSystem, startDiscoveryRun } = await import("@/server/system-discovery");
+  const run = await startDiscoveryRun(session);
+  for (const s of run.systems.filter((x) => x.state === "pending")) await scanRunSystem(session, run.id, s.key);
+  const ready = await proposeFromRun(session, run.id);
+  const titles = ready.proposals.filter((p) => !p.exists && p.confidence >= 0.5).map((p) => p.title);
+  return titles.length ? acceptProposals(session, run.id, titles) : [];
 }
 
 // ---------------------------------------------------------------------------

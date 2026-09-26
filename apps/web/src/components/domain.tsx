@@ -90,7 +90,7 @@ export function LevelChange({ from, to }: { from: number; to?: number | null }) 
   );
 }
 
-const STATUS_TONES: Record<string, "secondary" | "outline" | "success" | "warning" | "danger" | "info"> = {
+const STATUS_TONES: Record<string, "secondary" | "outline" | "success" | "warning" | "danger" | "info" | "agent"> = {
   draft: "secondary",
   reviewed: "info",
   active: "success",
@@ -99,13 +99,13 @@ const STATUS_TONES: Record<string, "secondary" | "outline" | "success" | "warnin
   reviewing: "warning",
   approved: "success",
   building: "outline",
-  live: "success",
+  live: "agent",
   rejected: "danger",
   testing: "info",
   paused: "warning",
   error: "danger",
   queued: "secondary",
-  running: "outline",
+  running: "agent",
   waiting_for_approval: "warning",
   completed: "success",
   failed: "danger",

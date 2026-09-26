@@ -9,7 +9,7 @@ export function LinkTabs({ items }: { items: Array<{ href: string; label: string
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <TabsList>
           {items.map((t) => (
-            <TabsTrigger key={t.href} value={t.href} asChild>
+            <TabsTrigger key={t.href} value={t.href} asChild className="data-[state=active]:text-brand">
               <Link href={t.href}>{t.label}</Link>
             </TabsTrigger>
           ))}

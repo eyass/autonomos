@@ -60,10 +60,10 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
 
   const actions = (
     <>
-      <ButtonLink href="/discover" variant="outline">
-        Discover processes
+      <ButtonLink href="/processes/new" variant="outline">
+        Add manually
       </ButtonLink>
-      <ButtonLink href="/processes/new">Add process</ButtonLink>
+      <ButtonLink href="/discover">Find processes</ButtonLink>
     </>
   );
 
@@ -85,12 +85,14 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Processes" description="The recurring work your teams do today, and how autonomous it could become." actions={actions} />
       {q.drafted ? (
-        <Alert variant="success" className="mb-4">
+        <Alert variant="agent" className="mb-4">
           <Sparkles />
           <AlertTitle>
             AutonomOS drafted {q.drafted} process{q.drafted === "1" ? "" : "es"} for you
           </AlertTitle>
-          <AlertDescription>From your website and connected systems. Open each one, correct anything that is off, and approve it. Approving finds its automation opportunities.</AlertDescription>
+          <AlertDescription>
+            From what AutonomOS read on your website and in your connected systems. Open each one, correct anything that is off, and approve it. Approving finds its automation opportunities.
+          </AlertDescription>
         </Alert>
       ) : null}
       <FilterBar

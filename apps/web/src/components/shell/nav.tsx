@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTransition } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LogoMark, Wordmark } from "@/components/brand/logo";
 import {
   Sidebar,
   SidebarContent,
@@ -71,14 +72,19 @@ export function AppSidebar({
         <SidebarMenu>
           {items.map(({ href, label, icon: Icon }) => (
             <SidebarMenuItem key={href}>
-              <SidebarMenuButton asChild isActive={isActive(path, href)} tooltip={label}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive(path, href)}
+                tooltip={label}
+                className="relative data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-highlight"
+              >
                 <Link href={href} onClick={() => setOpenMobile(false)}>
                   <Icon />
                   <span>{label}</span>
                 </Link>
               </SidebarMenuButton>
               {href === "/approvals" && pendingApprovals > 0 ? (
-                <SidebarMenuBadge className="bg-warning text-white peer-data-[active=true]/menu-button:text-white">{pendingApprovals}</SidebarMenuBadge>
+                <SidebarMenuBadge className="rounded-full bg-highlight text-highlight-foreground peer-data-[active=true]/menu-button:text-highlight-foreground">{pendingApprovals}</SidebarMenuBadge>
               ) : null}
             </SidebarMenuItem>
           ))}
@@ -99,9 +105,11 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/" onClick={() => setOpenMobile(false)}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">A</div>
+                <span className="flex size-8 shrink-0 items-center justify-center">
+                  <LogoMark className="!size-8" />
+                </span>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">AutonomOS</span>
+                  <Wordmark className="truncate text-sm" />
                   <span className="truncate text-xs text-muted-foreground">{orgName}</span>
                 </div>
               </Link>

@@ -159,7 +159,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
         </Card>
       ) : null}
       {found && !agent ? (
-        <Alert variant="success" className="mb-4">
+        <Alert variant="agent" className="mb-4">
           <Sparkles />
           <AlertDescription>
             AutonomOS found this opportunity when {proc.title} was approved. Build and test the agent in one click: it runs a simulated test, so nothing changes in your systems.

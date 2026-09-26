@@ -17,8 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 type Message = { role: "assistant" | "user"; content: string };
 
-export function Interview({ departments }: { departments: string[] }) {
-  const [department, setDepartment] = useState(departments[0] ?? "Customer Support");
+export function Interview({ departments, defaultDepartment }: { departments: string[]; defaultDepartment?: string }) {
+  const [department, setDepartment] = useState(defaultDepartment && departments.includes(defaultDepartment) ? defaultDepartment : (departments[0] ?? "Customer Support"));
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [processes, setProcesses] = useState<DiscoveredProcess[]>([]);
@@ -38,7 +38,7 @@ export function Interview({ departments }: { departments: string[] }) {
       if (!r.ok) return setError(r.error);
       setSessionId(r.data.id);
       setSuggestions(r.data.suggestions);
-      setMessages([{ role: "assistant", content: `Let's start with ${department}. What are the main things your team repeatedly does each week?` }]);
+      setMessages([{ role: "assistant", content: r.data.opening }]);
       setProcesses([]);
     });
 

@@ -462,6 +462,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"discovery_runs": {
+                  Row: {
+                    "accepted": NonNullable<Json>,"created_at": string,"created_by": string | null,"error": string | null,"id": string,"organization_id": string,"proposals": NonNullable<Json>,"samples": Json | null,"status": string,"summary": string | null,"systems": NonNullable<Json>,"updated_at": string
+                  }
+                  Insert: {
+                    "accepted"?: NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"error"?: string | null,"id"?: string,"organization_id": string,"proposals"?: NonNullable<Json>,"samples"?: Json | null,"status"?: string,"summary"?: string | null,"systems"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Update: {
+                    "accepted"?: NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"error"?: string | null,"id"?: string,"organization_id"?: string,"proposals"?: NonNullable<Json>,"samples"?: Json | null,"status"?: string,"summary"?: string | null,"systems"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "discovery_runs_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "discovery_runs_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"discovery_sessions": {
                   Row: {
                     "created_at": string,"created_by": string | null,"department_id": string | null,"department_name": string | null,"extracted": NonNullable<Json>,"id": string,"messages": NonNullable<Json>,"method": Database["public"]['Enums']["discovery_source"],"organization_id": string,"status": string,"updated_at": string
@@ -870,13 +895,13 @@ isOneToOne: false
                   ]
                 },"processes": {
                   Row: {
-                    "automation_difficulty": number,"business_value": number,"confidence": number | null,"created_at": string,"created_by": string | null,"current_autonomy_level": number,"decision_points": (string)[],"department_id": string | null,"description": string,"discovery_session_id": string | null,"discovery_source": Database["public"]['Enums']["discovery_source"],"document_id": string | null,"estimated_minutes_per_occurrence": number | null,"estimated_occurrences_per_month": number | null,"exceptions": (string)[],"frequency": Database["public"]['Enums']["process_frequency"],"id": string,"inputs": (string)[],"missing_information": (string)[],"notes": string | null,"organization_id": string,"outputs": (string)[],"potential_autonomy_level": number,"reviewed_at": string | null,"reviewed_by": string | null,"risk_level": number,"status": Database["public"]['Enums']["process_status"],"title": string,"trigger": string | null,"updated_at": string
+                    "automation_difficulty": number,"business_value": number,"confidence": number | null,"created_at": string,"created_by": string | null,"current_autonomy_level": number,"decision_points": (string)[],"department_id": string | null,"description": string,"discovery_session_id": string | null,"discovery_source": Database["public"]['Enums']["discovery_source"],"document_id": string | null,"estimated_minutes_per_occurrence": number | null,"estimated_occurrences_per_month": number | null,"evidence": NonNullable<Json>,"exceptions": (string)[],"frequency": Database["public"]['Enums']["process_frequency"],"id": string,"inputs": (string)[],"missing_information": (string)[],"notes": string | null,"organization_id": string,"outputs": (string)[],"potential_autonomy_level": number,"reviewed_at": string | null,"reviewed_by": string | null,"risk_level": number,"status": Database["public"]['Enums']["process_status"],"title": string,"trigger": string | null,"updated_at": string
                   }
                   Insert: {
-                    "automation_difficulty"?: number,"business_value"?: number,"confidence"?: number | null,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level"?: number,"decision_points"?: (string)[],"department_id"?: string | null,"description"?: string,"discovery_session_id"?: string | null,"discovery_source"?: Database["public"]['Enums']["discovery_source"],"document_id"?: string | null,"estimated_minutes_per_occurrence"?: number | null,"estimated_occurrences_per_month"?: number | null,"exceptions"?: (string)[],"frequency"?: Database["public"]['Enums']["process_frequency"],"id"?: string,"inputs"?: (string)[],"missing_information"?: (string)[],"notes"?: string | null,"organization_id": string,"outputs"?: (string)[],"potential_autonomy_level"?: number,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"risk_level"?: number,"status"?: Database["public"]['Enums']["process_status"],"title": string,"trigger"?: string | null,"updated_at"?: string
+                    "automation_difficulty"?: number,"business_value"?: number,"confidence"?: number | null,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level"?: number,"decision_points"?: (string)[],"department_id"?: string | null,"description"?: string,"discovery_session_id"?: string | null,"discovery_source"?: Database["public"]['Enums']["discovery_source"],"document_id"?: string | null,"estimated_minutes_per_occurrence"?: number | null,"estimated_occurrences_per_month"?: number | null,"evidence"?: NonNullable<Json>,"exceptions"?: (string)[],"frequency"?: Database["public"]['Enums']["process_frequency"],"id"?: string,"inputs"?: (string)[],"missing_information"?: (string)[],"notes"?: string | null,"organization_id": string,"outputs"?: (string)[],"potential_autonomy_level"?: number,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"risk_level"?: number,"status"?: Database["public"]['Enums']["process_status"],"title": string,"trigger"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "automation_difficulty"?: number,"business_value"?: number,"confidence"?: number | null,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level"?: number,"decision_points"?: (string)[],"department_id"?: string | null,"description"?: string,"discovery_session_id"?: string | null,"discovery_source"?: Database["public"]['Enums']["discovery_source"],"document_id"?: string | null,"estimated_minutes_per_occurrence"?: number | null,"estimated_occurrences_per_month"?: number | null,"exceptions"?: (string)[],"frequency"?: Database["public"]['Enums']["process_frequency"],"id"?: string,"inputs"?: (string)[],"missing_information"?: (string)[],"notes"?: string | null,"organization_id"?: string,"outputs"?: (string)[],"potential_autonomy_level"?: number,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"risk_level"?: number,"status"?: Database["public"]['Enums']["process_status"],"title"?: string,"trigger"?: string | null,"updated_at"?: string
+                    "automation_difficulty"?: number,"business_value"?: number,"confidence"?: number | null,"created_at"?: string,"created_by"?: string | null,"current_autonomy_level"?: number,"decision_points"?: (string)[],"department_id"?: string | null,"description"?: string,"discovery_session_id"?: string | null,"discovery_source"?: Database["public"]['Enums']["discovery_source"],"document_id"?: string | null,"estimated_minutes_per_occurrence"?: number | null,"estimated_occurrences_per_month"?: number | null,"evidence"?: NonNullable<Json>,"exceptions"?: (string)[],"frequency"?: Database["public"]['Enums']["process_frequency"],"id"?: string,"inputs"?: (string)[],"missing_information"?: (string)[],"notes"?: string | null,"organization_id"?: string,"outputs"?: (string)[],"potential_autonomy_level"?: number,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"risk_level"?: number,"status"?: Database["public"]['Enums']["process_status"],"title"?: string,"trigger"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
