@@ -87,3 +87,35 @@ describe("exhaustive discovery", () => {
     expect(merged[1]!.confidence).toBe(0.45);
   });
 });
+
+describe("per-system discovery", () => {
+  it("reads each kind of system through its own playbook", async () => {
+    const { playbookFor } = await import("./tasks/discovery");
+    expect(playbookFor({ system: "Stripe", itemKind: "payments and refunds" })).toMatch(/failed payments/);
+    expect(playbookFor({ system: "Google Calendar", itemKind: "calendar events" })).toMatch(/Recurring meetings/);
+    expect(playbookFor({ system: "Gmail", itemKind: "emails" })).toMatch(/inbox/);
+    expect(playbookFor({ system: "Acme ERP", itemKind: "records" })).toMatch(/business system/);
+  });
+  it("takes turns between systems so one busy system does not fill the top of the list", async () => {
+    const { mergeProposals } = await import("./tasks/discovery");
+    const base = mockSystemDiscovery([tickets], []).processes[0]!;
+    const mk = (title: string, system: string, perMonth: number) => ({ ...base, title, primarySystem: system, estimatedOccurrencesPerMonth: perMonth, evidence: [{ source: system, detail: "x" }] });
+    const merged = mergeProposals(
+      [],
+      [
+        mk("Supplier invoices", "Gmail", 90),
+        mk("Partner onboarding emails", "Gmail", 80),
+        mk("Interview scheduling", "Gmail", 70),
+        mk("Weekly revenue report", "Stripe", 4),
+        mk("Standup follow-up", "Google Calendar", 20),
+      ],
+      [],
+    );
+    expect(merged.slice(0, 3).map((p) => p.primarySystem)).toEqual(["Gmail", "Google Calendar", "Stripe"]);
+  });
+  it("tells people what an agent would do and where the work happens", () => {
+    const [p] = mockSystemDiscovery([tickets], []).processes;
+    expect(p!.primarySystem).toBe("Zendesk");
+    expect(p!.automation).toMatch(/an agent/);
+  });
+});

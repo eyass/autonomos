@@ -399,6 +399,15 @@ export const SystemProcessProposalSchema = DiscoveredProcessSchema.extend({
     // No min/max here: Gemini rejects array limits in this schema. Limits are applied in code.
     .array(z.object({ source: z.string().describe("The system, e.g. Gmail or Zendesk"), detail: z.string().describe("What in the data shows this work, with counts") }))
     .describe("One to five pieces of evidence"),
+  primarySystem: z.string().optional().describe("The connected system where this work mainly happens, e.g. Stripe"),
+  kind: z
+    .enum(["recurring_work", "improvement"])
+    .optional()
+    .describe("recurring_work: work people already do by hand. improvement: a problem or opportunity the data shows that nobody handles yet, such as a backlog, a leak or a missed follow-up"),
+  automation: z
+    .string()
+    .optional()
+    .describe("What an AutonomOS agent would do, concretely, with its trigger or schedule, e.g. 'Every Monday at 9:00, pull last week's refunds from Stripe and post a summary in #finance'"),
 });
 export type SystemProcessProposal = z.infer<typeof SystemProcessProposalSchema>;
 
