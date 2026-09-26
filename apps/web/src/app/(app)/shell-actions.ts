@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { runAction } from "@/lib/actions";
 import { adminDb, requireSessionOrThrow } from "@/lib/session";
 import { createSampleWorkspace } from "@/server/demo";
-import { switchWorkspace } from "@/server/platform";
+import { deleteWorkspace, switchWorkspace } from "@/server/platform";
+import { createClient } from "@/lib/supabase/server";
 
 export async function markNotificationsRead() {
   return runAction(async () => {
@@ -21,5 +22,19 @@ export async function switchWorkspaceAction(organizationId: string) {
 export async function createSampleWorkspaceAction() {
   const result = await runAction(async () => createSampleWorkspace(await requireSessionOrThrow()));
   if (result.ok) redirect("/");
+  return result;
+}
+
+// Sign-out as a server action: a form inside the account menu is unmounted when the menu
+// closes, before the browser submits it, so the old form never reached the server.
+export async function signOutAction() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/login");
+}
+
+export async function deleteWorkspaceAction(confirmName: string) {
+  const result = await runAction(async () => deleteWorkspace(await requireSessionOrThrow(), String(confirmName ?? "")));
+  if (result.ok) redirect(result.data);
   return result;
 }

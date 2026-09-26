@@ -96,6 +96,23 @@ export async function listWorkspaces(session: Session) {
   return (data ?? []).map((m) => ({ ...(m.organizations as unknown as { id: string; name: string; is_demo: boolean }), role: m.role })).filter((w) => Boolean(w.id));
 }
 
+// Deletes the current workspace and everything in it. Owners only, and the name must be
+// typed to confirm. Returns where to go next: another workspace, or setting up a new one.
+export async function deleteWorkspace(session: Session, confirmName: string): Promise<"/" | "/onboarding/company"> {
+  requireRole(session, ["owner"]);
+  if (confirmName.trim() !== session.org.name.trim()) throw new HttpError(400, `Type ${session.org.name} exactly to confirm.`);
+  const others = (await listWorkspaces(session)).filter((w) => w.id !== session.org.id);
+  const { error } = await adminDb().rpc("delete_organization", { target: session.org.id });
+  if (error) throw new Error(`delete workspace: ${error.message}`);
+  const jar = await cookies();
+  if (others[0]) {
+    jar.set(ORG_COOKIE, others[0].id, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" });
+    return "/";
+  }
+  jar.delete(ORG_COOKIE);
+  return "/onboarding/company";
+}
+
 export async function switchWorkspace(session: Session, organizationId: string) {
   const workspaces = await listWorkspaces(session);
   if (!workspaces.some((w) => w.id === organizationId)) throw new HttpError(403, "You are not a member of that workspace");

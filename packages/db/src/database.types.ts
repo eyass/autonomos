@@ -1011,6 +1011,9 @@ isOneToOne: false
 "create_organization":
 { Args: { "p_country": string,"p_description": string,"p_employee_count": string,"p_industry": string,"p_name": string,"p_website": string }; Returns: string
                            },
+"delete_organization":
+{ Args: { "target": string }; Returns: undefined
+                           },
 "has_org_role":
 { Args: { "org": string,"roles": (Database["public"]['Enums']["member_role"])[] }; Returns: boolean
                            },

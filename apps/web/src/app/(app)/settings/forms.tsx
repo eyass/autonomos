@@ -1,6 +1,18 @@
 "use client";
 import { EMPLOYEE_COUNTS, INDUSTRIES } from "@autonomos/schemas";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
+import { deleteWorkspaceAction } from "../shell-actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ActionButton } from "@/components/action-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
@@ -37,7 +49,7 @@ export function CompanyForm({
   const [state, action, pending] = useActionState(updateCompanyAction, null);
   return (
     <form action={action} className="grid gap-4 sm:grid-cols-2">
-      <FormField label="Name">
+      <FormField label="Workspace name">
         <Input name="name" defaultValue={org.name} disabled={disabled} required />
       </FormField>
       <FormField label="Industry">
@@ -234,5 +246,51 @@ export function ApprovalLimitForm({ userId, limit, currency }: { userId: string;
       </Button>
       {state && !(state as { ok: boolean }).ok ? <span className="text-xs text-destructive">{(state as { error: string }).error}</span> : null}
     </form>
+  );
+}
+
+// Deleting is permanent, so the workspace name must be typed to confirm.
+export function DeleteWorkspace({ name }: { name: string }) {
+  const [typed, setTyped] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <AlertDialog onOpenChange={() => (setTyped(""), setError(null))}>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive">Delete workspace</Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently deletes the workspace and everything in it: processes, opportunities, agents, run history, connections, members and the audit log. It cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <FormField label={`Type ${name} to confirm`}>
+          <Input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" aria-label="Workspace name to confirm" />
+        </FormField>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-white hover:bg-destructive/90"
+            disabled={pending || typed.trim() !== name.trim()}
+            onClick={(e) => {
+              e.preventDefault();
+              start(async () => {
+                const r = await deleteWorkspaceAction(typed);
+                if (r && !r.ok) setError(r.error);
+              });
+            }}
+          >
+            {pending ? "Deleting…" : "Delete permanently"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
