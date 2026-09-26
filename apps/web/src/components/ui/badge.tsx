@@ -22,6 +22,7 @@ const badgeVariants = cva(
         warning: "bg-warning-soft text-warning",
         info: "bg-info-soft text-info",
         danger: "bg-destructive-soft text-destructive",
+        agent: "bg-highlight-soft text-highlight-strong",
       },
     },
     defaultVariants: {

@@ -116,7 +116,7 @@ export default async function OverviewPage() {
         <Card>
           <CardContent>
             <div className="text-xs font-medium text-muted-foreground">Company autonomy score</div>
-            <div className="mt-2 text-4xl font-semibold tabular-nums sm:text-5xl" data-testid="autonomy-score">
+            <div className="mt-2 font-display text-5xl font-semibold tracking-tight text-brand tabular-nums sm:text-6xl" data-testid="autonomy-score">
               {pct(m.autonomyScore)}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Share of mapped human work that agents handle, weighted by time.</p>

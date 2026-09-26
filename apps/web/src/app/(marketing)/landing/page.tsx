@@ -57,20 +57,29 @@ export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <Badge variant="secondary">Now accepting design partners</Badge>
-          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl sm:leading-[1.1]">Automate the recurring work, with agents you can trust with real actions.</h1>
-          <p className="mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
+      <section className="relative overflow-hidden border-b border-border bg-brand-strong text-white">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60rem_30rem_at_85%_-10%,rgba(232,85,45,0.28),transparent_60%),radial-gradient(40rem_24rem_at_0%_110%,rgba(94,158,151,0.35),transparent_60%)]"
+        />
+        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium">
+            <span aria-hidden className="size-1.5 rounded-full bg-highlight" />
+            Now accepting design partners
+          </span>
+          <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl sm:leading-[1.05]">
+            Automate the recurring work, with agents you can <span className="text-highlight">trust with real actions.</span>
+          </h1>
+          <p className="mt-6 max-w-2xl text-base text-white/75 sm:text-lg">
             Recurring operational work eats your team&apos;s time. Most AI automation projects stall anyway, because nobody knows what to automate first, or trusts an agent to issue a refund or update
             a customer record.
           </p>
-          <p className="mt-4 max-w-2xl text-base font-medium sm:text-lg">{description}</p>
+          <p className="mt-4 max-w-2xl text-base font-medium text-white sm:text-lg">{description}</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <ButtonLink href="/signup" size="lg">
+            <ButtonLink href="/signup" size="lg" className="bg-white text-brand-strong hover:bg-white/90">
               Start free <ArrowRight size={16} />
             </ButtonLink>
-            <ButtonLink href="#how-it-works" size="lg" variant="outline">
+            <ButtonLink href="#how-it-works" size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white">
               See how it works
             </ButtonLink>
           </div>
@@ -88,7 +97,7 @@ export default function LandingPage() {
               <li key={s.label}>
                 <Card className="h-full p-5">
                   <div className="flex items-center gap-3">
-                    <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <span className="flex size-9 items-center justify-center rounded-md bg-highlight-soft text-highlight-strong">
                       <s.icon size={18} />
                     </span>
                     <span className="text-xs font-medium text-muted-foreground">
@@ -235,7 +244,7 @@ export default function LandingPage() {
 function SectionHeading({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
   return (
     <div className="max-w-2xl">
-      <p className="text-xs font-medium uppercase tracking-wide text-primary">{eyebrow}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-highlight-strong">{eyebrow}</p>
       <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
       {children ? <p className="mt-3 text-sm text-muted-foreground sm:text-base">{children}</p> : null}
     </div>

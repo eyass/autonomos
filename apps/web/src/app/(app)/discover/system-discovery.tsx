@@ -99,7 +99,7 @@ export function SystemDiscovery({ initialRun, autoStart }: { initialRun: Discove
                   <span className="mt-0.5 shrink-0">
                     {s.state === "pending" ? (
                       busy ? (
-                        <Spinner className="size-4" />
+                        <Spinner className="size-4 text-highlight" />
                       ) : (
                         <CircleDashed className="size-4 text-muted-foreground" />
                       )
@@ -128,7 +128,7 @@ export function SystemDiscovery({ initialRun, autoStart }: { initialRun: Discove
               ))}
               {phase === "proposing" ? (
                 <li className="flex items-center gap-2">
-                  <Spinner className="size-4" />
+                  <Spinner className="size-4 text-highlight" />
                   <span className="font-medium">Finding the recurring work in what was read…</span>
                 </li>
               ) : null}

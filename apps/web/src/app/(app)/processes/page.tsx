@@ -85,7 +85,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Processes" description="The recurring work your teams do today, and how autonomous it could become." actions={actions} />
       {q.drafted ? (
-        <Alert variant="success" className="mb-4">
+        <Alert variant="agent" className="mb-4">
           <Sparkles />
           <AlertTitle>
             AutonomOS drafted {q.drafted} process{q.drafted === "1" ? "" : "es"} for you

@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Brand type: Bricolage Grotesque for headings and numbers, Instrument Sans for text,
+// JetBrains Mono for IDs and code.
+const heading = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-heading", weight: ["500", "600", "700"] });
+const body = Instrument_Sans({ subsets: ["latin"], variable: "--font-body" });
+const code = JetBrains_Mono({ subsets: ["latin"], variable: "--font-code" });
+
+export const viewport = { themeColor: "#0e5e5a" };
 
 export const metadata: Metadata = {
   title: { default: "AutonomOS", template: "%s · AutonomOS" },
@@ -13,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${heading.variable} ${body.variable} ${code.variable}`}>
       <body className="min-h-screen font-sans antialiased">
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster position="top-center" />

@@ -70,6 +70,13 @@ Discover → "From your systems" reads a recent sample from every connected syst
 
 `Σ(process monthly minutes × coefficient) / Σ(process monthly minutes)` with L1 0, L2 0.2, L3 0.4, L4 0.75, L5 1. A process counts at the level of its best active agent.
 
+## Brand
+
+- **Brand teal `#0E5E5A`** (`--brand`, also `--primary`): logo, primary buttons, links, focus rings, active navigation, the autonomy score.
+- **Signal orange `#E8552D`** (`--highlight`): agent and AI activity and anything that needs attention: the pending-approvals count, AI-drafted alerts (`<Alert variant="agent">`), running and live states (`<Badge variant="agent">`), agent entries in Activity. Use `--highlight-strong` (`#B53D17`) for orange text on light backgrounds. Keep it rare so it keeps its meaning.
+- **Type:** Bricolage Grotesque for headings, card titles and big numbers (`font-display`); Instrument Sans for text; JetBrains Mono for IDs and code.
+- **Mark:** `components/brand/logo.tsx`, a teal tile with an open "A" and an orange signal dot.
+
 ## Running locally
 
 Requirements: Node 22, pnpm 10, Docker.

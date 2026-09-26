@@ -118,7 +118,7 @@ function ReviewForm({ analysis, website, onRestart }: { analysis: WebsiteAnalysi
   return (
     <form action={action} className="space-y-4">
       {analysis ? (
-        <Alert variant="success">
+        <Alert variant="agent">
           <Sparkles />
           <AlertDescription>
             Read {analysis.pagesRead.length} page{analysis.pagesRead.length === 1 ? "" : "s"} of {new URL(analysis.website).hostname}

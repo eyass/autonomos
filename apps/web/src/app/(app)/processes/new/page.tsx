@@ -16,7 +16,7 @@ export default async function NewProcessPage() {
   return (
     <>
       <PageHeader back={{ href: "/processes", label: "Processes" }} title="Add process" description="Describe a recurring process. You can refine every field after it is created." />
-      <Alert className="mb-4">
+      <Alert variant="agent" className="mb-4">
         <Sparkles />
         <AlertTitle>Let AutonomOS find processes for you</AlertTitle>
         <AlertDescription>

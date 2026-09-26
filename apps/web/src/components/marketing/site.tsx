@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { CONTACT_EMAIL } from "./config";
 import { ButtonLink } from "@/components/app/button-link";
 import { TableBody, TableHeader, TableRow } from "@/components/ui/table";
+import { Logo as BrandLogo } from "@/components/brand/logo";
 
 export { CONTACT_EMAIL, SECURITY_EMAIL, SITE_URL } from "./config";
 
@@ -16,11 +17,8 @@ const NAV = [
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("inline-flex items-center gap-2 text-sm font-semibold tracking-tight", className)} aria-label="AutonomOS home">
-      <span aria-hidden className="flex size-7 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-        A
-      </span>
-      AutonomOS
+    <Link href="/" className={cn("inline-flex items-center", className)} aria-label="AutonomOS home">
+      <BrandLogo markClassName="size-7" />
     </Link>
   );
 }
@@ -116,7 +114,7 @@ export function Prose({ className, children }: { className?: string; children: R
 export function PageIntro({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: React.ReactNode }) {
   return (
     <div className="mb-8">
-      {eyebrow ? <p className="text-xs font-medium uppercase tracking-wide text-primary">{eyebrow}</p> : null}
+      {eyebrow ? <p className="text-xs font-medium uppercase tracking-wide text-highlight-strong">{eyebrow}</p> : null}
       <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
       {children ? <div className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">{children}</div> : null}
     </div>

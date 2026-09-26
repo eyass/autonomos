@@ -109,7 +109,10 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                     <div className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-muted/50 sm:gap-4 sm:px-5">
                       <span className="w-11 shrink-0 tabular-nums text-muted-foreground">{time(e.occurred_at)}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-medium text-muted-foreground">{who}</div>
+                        <div className={`flex items-center gap-1.5 text-xs font-medium ${e.actor_type === "agent" ? "text-highlight-strong" : "text-muted-foreground"}`}>
+                          {e.actor_type === "agent" ? <span aria-hidden className="size-1.5 rounded-full bg-highlight" /> : null}
+                          {who}
+                        </div>
                         <div>{e.title}</div>
                       </div>
                       {(e.detail as { mode?: string } | null)?.mode === "test" ? (
