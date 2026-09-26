@@ -9,10 +9,17 @@ async function approveAll(page: Page) {
     const card = page.getByTestId("approval-card").first();
     if (!(await card.isVisible().catch(() => false))) return i;
     await card.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect(page.getByTestId("approval-card")).toHaveCount(0, { timeout: 5_000 }).catch(() => undefined);
+    await expect(page.getByTestId("approval-card"))
+      .toHaveCount(0, { timeout: 5_000 })
+      .catch(() => undefined);
     await page.waitForTimeout(1500);
   }
   return 5;
+}
+
+// Full-page screenshots for visual review, only when E2E_SCREENSHOTS is set.
+async function shot(page: Page, name: string) {
+  if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/${name}.png`, fullPage: true });
 }
 
 test("demo loop", async ({ page }) => {
@@ -26,55 +33,65 @@ test("demo loop", async ({ page }) => {
   await page.getByLabel("Password").fill("correct-horse-battery");
   await page.getByRole("button", { name: "Create account" }).click();
 
-  // Create company
-  await expect(page.getByRole("heading", { name: "Create your company" })).toBeVisible();
-  await page.getByLabel("Company name").fill("E2E Marketplace");
-  await page.getByLabel("Industry").selectOption("Marketplace");
+  // Your company: AutonomOS reads the website and fills everything in
+  await expect(page.getByRole("heading", { name: "Your company" })).toBeVisible();
+  await page.getByLabel("Company website").fill("http://127.0.0.1:3999/site");
+  await page.getByRole("button", { name: "Read my website" }).click();
+  await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");
+  await expect(page.getByLabel("Industry")).toHaveValue("Marketplace");
+  await expect(page.getByLabel("Number of employees")).toHaveValue("20–49");
+  await expect(page.getByLabel("Country")).toHaveValue("Netherlands");
+  await expect(page.getByLabel("What does your company do?")).toHaveValue(/marketplace/i);
+  await expect(page.getByRole("checkbox", { name: "Customer Support" })).toBeChecked();
+  await shot(page, "onboarding-company");
   await page.getByRole("button", { name: "Create company" }).click();
 
-  // About
-  await page.getByLabel("What does your company do?").fill("We run an online marketplace for second-hand furniture.");
-  await page.getByText("Customer Support", { exact: true }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  // Connect sandbox Zendesk and Stripe
+  // Connect: the tools found on the website come first
+  await expect(page.getByText("Found on your website")).toBeVisible();
   for (const key of ["zendesk", "stripe"]) {
     const card = page.getByTestId(`integration-${key}`);
+    await expect(card.getByText("Detected")).toBeVisible();
     await card.getByRole("button", { name: "Connect" }).click();
     await card.getByRole("button", { name: "Use sandbox data" }).click();
     await expect(card.getByText(/Connected/)).toBeVisible();
   }
+  await shot(page, "onboarding-connect");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Guided discovery
-  await expect(page).toHaveURL(/\/discover/);
+  // The first inventory is drafted without an interview
+  await expect(page).toHaveURL(/\/processes\?status=draft&drafted=\d+/);
+  await expect(page.getByText(/AutonomOS drafted \d+ process/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Refund request handling" })).toBeVisible();
+  await shot(page, "drafted-processes");
+
+  // The guided interview still works, with one-tap suggested answers; duplicates are not added
+  await page.goto("/discover");
   await page.getByRole("button", { name: "Start interview" }).click();
-  await page.getByLabel("Your answer").fill("Answer tickets, approve refunds, and review flagged listings");
+  await page.getByRole("button", { name: /Answer tickets, approve refunds/ }).click();
+  await expect(page.getByLabel("Your answer")).toHaveValue(/Answer tickets, approve refunds/);
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Refund request handling")).toBeVisible();
+  await shot(page, "interview");
   await page.getByRole("button", { name: /Save \d+ to inventory/ }).click();
 
-  // Review the refund process and generate an opportunity
+  // Approving a process finds its automation opportunities straight away
   await expect(page).toHaveURL(/\/processes/);
+  await expect(page.getByRole("link", { name: "Refund request handling" })).toHaveCount(1);
   await page.getByRole("link", { name: "Refund request handling" }).click();
   await expect(page).toHaveURL(/\/processes\/[0-9a-f-]+/);
   const processUrl = page.url();
   await page.getByRole("button", { name: "Approve process" }).click();
-  await page.getByRole("button", { name: "Create automation opportunity" }).click();
   await expect(page).toHaveURL(/\/opportunities\/[0-9a-f-]+/);
   await expect(page.getByText("Proposed", { exact: true })).toBeVisible();
-  const opportunityUrl = page.url();
+  const opportunityUrl = page.url().split("?")[0]!;
+  await shot(page, "opportunity-found");
 
-  // Create the agent through the wizard
-  await page.getByRole("link", { name: "Create agent" }).click();
-  for (let i = 0; i < 5; i++) await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("button", { name: "Create agent" }).click();
-  await expect(page).toHaveURL(/\/agents\/[0-9a-f-]+/);
-  const agentUrl = page.url().split("?")[0]!;
+  // One click builds the agent from the proposal and runs a simulated test
+  await page.getByRole("button", { name: "Build and test agent" }).click();
+  await expect(page).toHaveURL(/\/activity\/[0-9a-f-]+\?built=1/);
+  const agentUrl = new URL((await page.getByRole("link", { name: "Open agent" }).getAttribute("href"))!, page.url()).toString();
 
   // Test run: simulated, lists the approvals production would need
-  await page.getByRole("button", { name: "Run test" }).click();
-  await expect(page).toHaveURL(/\/activity\/[0-9a-f-]+/);
   await expect(page.getByText("Test finished")).toBeVisible();
   await expect(page.getByText("Approvals needed in production")).toBeVisible();
 
@@ -109,7 +126,22 @@ test("demo loop", async ({ page }) => {
 
   // Phone layout: every page fits the screen width and the menu reaches every section
   await page.setViewportSize({ width: 390, height: 844 });
-  const pages = ["/", "/approvals", "/approvals?view=resolved", "/processes", processUrl, "/opportunities", opportunityUrl, "/agents", agentUrl, "/activity", runUrl, "/discover", "/integrations", "/settings"];
+  const pages = [
+    "/",
+    "/approvals",
+    "/approvals?view=resolved",
+    "/processes",
+    processUrl,
+    "/opportunities",
+    opportunityUrl,
+    "/agents",
+    agentUrl,
+    "/activity",
+    runUrl,
+    "/discover",
+    "/integrations",
+    "/settings",
+  ];
   for (const url of pages) {
     await page.goto(url);
     await page.waitForLoadState("networkidle");

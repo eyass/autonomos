@@ -11,6 +11,14 @@ import { Field, FieldDescription, FieldGroup, FieldSeparator } from "@/component
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 
+// "eve.tester@acme.com" -> Eve / Tester. Only a starting point; the fields stay editable.
+function namesFromEmail(email: string) {
+  const local = email.split("@")[0] ?? "";
+  const parts = local.split(/[._-]+/).filter((p) => /^[a-z\u00c0-\u024f]{2,}$/i.test(p));
+  const cap = (w?: string) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : "");
+  return parts.length >= 2 ? { first: cap(parts[0]), last: cap(parts.slice(1).join(" ")) } : { first: cap(parts[0]), last: "" };
+}
+
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -19,6 +27,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [usePassword, setUsePassword] = useState(true);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [namesEdited, setNamesEdited] = useState(false);
   const callback = () => `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
   async function submit(form: FormData) {
@@ -86,19 +97,32 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               </Button>
             </Field>
             <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">Or continue with email</FieldSeparator>
+            <FormField label="Work email" htmlFor="email">
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@company.com"
+                onChange={(e) => {
+                  if (mode !== "signup" || namesEdited) return;
+                  const guess = namesFromEmail(e.target.value);
+                  setFirstName(guess.first);
+                  setLastName(guess.last);
+                }}
+              />
+            </FormField>
             {mode === "signup" ? (
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="First name" htmlFor="firstName">
-                  <Input id="firstName" name="firstName" required autoComplete="given-name" />
+                  <Input id="firstName" name="firstName" required autoComplete="given-name" value={firstName} onChange={(e) => (setNamesEdited(true), setFirstName(e.target.value))} />
                 </FormField>
                 <FormField label="Last name" htmlFor="lastName">
-                  <Input id="lastName" name="lastName" required autoComplete="family-name" />
+                  <Input id="lastName" name="lastName" required autoComplete="family-name" value={lastName} onChange={(e) => (setNamesEdited(true), setLastName(e.target.value))} />
                 </FormField>
               </div>
             ) : null}
-            <FormField label="Work email" htmlFor="email">
-              <Input id="email" name="email" type="email" required autoComplete="email" placeholder="you@company.com" />
-            </FormField>
             {mode === "signup" || usePassword ? (
               <FormField label="Password" htmlFor="password" hint={mode === "signup" ? "At least 8 characters" : undefined}>
                 <Input id="password" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} />

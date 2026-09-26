@@ -11,8 +11,8 @@ This repository is the V1 described in the PRD: the full loop from company creat
 | Area | What works |
 | --- | --- |
 | Auth and tenancy | Supabase Auth (email and password, magic link, Google), organisations, owner, admin and member roles, invites, row level security on every tenant table, automatic session expiry |
-| Onboarding | Create company, company context and improvement areas, connect systems (nothing mandatory) |
-| Process discovery | Guided AI interview with targeted follow-up questions, document import (PDF, DOCX, TXT, MD or pasted text), discovery from connected systems, manual creation with AI-generated workflow |
+| Onboarding | Agentic: the website is taken from the work email, crawled and profiled (name, industry, size, country, currency, hourly cost, what the company does, improvement areas, tools in use); the user reviews one prefilled form, connects the detected tools, and lands on a drafted process inventory |
+| Process discovery | First inventory drafted automatically from the website profile and connected systems; guided AI interview with targeted follow-up questions and one-tap suggested answers, document import (PDF, DOCX, TXT, MD or pasted text), discovery from connected systems, manual creation with AI-generated workflow |
 | Processes | Structured inventory with steps, systems, roles, exceptions, confidence and missing information; filters and sorts from the PRD; draft → reviewed → active → archived review flow; inline editing |
 | Opportunities | AI generation anchored by deterministic value, difficulty and risk scores; ranking by value × potential ÷ difficulty with risk shown separately; value vs difficulty matrix; before/after flow; required tools, approvals and human involvement |
 | Agents | Six-step wizard pre-filled from the opportunity; explicit tool allowlist; autonomy L1 to L5; manual, schedule and integration-event triggers; immutable configuration versions; test runs that simulate every write; activation gated on a completed test |
@@ -45,6 +45,17 @@ supabase/migrations   Schema, RLS, append-only audit, immutable agent versions, 
 4. A write that needs approval is persisted with its idempotency key, an approval request is created, and the task ends. Approving, rejecting or modifying enqueues a resume. Hard limits, the allowlist and the emergency pause are re-checked after approval.
 5. Allowed writes are persisted before they execute. A retry after a crash re-executes the same action with the same key instead of asking the model again, so a refund can never be issued twice.
 6. On completion the run records outcome, human minutes, time saved (baseline minus interventions), tokens and cost.
+
+### Agentic setup
+
+AutonomOS asks for as little as possible and drafts the rest for review:
+
+1. **Website from email.** A work email (not Gmail, Outlook and the like) gives the company domain, and onboarding starts reading it immediately.
+2. **Crawl** (`packages/integrations/src/website.ts`). The homepage plus up to five pages that say the most about a company (about, product, pricing, careers, support, integrations), chosen by path and link text with one page per kind first. It also reads JSON-LD organisation data, detects tools from script signatures (Zendesk, Intercom, HubSpot, Salesforce, Stripe, Slack, Notion and more) and reads the mail provider from MX records (Google Workspace or Microsoft 365). Every URL and redirect hop must resolve to a public address; responses are capped in size and time.
+3. **Profile** (`profileCompany`, SMART model). Name, summary, industry, headcount band, country, currency, a typical hourly labour cost, improvement areas and likely processes, each with its evidence. Fields the site does not support stay empty.
+4. **Review, not typing.** One prefilled form; the detected tools are listed first on the connect step.
+5. **First inventory** (`draftProcessInventory`). When onboarding finishes, the likely processes and the evidence from connected systems become draft processes (confidence at most 0.6, missing information listed). Duplicates across discovery sources are kept once.
+6. **Downstream.** Approving a process generates its automation opportunities; "Build and test agent" creates the proposed agent and starts a simulated test in one click; the interview offers suggested answers; a manually added process only needs a name and a sentence (department, steps and volume are inferred); Settings can refresh the profile from the website.
 
 ### Autonomy score
 

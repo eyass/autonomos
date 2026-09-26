@@ -1,4 +1,6 @@
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FilterBar } from "@/components/filter-bar";
 import { LevelChange, Scores, StatusBadge } from "@/components/domain";
 import { FREQUENCY_LABEL, hours } from "@/lib/format";
@@ -82,6 +84,15 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Processes" description="The recurring work your teams do today, and how autonomous it could become." actions={actions} />
+      {q.drafted ? (
+        <Alert variant="success" className="mb-4">
+          <Sparkles />
+          <AlertTitle>
+            AutonomOS drafted {q.drafted} process{q.drafted === "1" ? "" : "es"} for you
+          </AlertTitle>
+          <AlertDescription>From your website and connected systems. Open each one, correct anything that is off, and approve it. Approving finds its automation opportunities.</AlertDescription>
+        </Alert>
+      ) : null}
       <FilterBar
         className="mb-4"
         activeCount={active}

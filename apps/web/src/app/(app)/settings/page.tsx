@@ -4,13 +4,13 @@ import { ActionButton } from "@/components/action-button";
 import { dateTime, num, usd } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { archiveDepartmentAction, removeMemberAction, setApprovalAction, setPausedAction } from "./actions";
+import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, setApprovalAction, setPausedAction } from "./actions";
 import { CompanyForm, DepartmentForm, InviteForm } from "./forms";
 import { DefinitionList } from "@/components/app/definition-list";
 import { PageHeader } from "@/components/app/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = { title: "Settings" };
 
@@ -65,6 +65,18 @@ export default async function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Company</CardTitle>
+            <CardDescription>
+              {session.org.websiteProfile
+                ? `Profile drafted from ${session.org.website ?? "your website"}${session.org.detectedTools.length ? `. Tools found: ${session.org.detectedTools.join(", ")}` : ""}.`
+                : "Add your website to let AutonomOS keep this profile up to date."}
+            </CardDescription>
+            {admin && session.org.website ? (
+              <CardAction>
+                <ActionButton size="sm" variant="outline" action={refreshProfileAction} pendingLabel="Reading website…">
+                  Refresh from website
+                </ActionButton>
+              </CardAction>
+            ) : null}
           </CardHeader>
           <CardContent>
             <CompanyForm org={session.org} disabled={!admin} />

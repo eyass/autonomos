@@ -9,27 +9,36 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-export function IntegrationGrid({ integrations, canManage, compact }: { integrations: IntegrationView[]; canManage: boolean; compact?: boolean }) {
-  const categories = [...new Set(integrations.map((i) => i.category))];
+export function IntegrationGrid({ integrations, canManage, compact, highlight = [] }: { integrations: IntegrationView[]; canManage: boolean; compact?: boolean; highlight?: string[] }) {
+  // Tools detected on the company website come first, so connecting them is one step.
+  const found = integrations.filter((i) => highlight.includes(i.key));
+  const rest = integrations.filter((i) => !highlight.includes(i.key));
+  const categories = [...new Set(rest.map((i) => i.category))];
+  const section = (title: string, items: IntegrationView[], note?: string) => (
+    <section key={title}>
+      <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h2>
+      {note ? <p className="-mt-1 mb-2 text-xs text-muted-foreground">{note}</p> : null}
+      <div className="grid gap-3 md:grid-cols-2">
+        {items.map((i) => (
+          <IntegrationCard key={i.key} i={i} canManage={canManage} compact={compact} found={highlight.includes(i.key)} />
+        ))}
+      </div>
+    </section>
+  );
   return (
     <div className="space-y-6">
-      {categories.map((cat) => (
-        <section key={cat}>
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{cat}</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            {integrations
-              .filter((i) => i.category === cat)
-              .map((i) => (
-                <IntegrationCard key={i.key} i={i} canManage={canManage} compact={compact} />
-              ))}
-          </div>
-        </section>
-      ))}
+      {found.length ? section("Found on your website", found, "Detected from your website and email setup.") : null}
+      {categories.map((cat) =>
+        section(
+          found.length ? `Other ${cat.toLowerCase()} tools` : cat,
+          rest.filter((i) => i.category === cat),
+        ),
+      )}
     </div>
   );
 }
 
-function IntegrationCard({ i, canManage, compact }: { i: IntegrationView; canManage: boolean; compact?: boolean }) {
+function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView; canManage: boolean; compact?: boolean; found?: boolean }) {
   const [review, setReview] = useState(false);
   const connected = i.status === "connected";
   const available = i.sandboxAvailable || i.oauthAvailable;
@@ -38,7 +47,15 @@ function IntegrationCard({ i, canManage, compact }: { i: IntegrationView; canMan
       <CardHeader>
         <CardTitle>{i.name}</CardTitle>
         <CardDescription>{i.description}</CardDescription>
-        <CardAction>{connected ? <Badge variant="success">Connected{i.provider === "sandbox" ? " · sandbox" : ""}</Badge> : <Badge variant="secondary">Not connected</Badge>}</CardAction>
+        <CardAction>
+          {connected ? (
+            <Badge variant="success">Connected{i.provider === "sandbox" ? " · sandbox" : ""}</Badge>
+          ) : found ? (
+            <Badge variant="info">Detected</Badge>
+          ) : (
+            <Badge variant="secondary">Not connected</Badge>
+          )}
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-3 empty:hidden">
         {connected && !compact ? (

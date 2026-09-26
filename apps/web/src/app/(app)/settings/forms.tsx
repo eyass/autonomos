@@ -6,6 +6,7 @@ import { FormField } from "@/components/app/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 type R = { ok: true } | { ok: false; error: string } | null;
@@ -27,7 +28,7 @@ export function CompanyForm({
   org,
   disabled,
 }: {
-  org: { name: string; industry: string | null; website: string | null; employeeCount: string | null; defaultHourlyCost: number; currency: string };
+  org: { name: string; industry: string | null; website: string | null; employeeCount: string | null; defaultHourlyCost: number; currency: string; companySummary: string | null };
   disabled: boolean;
 }) {
   const [state, action, pending] = useActionState(updateCompanyAction, null);
@@ -55,6 +56,11 @@ export function CompanyForm({
           ))}
         </NativeSelect>
       </FormField>
+      <div className="sm:col-span-2">
+        <FormField label="What the company does" hint="Used as context for discovery and by every agent.">
+          <Textarea name="summary" rows={3} defaultValue={org.companySummary ?? ""} disabled={disabled} />
+        </FormField>
+      </div>
       <FormField label={`Default hourly labour cost (${org.currency})`} hint="Used for estimated value. Override per department below.">
         <Input name="defaultHourlyCost" type="number" min={1} step="0.01" defaultValue={org.defaultHourlyCost} disabled={disabled} />
       </FormField>

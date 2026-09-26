@@ -72,6 +72,39 @@ export const INDUSTRIES = [
   "Other",
 ] as const;
 
+export const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "DKK", "NOK", "PLN", "CAD", "AUD"] as const;
+
+// ---------------------------------------------------------------------------
+// Company profile, drafted from the company website during onboarding
+// ---------------------------------------------------------------------------
+
+export const LikelyProcessSchema = z.object({
+  title: z.string().min(1).describe("Name of the recurring work, in plain business language, for example Refund request handling"),
+  department: z.enum(DEPARTMENTS),
+  description: z.string().describe("One sentence on what the work involves"),
+  evidence: z.string().describe("What on the website or in the detected tools suggests this work exists"),
+});
+
+export const CompanyProfileSchema = z.object({
+  name: z.string().min(1).describe("The company's trading name, without legal suffixes like BV or Ltd unless that is how it presents itself"),
+  summary: z.string().min(10).describe("Two to four plain sentences: what the company sells, to whom, and how it operates day to day"),
+  industry: z.enum(INDUSTRIES),
+  employeeCount: z.enum(EMPLOYEE_COUNTS).nullable().describe("Only when the site states or clearly implies the headcount; otherwise null"),
+  country: z.string().nullable().describe("Country of the head office, in English, for example Netherlands"),
+  currency: z.enum(CURRENCIES),
+  hourlyCostEstimate: z.number().positive().max(2000).describe("Typical fully loaded hourly labour cost of operational staff in that country, in the currency"),
+  improvementAreas: z.array(z.enum(DEPARTMENTS)).min(1).max(4).describe("Departments where recurring work is most likely, most promising first"),
+  customers: z.string().nullable().describe("Who the customers are, for example consumers buying second-hand furniture"),
+  likelyProcesses: z.array(LikelyProcessSchema).max(8),
+  evidence: z.array(z.object({ field: z.string(), source: z.string() })).max(12).describe("Where each important field came from, for example industry: homepage headline"),
+  confidence: z.number().min(0).max(1),
+});
+export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
+
+export const InterviewSuggestionsSchema = z.object({
+  suggestions: z.array(z.string().min(1).max(300)).max(3).describe("Short answers the user can send as-is"),
+});
+
 // ---------------------------------------------------------------------------
 // Process discovery (PRD section 103)
 // ---------------------------------------------------------------------------
@@ -131,6 +164,11 @@ export const GeneratedWorkflowSchema = z.object({
   steps: z.array(DiscoveredStepSchema).min(1),
   systems: z.array(z.string()),
   roles: z.array(z.string()),
+  // Filled so a manually added process needs only a name and a sentence.
+  department: z.enum(DEPARTMENTS).optional().describe("The department that owns this work"),
+  frequency: ProcessFrequency.optional(),
+  estimatedOccurrencesPerMonth: z.number().nonnegative().optional(),
+  estimatedMinutesPerOccurrence: z.number().nonnegative().optional(),
 });
 
 // ---------------------------------------------------------------------------

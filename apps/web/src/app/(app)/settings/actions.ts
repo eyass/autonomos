@@ -1,7 +1,9 @@
 "use server";
 import { z } from "zod";
 import { runAction } from "@/lib/actions";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireSessionOrThrow } from "@/lib/session";
+import { refreshWebsiteProfile } from "@/server/company-profile";
 import { archiveDepartment, CompanySettingsSchema, inviteMember, removeMember, setAgentsPaused, setMemberApproval, updateCompany, upsertDepartment } from "@/server/org";
 
 export async function updateCompanyAction(_: unknown, form: FormData) {
@@ -13,6 +15,7 @@ export async function updateCompanyAction(_: unknown, form: FormData) {
         industry: form.get("industry") ?? "",
         website: form.get("website") ?? "",
         employeeCount: form.get("employeeCount") ?? "",
+        summary: form.get("summary") ?? undefined,
         defaultHourlyCost: Number(form.get("defaultHourlyCost")),
       }),
     ),
@@ -48,4 +51,13 @@ export async function setApprovalAction(userId: string, canApprove: boolean) {
 
 export async function setPausedAction(paused: boolean) {
   return runAction(async () => setAgentsPaused(await requireSessionOrThrow(), paused));
+}
+
+export async function refreshProfileAction() {
+  return runAction(async () => {
+    const session = await requireSessionOrThrow();
+    rateLimit(`website:${session.user.id}`, 6, 60_000);
+    const analysis = await refreshWebsiteProfile(session);
+    return { pages: analysis.pagesRead.length, tools: analysis.detectedTools.map((t) => t.name) };
+  });
 }

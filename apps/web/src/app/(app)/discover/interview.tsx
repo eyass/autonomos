@@ -1,6 +1,7 @@
 "use client";
 import type { DiscoveredProcess } from "@autonomos/schemas";
 import { useRouter } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AutonomyLadder } from "@/components/domain";
 import { hours, pct } from "@/lib/format";
@@ -23,6 +24,7 @@ export function Interview({ departments }: { departments: string[] }) {
   const [processes, setProcesses] = useState<DiscoveredProcess[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -34,7 +36,8 @@ export function Interview({ departments }: { departments: string[] }) {
       setError(null);
       const r = await startInterviewAction(department);
       if (!r.ok) return setError(r.error);
-      setSessionId(r.data);
+      setSessionId(r.data.id);
+      setSuggestions(r.data.suggestions);
       setMessages([{ role: "assistant", content: `Let's start with ${department}. What are the main things your team repeatedly does each week?` }]);
       setProcesses([]);
     });
@@ -43,6 +46,7 @@ export function Interview({ departments }: { departments: string[] }) {
     if (!sessionId || !draft.trim()) return;
     const answer = draft.trim();
     setDraft("");
+    setSuggestions([]);
     setMessages((m) => [...m, { role: "user", content: answer }]);
     start(async () => {
       const r = await answerInterviewAction(sessionId, answer);
@@ -51,6 +55,7 @@ export function Interview({ departments }: { departments: string[] }) {
         return;
       }
       setMessages(r.data.messages);
+      setSuggestions(r.data.suggestions);
       setProcesses(r.data.processes);
       setSelected(new Set(r.data.processes.map((p) => p.title)));
     });
@@ -114,6 +119,16 @@ export function Interview({ departments }: { departments: string[] }) {
           <div ref={end} />
         </div>
         <div className="border-t border-border p-3">
+          {suggestions.length && !pending ? (
+            <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Suggested answers">
+              {suggestions.map((sug) => (
+                <Button key={sug} type="button" variant="outline" size="sm" className="h-auto max-w-full whitespace-normal py-1 text-left text-xs" onClick={() => setDraft(sug)}>
+                  <Sparkles className="text-primary" />
+                  {sug}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <Textarea
             aria-label="Your answer"
             value={draft}

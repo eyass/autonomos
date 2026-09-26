@@ -1,4 +1,5 @@
 import {
+  DEPARTMENTS,
   DiscoveryTurnSchema,
   DocumentExtractionSchema,
   GeneratedWorkflowSchema,
@@ -97,6 +98,7 @@ export async function generateWorkflow(input: {
     systemRules: [
       ...EXTRACTION_RULES,
       "Produce the ordered steps a human team currently performs for this process. 4 to 10 steps. Name the system used in each step when it is known or strongly implied.",
+      "Also choose the owning department (when the given department is 'Detect', decide it; otherwise keep it) and estimate frequency, occurrences per month and minutes per occurrence conservatively from the description and company size.",
     ],
     sections: [
       section("company_context", input.company),
@@ -105,12 +107,34 @@ export async function generateWorkflow(input: {
     ],
     task: "Generate the current-state workflow for this process.",
     mock: () => {
-      const p = mockProcessesFromText(`${input.title}. ${input.description}`, input.department, "manual")[0]!;
-      return { trigger: p.trigger, steps: p.steps, systems: p.systems, roles: p.roles };
+      const text = `${input.title}. ${input.description}`;
+      const department = input.department === "Detect" ? guessDepartment(text) : (input.department as (typeof DEPARTMENTS)[number]);
+      const p = mockProcessesFromText(text, department, "manual")[0]!;
+      return {
+        trigger: p.trigger,
+        steps: p.steps,
+        systems: p.systems,
+        roles: p.roles,
+        department: (DEPARTMENTS as readonly string[]).includes(department) ? department : undefined,
+        frequency: p.frequency,
+        estimatedOccurrencesPerMonth: p.estimatedOccurrencesPerMonth,
+        estimatedMinutesPerOccurrence: p.estimatedMinutesPerOccurrence,
+      };
     },
     onUsage: input.onUsage,
   });
   return object;
+}
+
+export function guessDepartment(text: string): (typeof DEPARTMENTS)[number] {
+  const t = text.toLowerCase();
+  if (/refund|ticket|support|complaint|customer question|inquir/.test(t)) return "Customer Support";
+  if (/invoice|payment|payout|expense|reconcil|billing|accounts/.test(t)) return "Finance";
+  if (/lead|prospect|deal|quote|sales|demo/.test(t)) return "Sales";
+  if (/campaign|newsletter|content|social|seo/.test(t)) return "Marketing";
+  if (/hire|hiring|onboard|payroll|leave|employee/.test(t)) return "HR";
+  if (/bug|deploy|release|incident/.test(t)) return "Engineering";
+  return "Operations";
 }
 
 // ---------------------------------------------------------------------------

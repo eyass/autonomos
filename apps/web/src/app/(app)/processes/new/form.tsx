@@ -23,7 +23,8 @@ export function NewProcessForm({ departments }: { departments: string[] }) {
           <Textarea id="description" name="description" required rows={4} />
         </FormField>
         <FormField label="Department" htmlFor="department">
-          <NativeSelect id="department" name="department" defaultValue={departments[0] ?? "Operations"}>
+          <NativeSelect id="department" name="department" defaultValue="Detect">
+            <NativeSelectOption value="Detect">Let AutonomOS decide</NativeSelectOption>
             {departments.map((d) => (
               <NativeSelectOption key={d}>{d}</NativeSelectOption>
             ))}

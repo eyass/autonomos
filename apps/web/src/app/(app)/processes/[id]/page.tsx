@@ -4,7 +4,7 @@ import { LevelChange, Scores, StatusBadge } from "@/components/domain";
 import { FREQUENCY_LABEL, hours, money, num, pct } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { generateOpportunitiesAction, setProcessStatusAction } from "../actions";
+import { approveProcessAction, generateOpportunitiesAction, setProcessStatusAction } from "../actions";
 import { ProcessEditor } from "./editor";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const SOURCE_LABEL = { interview: "AI interview", document: "Imported document", integration: "Connected systems", manual: "Added manually" } as const;
+const SOURCE_LABEL = { interview: "AI interview", document: "Imported document", integration: "Connected systems", manual: "Added manually", website: "Drafted from your website" } as const;
 
 export default async function ProcessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -76,10 +76,14 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
         }
         actions={
           <>
-            {p.status === "draft" ? <ActionButton action={setProcessStatusAction.bind(null, id, "reviewed")}>Approve process</ActionButton> : null}
+            {p.status === "draft" ? (
+              <ActionButton action={approveProcessAction.bind(null, id)} pendingLabel="Approving and finding opportunities…">
+                Approve process
+              </ActionButton>
+            ) : null}
             {p.status !== "draft" && p.status !== "archived" ? (
               <ActionButton action={generateOpportunitiesAction.bind(null, id)} pendingLabel="Analysing…">
-                Create automation opportunity
+                {opportunities?.length ? "Find more opportunities" : "Create automation opportunity"}
               </ActionButton>
             ) : null}
             {p.status !== "archived" ? (
@@ -97,7 +101,10 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
 
       {p.status === "draft" ? (
         <Alert variant="info" className="mb-4">
-          <AlertDescription>AI-generated processes are drafts until someone who knows the work reviews them. Check the steps and numbers, fix anything wrong, then approve.</AlertDescription>
+          <AlertDescription>
+            AI-generated processes are drafts until someone who knows the work reviews them. Check the steps and numbers, fix anything wrong, then approve. Approving finds its automation
+            opportunities.
+          </AlertDescription>
         </Alert>
       ) : null}
       {p.missing_information.length ? (

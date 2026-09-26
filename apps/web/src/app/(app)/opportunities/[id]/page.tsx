@@ -1,4 +1,6 @@
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import { buildAndTestAgentAction } from "@/app/(app)/agents/actions";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { BeforeAfter, LevelChange, Scores, StatusBadge } from "@/components/domain";
@@ -15,8 +17,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 type FutureStep = { title: string; actor: "agent" | "human" | "system"; approval?: boolean };
 
-export default async function OpportunityPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OpportunityPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ found?: string }> }) {
   const { id } = await params;
+  const { found } = await searchParams;
   const session = await requireSession();
   const supabase = await createClient();
   const { data: o } = await supabase
@@ -54,7 +57,13 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
             <ButtonLink href={`/agents/${agent.id}`}>Open {agent.name}</ButtonLink>
           ) : (
             <>
-              <ButtonLink href={`/agents/new?opportunity=${id}`}>Create agent</ButtonLink>
+              <ActionButton action={buildAndTestAgentAction.bind(null, id)} pendingLabel="Building and testing…">
+                <Sparkles />
+                Build and test agent
+              </ActionButton>
+              <ButtonLink href={`/agents/new?opportunity=${id}`} variant="outline">
+                Customise first
+              </ButtonLink>
               {o.status === "suggested" ? (
                 <ActionButton variant="outline" action={setOpportunityStatusAction.bind(null, id, "approved")}>
                   Approve
@@ -74,6 +83,14 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
         }
       />
 
+      {found && !agent ? (
+        <Alert variant="success" className="mb-4">
+          <Sparkles />
+          <AlertDescription>
+            AutonomOS found this opportunity when {proc.title} was approved. Build and test the agent in one click: it runs a simulated test, so nothing changes in your systems.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {missing.length ? (
         <Alert variant="warning" className="mb-4">
           <AlertDescription>

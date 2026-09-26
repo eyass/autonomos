@@ -10,7 +10,7 @@ export default async function AboutPage() {
   if (!session) redirect("/onboarding/company");
   return (
     <>
-      <Steps current={1} />
+      <Steps current={0} />
       <h1 className="mb-1 text-xl font-semibold">Tell us about {session.org.name}</h1>
       <p className="mb-6 text-sm text-muted-foreground">This context shapes how processes are discovered and how agents talk about your business.</p>
       <AboutForm summary={session.org.companySummary ?? session.org.description ?? ""} areas={session.org.improvementAreas} />

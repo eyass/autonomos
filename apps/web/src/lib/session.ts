@@ -3,11 +3,15 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createServiceClient } from "@autonomos/db";
+import type { CompanyProfile } from "@autonomos/schemas";
 import { createClient } from "./supabase/server";
 
 export const ORG_COOKIE = "aos_org";
 
 export type Role = "owner" | "admin" | "member";
+
+// The profile drafted from the website, plus which pages it was read from.
+export type WebsiteProfile = CompanyProfile & { pagesRead?: Array<{ url: string; kind: string; title: string }>; otherTechnology?: string[] };
 
 export type Session = {
   user: { id: string; email: string; firstName: string; lastName: string };
@@ -25,6 +29,8 @@ export type Session = {
     defaultHourlyCost: number;
     agentsPaused: boolean;
     onboardingStep: string;
+    detectedTools: string[];
+    websiteProfile: WebsiteProfile | null;
     onboardingCompletedAt: string | null;
   };
   role: Role;
@@ -45,11 +51,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const user = await getUser();
   if (!user) return null;
   const supabase = await createClient();
-  const { data: memberships } = await supabase
-    .from("organization_members")
-    .select("organization_id, role, can_approve, created_at")
-    .eq("user_id", user.id)
-    .order("created_at");
+  const { data: memberships } = await supabase.from("organization_members").select("organization_id, role, can_approve, created_at").eq("user_id", user.id).order("created_at");
   let rows = memberships ?? [];
   if (!rows.length) {
     // First sign-in of an invited user: claim pending invites, then look again.
@@ -83,6 +85,8 @@ export const getSession = cache(async (): Promise<Session | null> => {
       defaultHourlyCost: Number(org.default_hourly_cost),
       agentsPaused: org.agents_paused,
       onboardingStep: org.onboarding_step,
+      detectedTools: org.detected_tools ?? [],
+      websiteProfile: (org.website_profile as WebsiteProfile | null) ?? null,
       onboardingCompletedAt: org.onboarding_completed_at,
     },
     role: membership.role,
@@ -99,7 +103,10 @@ export async function requireSession(): Promise<Session> {
 }
 
 export class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }

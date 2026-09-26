@@ -19,8 +19,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const STEP_TONE: Record<string, string> = { succeeded: "bg-success", failed: "bg-destructive", waiting: "bg-warning", simulated: "bg-info", skipped: "bg-muted-foreground" };
 
-export default async function RunPage({ params }: { params: Promise<{ runId: string }> }) {
+export default async function RunPage({ params, searchParams }: { params: Promise<{ runId: string }>; searchParams: Promise<{ built?: string }> }) {
   const { runId } = await params;
+  const { built } = await searchParams;
   const session = await requireSession();
   const supabase = await createClient();
   const { data: run } = await supabase
@@ -69,6 +70,13 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
           </ButtonLink>
         }
       />
+      {built ? (
+        <Alert variant="success" className="mb-4">
+          <AlertDescription>
+            AutonomOS built {agent.name} and started a test run. Actions that would change something are simulated, never executed. When the result looks right, open the agent to activate it.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {run.status === "queued" ? (
         <Alert variant="info" className="mb-4">
           <AlertDescription>Queued on the durable runtime. If this stays queued, check that the Trigger.dev worker is running.</AlertDescription>
