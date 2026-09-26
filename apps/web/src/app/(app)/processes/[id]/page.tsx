@@ -208,6 +208,23 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
           />
         </div>
         <div className="space-y-6">
+          {((p.evidence as Array<{ source: string; detail: string }> | null) ?? []).length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Found in your systems</CardTitle>
+                <CardDescription>Why AutonomOS proposed this process.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1.5 text-sm">
+                  {(p.evidence as Array<{ source: string; detail: string }>).map((e, i) => (
+                    <li key={i}>
+                      <span className="font-medium">{e.source}:</span> <span className="text-muted-foreground">{e.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
           {opportunities?.length || agents?.length ? (
             <Card>
               <CardHeader>

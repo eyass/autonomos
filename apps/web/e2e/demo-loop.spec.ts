@@ -65,7 +65,7 @@ test("demo loop", async ({ page }) => {
   await shot(page, "drafted-processes");
 
   // The guided interview still works, with one-tap suggested answers; duplicates are not added
-  await page.goto("/discover");
+  await page.goto("/discover?tab=interview");
   await page.getByRole("button", { name: "Start interview" }).click();
   await page.getByRole("button", { name: /Answer tickets, approve refunds/ }).click();
   await expect(page.getByLabel("Your answer")).toHaveValue(/Answer tickets, approve refunds/);
@@ -73,6 +73,22 @@ test("demo loop", async ({ page }) => {
   await expect(page.getByText("Refund request handling")).toBeVisible();
   await shot(page, "interview");
   await page.getByRole("button", { name: /Save \d+ to inventory/ }).click();
+  await expect(page).toHaveURL(/\/processes/);
+
+  // Discovery reads the connected systems on its own and proposes processes with evidence
+  await page.goto("/discover");
+  await expect(page.getByRole("list", { name: "Systems read" }).getByText(/Read \d+ tickets/)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/\d+ process(es)? found/)).toBeVisible({ timeout: 60_000 });
+  // Processes already in the inventory are not proposed again.
+  await expect(page.getByTestId("proposal").filter({ hasText: "Refund request handling" })).toHaveCount(0);
+  const orderStatus = page.getByTestId("proposal").filter({ hasText: "Order status enquiries" });
+  await expect(orderStatus.getByText(/Zendesk:/)).toBeVisible();
+  await shot(page, "system-discovery");
+  await page.getByRole("button", { name: /Add \d+ to inventory/ }).click();
+  await expect(page).toHaveURL(/\/processes\?status=draft&drafted=\d+/);
+  await page.getByRole("link", { name: "Order status enquiries" }).click();
+  await expect(page.getByText("Found in your systems")).toBeVisible();
+  await page.goto("/processes");
 
   // Approving a process finds its automation opportunities straight away
   await expect(page).toHaveURL(/\/processes/);

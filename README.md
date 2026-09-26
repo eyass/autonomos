@@ -57,6 +57,15 @@ AutonomOS asks for as little as possible and drafts the rest for review:
 5. **First inventory** (`draftProcessInventory`). When onboarding finishes, the likely processes and the evidence from connected systems become draft processes (confidence at most 0.6, missing information listed). Duplicates across discovery sources are kept once.
 6. **Downstream.** Approving a process generates its automation opportunities; "Build and test agent" creates the proposed agent and starts a simulated test in one click; the interview offers suggested answers; a manually added process only needs a name and a sentence (department, steps and volume are inferred); Settings can refresh the profile from the website.
 
+### Discovery from connected systems
+
+Discover → "From your systems" reads a recent sample from every connected system and proposes the recurring work it shows. It runs on its own when the page opens and there is no result from the last day.
+
+- **What is read:** Gmail messages from the last 30 days (promotions and social excluded), the latest Zendesk tickets, recent Stripe charges and refunds, and the busiest Slack channels. It works on live accounts through Composio (`GMAIL_FETCH_EMAILS`, `ZENDESK_LIST_ZENDESK_TICKETS`, `STRIPE_LIST_CHARGES`, `STRIPE_LIST_REFUNDS`, `SLACK_LIST_ALL_CHANNELS`, `SLACK_FETCH_CONVERSATION_HISTORY`) and on sandbox systems, which get a month of fictional history the first time they are read.
+- **Privacy:** only subjects, short snippets, tags, dates and amounts are kept. Email addresses become their domain; phone numbers and IBANs are removed before anything reaches the model. The redacted sample is deleted once proposals are made; a run keeps counts and proposals (`discovery_runs`).
+- **Output:** each proposal carries evidence ("5 of 15 tickets are about order status") and a volume estimate scaled from the sample. Accepted proposals become draft processes with a "Found in your systems" card.
+- **Interview:** the guided interview opens with what the systems showed for that department and asks about what the data cannot show.
+
 ### Autonomy score
 
 `Σ(process monthly minutes × coefficient) / Σ(process monthly minutes)` with L1 0, L2 0.2, L3 0.4, L4 0.75, L5 1. A process counts at the level of its best active agent.
