@@ -111,7 +111,12 @@ export function ProposalReview({ run, onReadAgain }: { run: DiscoveryRunView; on
         <>
           <CardContent key={current.title} className="space-y-4" data-testid="proposal">
             <div className="flex flex-wrap items-center gap-2">
-              {current.confidence > INFERRED ? <Badge variant="agent">Seen in your data</Badge> : <Badge variant="outline">Likely for a company like yours</Badge>}
+              {current.confidence > INFERRED ? (
+                <Badge variant="agent">{current.primarySystem ? `Seen in ${current.primarySystem}` : "Seen in your data"}</Badge>
+              ) : (
+                <Badge variant="outline">Likely for a company like yours</Badge>
+              )}
+              {current.kind === "improvement" ? <Badge variant="info">Improvement</Badge> : null}
               {current.department ? <Badge variant="secondary">{current.department}</Badge> : null}
               {current.confidence > INFERRED && current.confidence < 0.5 ? <Badge variant="warning">Weak evidence</Badge> : null}
             </div>
@@ -131,6 +136,12 @@ export function ProposalReview({ run, onReadAgain }: { run: DiscoveryRunView; on
                 <dd>{volume(current)}</dd>
               </div>
             </dl>
+            {current.automation ? (
+              <div className="rounded-lg border border-highlight/30 bg-highlight-soft/40 p-3">
+                <div className="text-xs font-medium text-highlight-strong">What an agent would do</div>
+                <p className="mt-0.5 text-sm">{current.automation}</p>
+              </div>
+            ) : null}
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">{current.confidence > INFERRED ? "What the data shows" : "Why it is likely"}</div>
               <ul className="space-y-1 text-sm">

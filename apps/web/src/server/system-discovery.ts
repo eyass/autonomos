@@ -145,7 +145,8 @@ export async function scanRunSystem(session: Session, runId: string, key: string
     updated = scan.unsupported
       ? { ...target, state: "skipped", line: scan.unsupported }
       : { ...target, state: "done", sampled: scan.sampled, itemKind: scan.itemKind, periodDays: scan.periodDays, estimatedTotal: scan.estimatedTotal ?? null, line: describeScan(scan, conn.name) };
-    if (!scan.unsupported && scan.sampled) sample = { system: conn.name, summary: describeScan(scan, conn.name), periodDays: scan.periodDays, items: scan.items.slice(0, 100) };
+    if (!scan.unsupported && scan.sampled)
+      sample = { system: conn.name, itemKind: scan.itemKind, summary: describeScan(scan, conn.name), periodDays: scan.periodDays, items: scan.items.slice(0, 100) };
   } catch (e) {
     console.error("system scan failed", key, e);
     updated = { ...target, state: "failed", line: `Could not read ${target.name}: ${e instanceof Error ? e.message.slice(0, 160) : "unknown error"}` };
