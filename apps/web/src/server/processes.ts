@@ -306,7 +306,12 @@ export async function startInterview(session: Session, department: string) {
     .single();
   if (error || !data) throw new Error(`interview: ${error?.message}`);
   await track(session, "process_discovery_started", { method: "interview", department });
-  return { id: data.id, opening, suggestions: await interviewSuggestions(session, department, [{ role: "assistant", content: opening }]) };
+  const suggestions = await Promise.race([
+    interviewSuggestions(session, department, [{ role: "assistant", content: opening }]),
+    new Promise<string[]>((r) => setTimeout(() => r([]), SUGGESTIONS_BUDGET_MS)),
+  ]);
+  if (suggestions.length) await adminDb().from("discovery_sessions").update({ suggestions }).eq("id", data.id);
+  return { id: data.id, opening, suggestions };
 }
 
 // One-tap answers for the interview, grounded in the company profile. Never blocks the interview.
@@ -325,30 +330,174 @@ async function interviewSuggestions(session: Session, department: string, messag
   }
 }
 
-export async function answerInterview(session: Session, sessionId: string, answer: string) {
-  const db = adminDb();
-  const { data: s } = await db.from("discovery_sessions").select("*").eq("organization_id", session.org.id).eq("id", sessionId).maybeSingle();
-  if (!s) throw new HttpError(404, "Interview not found");
-  if (s.status !== "open") throw new HttpError(409, "This interview is finished");
-  const messages = [...((s.messages as InterviewMessage[]) ?? []), { role: "user" as const, content: answer.slice(0, 6000) }];
-  const turn = await runDiscoveryTurn({
-    company: await companyContext(session),
-    department: s.department_name ?? "Operations",
-    messages,
-    existingProcesses: (s.extracted as DiscoveredProcess[]) ?? [],
-    systemFindings: await findingsFor(session, s.department_name ?? "Operations"),
-    onUsage: usageSink(session),
-  });
-  const next = turn.done || !turn.nextQuestion ? "That gives me a good picture. Review the processes below and save them to your inventory." : turn.nextQuestion;
-  const updated = [...messages, { role: "assistant" as const, content: next }];
-  await db
+// Answers run as a background turn on the server (see the discover actions), and the page
+// polls interviewState. A turn that runs past TURN_TIMEOUT_MS is reported as failed, so the
+// page never waits without an end; Retry runs it again and Cancel takes the answer back.
+export const TURN_TIMEOUT_MS = 100_000;
+const SUGGESTIONS_BUDGET_MS = 8_000;
+
+export type InterviewState = {
+  id: string;
+  department: string;
+  status: "open" | "completed";
+  messages: InterviewMessage[];
+  processes: DiscoveredProcess[];
+  suggestions: string[];
+  // Seconds the current answer has been worked on, measured on the server.
+  pending: { answer: string; elapsed: number } | null;
+  failed: { answer: string; message: string } | null;
+};
+
+type SessionRow = {
+  id: string;
+  department_name: string | null;
+  status: string;
+  messages: unknown;
+  extracted: unknown;
+  suggestions: unknown;
+  pending_answer: string | null;
+  pending_since: string | null;
+  turn_error: string | null;
+};
+
+async function loadInterview(session: Session, sessionId: string): Promise<SessionRow> {
+  const { data } = await adminDb()
     .from("discovery_sessions")
-    .update({ messages: updated as never, extracted: turn.processes as never })
+    .select("id, department_name, status, messages, extracted, suggestions, pending_answer, pending_since, turn_error")
     .eq("organization_id", session.org.id)
+    .eq("method", "interview")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!data) throw new HttpError(404, "Interview not found");
+  return data;
+}
+
+const turnAge = (since: string) => Date.now() - new Date(since).getTime();
+const TIMED_OUT = "This took longer than expected, so it was stopped. Retry, or save what was found so far.";
+
+function toState(s: SessionRow): InterviewState {
+  const inFlight = s.pending_since && !s.turn_error ? s.pending_since : null;
+  return {
+    id: s.id,
+    department: s.department_name ?? "Operations",
+    status: s.status === "open" ? "open" : "completed",
+    messages: (s.messages as InterviewMessage[]) ?? [],
+    processes: (s.extracted as DiscoveredProcess[]) ?? [],
+    suggestions: inFlight ? [] : ((s.suggestions as string[]) ?? []),
+    pending: inFlight && s.pending_answer !== null ? { answer: s.pending_answer, elapsed: Math.max(0, Math.round(turnAge(inFlight) / 1000)) } : null,
+    failed: s.turn_error && s.pending_answer !== null ? { answer: s.pending_answer, message: s.turn_error } : null,
+  };
+}
+
+export async function interviewState(session: Session, sessionId: string): Promise<InterviewState> {
+  const s = await loadInterview(session, sessionId);
+  if (s.pending_since && !s.turn_error && turnAge(s.pending_since) > TURN_TIMEOUT_MS) {
+    // The token stays, so a result that still arrives is kept; Retry or Cancel replaces it.
+    await adminDb().from("discovery_sessions").update({ turn_error: TIMED_OUT }).eq("id", sessionId).eq("pending_since", s.pending_since);
+    s.turn_error = TIMED_OUT;
+  }
+  return toState(s);
+}
+
+// Records the answer and marks the turn in flight. Returns the token for runInterviewTurn.
+export async function submitInterviewAnswer(session: Session, sessionId: string, answer: string) {
+  const text = answer.trim().slice(0, 6000);
+  if (!text) throw new HttpError(400, "Write an answer first");
+  const s = await loadInterview(session, sessionId);
+  if (s.status !== "open") throw new HttpError(409, "This interview is finished");
+  if (s.pending_since && !s.turn_error && turnAge(s.pending_since) < TURN_TIMEOUT_MS) throw new HttpError(409, "Still working on the last answer");
+  const since = new Date().toISOString();
+  const messages = [...((s.messages as InterviewMessage[]) ?? []), { role: "user" as const, content: text }];
+  await adminDb()
+    .from("discovery_sessions")
+    .update({ messages: messages as never, pending_answer: text, pending_since: since, turn_error: null, suggestions: [] })
     .eq("id", sessionId);
-  // Suggestions are a convenience: never let them hold up the answer.
-  const suggestions = await Promise.race([interviewSuggestions(session, s.department_name ?? "Operations", updated), new Promise<string[]>((r) => setTimeout(() => r([]), 8_000))]);
-  return { messages: updated, processes: turn.processes, done: turn.done, suggestions };
+  return { since, state: toState({ ...s, messages, pending_answer: text, pending_since: since, turn_error: null, suggestions: [] }) };
+}
+
+// Runs the failed or timed-out turn again with the same answer.
+export async function retryInterviewTurn(session: Session, sessionId: string) {
+  const s = await loadInterview(session, sessionId);
+  if (s.status !== "open") throw new HttpError(409, "This interview is finished");
+  if (s.pending_answer === null) throw new HttpError(409, "There is nothing to retry");
+  if (s.pending_since && !s.turn_error && turnAge(s.pending_since) < TURN_TIMEOUT_MS) throw new HttpError(409, "Still working on the last answer");
+  const since = new Date().toISOString();
+  await adminDb().from("discovery_sessions").update({ pending_since: since, turn_error: null }).eq("id", sessionId);
+  return { since, state: toState({ ...s, pending_since: since, turn_error: null }) };
+}
+
+// Takes the answer back: drops it from the conversation and discards any result still coming.
+export async function cancelInterviewTurn(session: Session, sessionId: string) {
+  const s = await loadInterview(session, sessionId);
+  const answer = s.pending_answer;
+  const messages = (s.messages as InterviewMessage[]) ?? [];
+  const last = messages.at(-1);
+  const kept = answer !== null && last?.role === "user" && last.content === answer ? messages.slice(0, -1) : messages;
+  await adminDb()
+    .from("discovery_sessions")
+    .update({ messages: kept as never, pending_answer: null, pending_since: null, turn_error: null })
+    .eq("id", sessionId);
+  return { answer: answer ?? "", state: toState({ ...s, messages: kept, pending_answer: null, pending_since: null, turn_error: null }) };
+}
+
+// The turn itself, after the response. Every write is conditional on the token, so a turn
+// that was cancelled or retried in the meantime changes nothing.
+export async function runInterviewTurn(session: Session, sessionId: string, since: string) {
+  const db = adminDb();
+  const s = await loadInterview(session, sessionId).catch(() => null);
+  // Postgres gives the time back in its own format, so compare instants, not strings.
+  if (!s?.pending_since || new Date(s.pending_since).getTime() !== new Date(since).getTime()) return;
+  const department = s.department_name ?? "Operations";
+  const messages = (s.messages as InterviewMessage[]) ?? [];
+  try {
+    const turn = await runDiscoveryTurn({
+      company: await companyContext(session),
+      department,
+      messages,
+      existingProcesses: (s.extracted as DiscoveredProcess[]) ?? [],
+      systemFindings: await findingsFor(session, department),
+      onUsage: usageSink(session),
+    });
+    const next = turn.done || !turn.nextQuestion ? "That gives me a good picture. Review the processes below and save them to your inventory." : turn.nextQuestion;
+    const updated = [...messages, { role: "assistant" as const, content: next }];
+    const suggestions = await Promise.race([interviewSuggestions(session, department, updated), new Promise<string[]>((r) => setTimeout(() => r([]), SUGGESTIONS_BUDGET_MS))]);
+    await db
+      .from("discovery_sessions")
+      .update({ messages: updated as never, extracted: turn.processes as never, suggestions, pending_answer: null, pending_since: null, turn_error: null })
+      .eq("id", sessionId)
+      .eq("pending_since", since);
+  } catch (e) {
+    console.error("interview turn failed", e);
+    const message = /timeout|timed out|abort/i.test(e instanceof Error ? `${e.name} ${e.message}` : "") ? TIMED_OUT : "The AI model did not answer. Retry, or save what was found so far.";
+    await db.from("discovery_sessions").update({ turn_error: message }).eq("id", sessionId).eq("pending_since", since);
+  }
+}
+
+// The API's answer: the same turn, waited for in the request.
+export async function answerInterview(session: Session, sessionId: string, answer: string) {
+  const { since } = await submitInterviewAnswer(session, sessionId, answer);
+  await runInterviewTurn(session, sessionId, since);
+  const state = await interviewState(session, sessionId);
+  if (state.failed) throw new HttpError(502, state.failed.message);
+  return { messages: state.messages, processes: state.processes, suggestions: state.suggestions };
+}
+
+// An interview this person left open in the last day, to pick up where they stopped.
+export async function openInterviewFor(session: Session): Promise<{ id: string; department: string; answers: number } | null> {
+  const { data } = await adminDb()
+    .from("discovery_sessions")
+    .select("id, department_name, messages")
+    .eq("organization_id", session.org.id)
+    .eq("method", "interview")
+    .eq("status", "open")
+    .eq("created_by", session.user.id)
+    .gte("updated_at", new Date(Date.now() - 86_400_000).toISOString())
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  const answers = ((data.messages as InterviewMessage[]) ?? []).filter((m) => m.role === "user").length;
+  return answers ? { id: data.id, department: data.department_name ?? "Operations", answers } : null;
 }
 
 export async function finishInterview(session: Session, sessionId: string, selectedTitles?: string[]) {

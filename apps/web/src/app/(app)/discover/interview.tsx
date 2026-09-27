@@ -3,10 +3,11 @@ import type { DiscoveredProcess } from "@autonomos/schemas";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { AutonomyLadder } from "@/components/domain";
 import { hours, pct } from "@/lib/format";
-import { answerInterviewAction, finishInterviewAction, startInterviewAction } from "./actions";
+import type { InterviewState } from "@/server/processes";
+import { answerInterviewAction, cancelInterviewAction, finishInterviewAction, retryInterviewAction, startInterviewAction } from "./actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,9 +18,15 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 
 type Message = { role: "assistant" | "user"; content: string };
+export type ResumableInterview = { id: string; department: string; answers: number };
 
-// A person waits on each answer, so it never waits silently: this long, then it stops and offers a retry.
-const ANSWER_TIMEOUT_MS = 60_000;
+// Each answer is worked on by the server after the request returns; the page asks how it is
+// going this often, and gives up asking (with a way to try again) after this many misses.
+const POLL_MS = 1_500;
+const MAX_MISSES = 5;
+// The interview open in this tab, so switching tabs and coming back carries on where it was.
+const STORAGE_KEY = "autonomos:interview";
+
 function phase(seconds: number) {
   if (seconds < 3) return "Reading your answer";
   if (seconds < 12) return "Updating the processes";
@@ -27,7 +34,38 @@ function phase(seconds: number) {
   return "Still working. The AI model is slow right now";
 }
 
-export function Interview({ departments, defaultDepartment }: { departments: string[]; defaultDepartment?: string }) {
+function remember(id: string | null) {
+  try {
+    if (id) window.sessionStorage.setItem(STORAGE_KEY, id);
+    else window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage can be blocked; resuming then relies on the Continue button.
+  }
+}
+
+function remembered() {
+  try {
+    return window.sessionStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchInterview(id: string, signal?: AbortSignal): Promise<InterviewState | "gone" | null> {
+  try {
+    const res = await fetch(`/api/interviews/${id}`, { signal, cache: "no-store" });
+    if (res.status === 404) return "gone";
+    const json = (await res.json()) as { ok: boolean; data?: InterviewState };
+    return json.ok && json.data ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+// Wall-clock reads live here, outside render.
+const nowMs = () => Date.now();
+
+export function Interview({ departments, defaultDepartment, resumable }: { departments: string[]; defaultDepartment?: string; resumable?: ResumableInterview | null }) {
   const [department, setDepartment] = useState(defaultDepartment && departments.includes(defaultDepartment) ? defaultDepartment : (departments[0] ?? "Customer Support"));
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -37,72 +75,173 @@ export function Interview({ departments, defaultDepartment }: { departments: str
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const [busy, setBusy] = useState<{ since: number; answer: string } | null>(null);
-  const [failed, setFailed] = useState<{ answer: string; message: string } | null>(null);
+  // The answer being worked on, with the server's elapsed seconds and when they were read.
+  const [busy, setBusy] = useState<{ answer: string; base: number; at: number } | null>(null);
+  const [failed, setFailed] = useState<{ answer: string; message: string; lost?: boolean } | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  // Each answer gets an id; a cancelled or superseded answer's result is ignored.
-  const request = useRef(0);
-  useEffect(() => () => void request.current++, []);
-  useEffect(() => {
-    if (!busy) return;
-    const t = setInterval(() => setElapsed(Math.round((Date.now() - busy.since) / 1000)), 1000);
-    return () => clearInterval(t);
-  }, [busy]);
+  const [resuming, setResuming] = useState(false);
   const router = useRouter();
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [messages]);
+  const known = useRef<Set<string>>(new Set());
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
+  // Takes the server's view of the interview as the truth.
+  const apply = useCallback((s: InterviewState) => {
+    setSessionId(s.id);
+    setDepartment(s.department);
+    setMessages(s.messages);
+    setProcesses(s.processes);
+    setSuggestions(s.suggestions);
+    // New processes start selected; ones the person unticked stay unticked.
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((t) => s.processes.some((p) => p.title === t)));
+      for (const p of s.processes) if (!known.current.has(p.title)) next.add(p.title);
+      known.current = new Set(s.processes.map((p) => p.title));
+      return next;
+    });
+    setBusy(s.pending ? { answer: s.pending.answer, base: s.pending.elapsed, at: nowMs() } : null);
+    setElapsed(s.pending?.elapsed ?? 0);
+    setFailed(s.failed);
+  }, []);
+
+  // Shows a fetched interview, or forgets it when it is gone or already saved.
+  const opened = useCallback(
+    (s: InterviewState | "gone" | null) => {
+      setResuming(false);
+      if (s === "gone" || (s && s.status !== "open")) return remember(null);
+      if (!s) return setError("Could not load the interview. Try again in a moment.");
+      remember(s.id);
+      apply(s);
+    },
+    [apply],
+  );
+
+  // Picks the interview back up after a reload.
+  useEffect(() => {
+    const id = remembered();
+    if (!id) return;
+    const controller = new AbortController();
+    fetchInterview(id, controller.signal).then((s) => {
+      if (!controller.signal.aborted) opened(s);
+    });
+    return () => controller.abort();
+  }, [opened]);
+
+  // While an answer is worked on: follow it on the server, and count the seconds between reads.
+  const polling = busy !== null;
+  useEffect(() => {
+    if (!polling || !sessionId) return;
+    const controller = new AbortController();
+    let misses = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      const s = await fetchInterview(sessionId, controller.signal);
+      if (controller.signal.aborted) return;
+      if (s && s !== "gone") {
+        misses = 0;
+        apply(s);
+        if (s.pending) timer = setTimeout(poll, POLL_MS);
+        return;
+      }
+      if (s === "gone" || ++misses >= MAX_MISSES) {
+        const b = busyRef.current;
+        setBusy(null);
+        if (b) setFailed({ answer: b.answer, message: "Lost contact with the server while it worked on your answer.", lost: true });
+        return;
+      }
+      timer = setTimeout(poll, POLL_MS);
+    };
+    timer = setTimeout(poll, POLL_MS);
+    const tick = setInterval(() => {
+      const b = busyRef.current;
+      if (b) setElapsed(b.base + Math.round((nowMs() - b.at) / 1000));
+    }, 1000);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+      clearInterval(tick);
+    };
+  }, [polling, sessionId, apply]);
+
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [messages]);
 
   const begin = () =>
     start(async () => {
       setError(null);
       const r = await startInterviewAction(department);
       if (!r.ok) return setError(r.error);
-      setSessionId(r.data.id);
-      setSuggestions(r.data.suggestions);
-      setMessages([{ role: "assistant", content: r.data.opening }]);
-      setProcesses([]);
+      remember(r.data.id);
+      known.current = new Set();
+      apply({ id: r.data.id, department, status: "open", messages: [{ role: "assistant", content: r.data.opening }], processes: [], suggestions: r.data.suggestions, pending: null, failed: null });
     });
 
-  const submit = async (answer: string) => {
-    if (!sessionId) return;
-    const id = ++request.current;
-    setError(null);
-    setFailed(null);
-    setElapsed(0);
-    setBusy({ since: Date.now(), answer });
-    const timeout = new Promise<{ ok: false; error: string }>((resolve) => setTimeout(() => resolve({ ok: false, error: "timeout" }), ANSWER_TIMEOUT_MS));
-    const r = await Promise.race([answerInterviewAction(sessionId, answer), timeout]).catch((e: unknown) => ({
-      ok: false as const,
-      error: e instanceof Error ? e.message : "The answer could not be sent.",
-    }));
-    if (id !== request.current) return;
-    setBusy(null);
-    if (!r.ok) {
-      setFailed({ answer, message: r.error === "timeout" ? "This took longer than a minute, so it was stopped." : r.error });
-      return;
-    }
-    setMessages(r.data.messages);
-    setSuggestions(r.data.suggestions);
-    setProcesses(r.data.processes);
-    setSelected(new Set(r.data.processes.map((p) => p.title)));
-  };
-
   const send = () => {
-    if (!sessionId || !draft.trim() || busy) return;
+    if (!sessionId || !draft.trim() || busy || pending) return;
     const answer = draft.trim();
     setDraft("");
+    setError(null);
+    setFailed(null);
     setSuggestions([]);
     setMessages((m) => [...m, { role: "user", content: answer }]);
-    void submit(answer);
+    setBusy({ answer, base: 0, at: nowMs() });
+    setElapsed(0);
+    start(async () => {
+      const r = await answerInterviewAction(sessionId, answer).catch(() => ({ ok: false as const, error: "The answer could not be sent. Check your connection." }));
+      if (r.ok) return apply(r.data);
+      setBusy(null);
+      setMessages((m) => (m.at(-1)?.role === "user" && m.at(-1)?.content === answer ? m.slice(0, -1) : m));
+      setDraft(answer);
+      setError(r.error);
+    });
   };
 
-  // Stops waiting and puts the answer back in the box to edit or send again.
+  const retry = () => {
+    if (!sessionId || !failed) return;
+    const lost = failed.lost;
+    setFailed(null);
+    setError(null);
+    start(async () => {
+      // After a lost connection the turn may well have finished; look before running it again.
+      if (lost) {
+        const s = await fetchInterview(sessionId);
+        if (s && s !== "gone" && !s.failed) return apply(s);
+      }
+      const r = await retryInterviewAction(sessionId).catch(() => ({ ok: false as const, error: "Could not reach the server. Try again." }));
+      if (r.ok) return apply(r.data);
+      setFailed({ answer: failed.answer, message: r.error, lost });
+    });
+  };
+
+  // Takes the answer back and puts it in the box to edit or send again.
   const cancel = () => {
-    if (!busy) return;
-    request.current++;
-    setMessages((m) => (m.at(-1)?.role === "user" ? m.slice(0, -1) : m));
-    setDraft(busy.answer);
+    if (!sessionId || !(busy || failed)) return;
+    const answer = busy?.answer ?? failed?.answer ?? "";
+    start(async () => {
+      const r = await cancelInterviewAction(sessionId).catch(() => null);
+      if (r?.ok) apply(r.data.state);
+      else {
+        setBusy(null);
+        setFailed(null);
+        setMessages((m) => (m.at(-1)?.role === "user" ? m.slice(0, -1) : m));
+      }
+      setDraft(answer);
+    });
+  };
+
+  const restart = () => {
+    remember(null);
+    setSessionId(null);
     setBusy(null);
+    setFailed(null);
+    setMessages([]);
+    setProcesses([]);
+    setSuggestions([]);
+    known.current = new Set();
   };
 
   const save = () =>
@@ -110,6 +249,7 @@ export function Interview({ departments, defaultDepartment }: { departments: str
       if (!sessionId) return;
       const r = await finishInterviewAction(sessionId, [...selected]);
       if (!r.ok) return setError(r.error);
+      remember(null);
       router.push("/processes?status=draft");
     });
 
@@ -129,9 +269,21 @@ export function Interview({ departments, defaultDepartment }: { departments: str
               ))}
             </NativeSelect>
           </div>
-          <Button onClick={begin} disabled={pending}>
-            Start interview
+          <Button onClick={begin} disabled={pending || resuming}>
+            {pending ? "Starting…" : "Start interview"}
           </Button>
+          {resumable ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResuming(true);
+                void fetchInterview(resumable.id).then(opened);
+              }}
+              disabled={pending || resuming}
+            >
+              {resuming ? "Opening…" : `Continue the ${resumable.department} interview (${resumable.answers} answer${resumable.answers === 1 ? "" : "s"})`}
+            </Button>
+          ) : null}
           {error ? (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -148,7 +300,7 @@ export function Interview({ departments, defaultDepartment }: { departments: str
         <CardHeader>
           <CardTitle>{`${department} interview`}</CardTitle>
           <CardAction>
-            <Button variant="ghost" size="sm" onClick={() => setSessionId(null)}>
+            <Button variant="ghost" size="sm" onClick={restart} disabled={pending}>
               Restart
             </Button>
           </CardAction>
@@ -165,7 +317,7 @@ export function Interview({ departments, defaultDepartment }: { departments: str
                 <Loader2 className="size-3.5 animate-spin" />
                 {phase(elapsed)}… <span className="tabular-nums">{elapsed}s</span>
               </span>
-              <Button variant="ghost" size="sm" className="h-7" onClick={cancel}>
+              <Button variant="ghost" size="sm" className="h-7" onClick={cancel} disabled={pending}>
                 Cancel
               </Button>
             </div>
@@ -175,8 +327,11 @@ export function Interview({ departments, defaultDepartment }: { departments: str
               <AlertDescription>
                 <p>{failed.message}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => void submit(failed.answer)}>
+                  <Button size="sm" onClick={retry} disabled={pending}>
                     Retry
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={cancel} disabled={pending}>
+                    Edit answer
                   </Button>
                   {processes.length ? (
                     <Button size="sm" variant="outline" onClick={save}>
