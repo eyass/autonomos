@@ -1,4 +1,5 @@
 import "server-only";
+import { rankByValue, type ProcessValue } from "@autonomos/agents";
 import { proposeProcessesFromSystems, type SystemSample } from "@autonomos/ai";
 import { sandboxStore, sendNotification } from "@autonomos/db";
 import { describeInventory, describeScan, sandboxHistory, scanSystem, SCANNABLE, type SystemScan } from "@autonomos/integrations";
@@ -30,7 +31,8 @@ export type DiscoveryRunView = {
   status: "scanning" | "proposing" | "ready" | "failed";
   systems: RunSystem[];
   summary: string | null;
-  proposals: Array<SystemProcessProposal & { exists: boolean; status: ProposalStatus }>;
+  // value: what the proposal is worth and why (set when the run ranked its proposals).
+  proposals: Array<SystemProcessProposal & { exists: boolean; status: ProposalStatus; value?: ProcessValue }>;
   accepted: string[];
   rejected: string[];
   createdAt: string;
@@ -180,6 +182,18 @@ export async function scanRunSystem(session: Session, runId: string, key: string
   return updated;
 }
 
+// How many suggestions a run puts forward at most: a short list worth reviewing, not an inventory dump.
+const PROPOSALS_SHOWN = 20;
+
+// "Left out 14 lower-value ideas: 6 save under an hour a month, 5 guesses with little at stake, ..."
+export function leftOutLine(dropped: Array<{ reason: string }>) {
+  if (!dropped.length) return "";
+  const counts = new Map<string, number>();
+  for (const d of dropped) counts.set(d.reason, (counts.get(d.reason) ?? 0) + 1);
+  const parts = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([reason, n]) => `${n} ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`);
+  return `Left out ${dropped.length} lower-value idea${dropped.length === 1 ? "" : "s"} (${parts.join("; ")}).`;
+}
+
 export async function proposeFromRun(session: Session, runId: string): Promise<DiscoveryRunView> {
   const run = await loadRun(session, runId);
   if (run.status === "ready") return toView(run, await existingTitles(session));
@@ -206,10 +220,20 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
       rejectedProcesses: await rejectedTitles(session),
       onUsage: (u) => recordUsage(session.org.id, u),
     });
+    // Only what truly adds value is put forward, most valuable first; the summary says what was
+    // left out and why, so nothing disappears silently.
+    const { kept, dropped } = rankByValue(result.processes, session.org.defaultHourlyCost, PROPOSALS_SHOWN);
+    // The summary describes what is shown, not what was generated before filtering.
+    const read = result.summary.match(/^Read [^.]*\./)?.[0] ?? "";
+    const seen = kept.filter((p) => p.value.evidenced).length;
+    const shown = kept.length
+      ? `${kept.length} suggestion${kept.length === 1 ? "" : "s"} worth reviewing, most valuable first${seen < kept.length ? ` (${seen} seen in your data, ${kept.length - seen} likely for a company like yours)` : ""}.`
+      : "Nothing stood out as worth an agent yet.";
+    const summary = [read, shown, leftOutLine(dropped)].filter(Boolean).join(" ");
     // Samples were only needed for this step; the run keeps counts and proposals.
     const { data } = await db
       .from("discovery_runs")
-      .update({ status: "ready", samples: null, summary: result.summary, proposals: result.processes as never, updated_at: new Date().toISOString() })
+      .update({ status: "ready", samples: null, summary, proposals: kept as never, updated_at: new Date().toISOString() })
       .eq("id", runId)
       .select("*")
       .single();

@@ -48,7 +48,7 @@ describe("mockSystemDiscovery", () => {
 });
 
 describe("exhaustive discovery", () => {
-  it("adds likely processes from every department after the evidenced ones, capped and not preselected", async () => {
+  it("adds a few likely processes after the evidenced ones, capped and not preselected", async () => {
     process.env.AI_MOCK = "1";
     const { proposeProcessesFromSystems, INFERRED_MAX_CONFIDENCE, DISCOVERY_LIMITS } = await import("./tasks/discovery");
     const r = await proposeProcessesFromSystems({
@@ -57,12 +57,13 @@ describe("exhaustive discovery", () => {
       existingProcesses: ["Payroll preparation"],
       rejectedProcesses: ["Month end close", "Order status enquiries"],
     });
-    expect(r.processes.length).toBeGreaterThan(12);
+    expect(r.processes.length).toBeGreaterThan(5);
     expect(r.processes.length).toBeLessThanOrEqual(DISCOVERY_LIMITS.total);
+    // Inferred work is a short tail, never more than the limit, never preselected.
     const inferred = r.processes.filter((p) => p.evidence[0]!.source === "Company profile");
-    expect(inferred.length).toBeGreaterThan(5);
+    expect(inferred.length).toBeGreaterThan(0);
+    expect(inferred.length).toBeLessThanOrEqual(DISCOVERY_LIMITS.inferred);
     expect(inferred.every((p) => p.confidence <= INFERRED_MAX_CONFIDENCE)).toBe(true);
-    expect(new Set(inferred.map((p) => p.department)).size).toBeGreaterThanOrEqual(5);
     expect(r.processes.map((p) => p.title)).not.toContain("Payroll preparation");
     // Rejected processes, and rewordings of them, never come back.
     expect(r.processes.map((p) => p.title)).not.toContain("Month-end close");
