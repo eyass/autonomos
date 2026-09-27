@@ -14,7 +14,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { ActionButton } from "@/components/action-button";
 import { createSampleWorkspaceAction } from "./shell-actions";
 
-export const metadata = { title: "Overview" };
+export const metadata = { title: "Home" };
 
 export default async function OverviewPage() {
   const session = await requireSession();
@@ -50,13 +50,13 @@ export default async function OverviewPage() {
     {
       done: (reviewed ?? 0) > 0,
       title: "Approve one process",
-      detail: "Approving finds its automation opportunities.",
+      detail: "Approving finds ideas for automating it.",
       href: firstDraft ? `/processes/${firstDraft.id}` : "/processes?status=draft",
       cta: "Review a draft",
     },
     {
       done: m.opportunities > 0 || m.activeAgents > 0,
-      title: "Pick an opportunity",
+      title: "Pick an automation idea",
       detail: "Ranked by value, difficulty and risk.",
       href: topOpportunity ? `/opportunities/${topOpportunity}` : "/opportunities",
       cta: "Open the top one",
@@ -123,7 +123,7 @@ export default async function OverviewPage() {
   if (!m.processesMapped) {
     return (
       <>
-        <PageHeader title="Overview" description="How autonomous is your company?" />
+        <PageHeader title="Home" description="How autonomous is your company?" />
         {playbookCard}
       </>
     );
@@ -140,7 +140,7 @@ export default async function OverviewPage() {
   const chart = trendData.length > 1 ? trendData : daily;
   return (
     <>
-      <PageHeader title="Overview" />
+      <PageHeader title="Home" />
       {playbookCard}
       <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-3">
         <Card className={chart.length > 1 ? "" : "lg:col-span-3"}>

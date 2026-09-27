@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
-export const metadata = { title: "Activity" };
+export const metadata = { title: "History" };
 
 const ATTENTION = ["warning", "error", "waiting"];
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
@@ -71,7 +71,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Activity" description="Everything agents and people did, across the company." />
+      <PageHeader title="History" description="Everything agents and people did, across the company." />
       <LinkTabs
         items={[
           { href: `/activity?view=attention`, label: `Needs attention${attention ? ` (${attention})` : ""}`, active: view === "attention" },

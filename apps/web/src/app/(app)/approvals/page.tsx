@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
 import { Card } from "@/components/ui/card";
 
-export const metadata = { title: "Approvals" };
+export const metadata = { title: "Inbox" };
 
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const session = await requireSession();
@@ -51,7 +51,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   if (resolved) {
     return (
       <>
-        <PageHeader title="Approvals" description="Every decision is recorded in the audit log." />
+        <PageHeader title="Inbox" description="Every decision is recorded in the audit log." />
         {tabs}
         {data?.length ? (
           <Card>
@@ -102,7 +102,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader title="Approvals" description="Actions waiting for a person to decide." />
+      <PageHeader title="Inbox" description="Actions to approve and work agents handed to you." />
       {tabs}
       {views.length ? (
         <div className="space-y-4">

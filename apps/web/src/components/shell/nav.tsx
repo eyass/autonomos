@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Bot, Check, CheckCircle2, ChevronsUpDown, FlaskConical, Plus, LayoutDashboard, LifeBuoy, Lightbulb, LogOut, Pencil, Plug, Settings, Workflow } from "lucide-react";
+import { Activity, Bot, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Pencil, Plug, Plus, Settings, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
@@ -21,23 +21,25 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const MAIN = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/approvals", label: "Approvals", icon: CheckCircle2 },
-  { href: "/processes", label: "Processes", icon: Workflow },
-  { href: "/opportunities", label: "Opportunities", icon: Lightbulb },
-  { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/activity", label: "Activity", icon: Activity },
+// The loop in five words: see where you stand, answer what waits for you, map the work and
+// what to automate, run agents, look back. Each item says what it holds.
+type NavItem = { href: string; label: string; hint?: string; icon: typeof LayoutDashboard; also?: string[] };
+const MAIN: NavItem[] = [
+  { href: "/", label: "Home", hint: "How autonomous you are", icon: LayoutDashboard },
+  { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox },
+  { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"] },
+  { href: "/agents", label: "Agents", hint: "Doing the work for you", icon: Bot },
+  { href: "/activity", label: "History", hint: "Everything that happened", icon: Activity },
 ];
-const ADMIN = [
+const ADMIN: NavItem[] = [
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/docs", label: "Help", icon: LifeBuoy },
 ];
 
-function isActive(path: string, href: string) {
-  if (href === "/") return path === "/";
-  return path === href || path.startsWith(`${href}/`) || (href === "/processes" && path.startsWith("/discover"));
+function isActive(path: string, item: NavItem) {
+  if (item.href === "/") return path === "/";
+  return [item.href, ...(item.also ?? [])].some((h) => path === h || path.startsWith(`${h}/`));
 }
 
 // The application sidebar, following the shadcn sidebar-07 block: collapses to icons on
@@ -68,28 +70,39 @@ export function AppSidebar({
   const path = usePathname();
   const [pending, start] = useTransition();
   const { setOpenMobile } = useSidebar();
-  const group = (items: typeof MAIN) => (
+  const group = (items: NavItem[]) => (
     <SidebarGroup>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map(({ href, label, icon: Icon }) => (
-            <SidebarMenuItem key={href}>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive(path, href)}
-                tooltip={label}
-                className="relative data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-highlight"
-              >
-                <Link href={href} onClick={() => setOpenMobile(false)}>
-                  <Icon />
-                  <span>{label}</span>
-                </Link>
-              </SidebarMenuButton>
-              {href === "/approvals" && pendingApprovals > 0 ? (
-                <SidebarMenuBadge className="rounded-full bg-highlight text-highlight-foreground peer-data-[active=true]/menu-button:text-highlight-foreground">{pendingApprovals}</SidebarMenuBadge>
-              ) : null}
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const { href, label, hint, icon: Icon } = item;
+            return (
+              <SidebarMenuItem key={href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive(path, item)}
+                  tooltip={hint ? `${label}: ${hint}` : label}
+                  size={hint ? "lg" : "default"}
+                  className="relative data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-highlight"
+                >
+                  <Link href={href} onClick={() => setOpenMobile(false)}>
+                    <Icon />
+                    {hint ? (
+                      <span className="flex min-w-0 flex-col leading-tight">
+                        <span>{label}</span>
+                        <span className="truncate text-xs font-normal text-muted-foreground">{hint}</span>
+                      </span>
+                    ) : (
+                      <span>{label}</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+                {href === "/approvals" && pendingApprovals > 0 ? (
+                  <SidebarMenuBadge className="rounded-full bg-highlight text-highlight-foreground peer-data-[active=true]/menu-button:text-highlight-foreground">{pendingApprovals}</SidebarMenuBadge>
+                ) : null}
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

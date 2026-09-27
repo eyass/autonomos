@@ -8,10 +8,11 @@ import { ButtonLink } from "@/components/app/button-link";
 import { EmptyState } from "@/components/app/empty-state";
 import { LinkTabs } from "@/components/app/link-tabs";
 import { PageHeader } from "@/components/app/page-header";
+import { WorkTabs } from "@/components/app/work-tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const metadata = { title: "Opportunities" };
+export const metadata = { title: "Automation ideas" };
 
 export default async function OpportunitiesPage({ searchParams }: { searchParams: Promise<{ process?: string; status?: string }> }) {
   const session = await requireSession();
@@ -32,10 +33,11 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   if (!list.length && !q.process && !q.status) {
     return (
       <>
-        <PageHeader title="Opportunities" description="Where agents should take over work, ranked by value, difficulty and risk." />
+        <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." />
+        <WorkTabs active="ideas" />
         <EmptyState
-          title="No opportunities yet."
-          description="Review a process, then ask AutonomOS to find automation opportunities in it."
+          title="No automation ideas yet."
+          description="Approve a process and AutonomOS suggests where an agent could take over."
           action={<ButtonLink href="/processes">Go to processes</ButtonLink>}
         />
       </>
@@ -45,22 +47,23 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   const rejected = q.status === "rejected";
   return (
     <>
-      <PageHeader title="Opportunities" description="Where agents should take over work, best first." />
+      <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." />
+      <WorkTabs active="ideas" />
       <LinkTabs
         items={[
-          { href: "/opportunities", label: "Open", active: !rejected },
+          { href: "/opportunities", label: "Open ideas", active: !rejected },
           { href: "/opportunities?status=rejected", label: "Rejected", active: rejected },
         ]}
       />
       {!list.length ? (
-        <EmptyState title={rejected ? "No rejected opportunities." : "No open opportunities."} />
+        <EmptyState title={rejected ? "No rejected ideas." : "No open ideas."} />
       ) : (
         <>
           <Card className="@container mb-6 gap-0 overflow-hidden py-0 sm:py-0">
             <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 sm:[&_td:first-child]:pl-6 sm:[&_th:first-child]:pl-6">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Opportunity</TableHead>
+                  <TableHead>Idea</TableHead>
                   <TableHead className="hidden @lg:table-cell">Hours saved</TableHead>
                   <TableHead className="hidden @4xl:table-cell">Scores</TableHead>
                   <TableHead className="hidden @2xl:table-cell">Autonomy</TableHead>
