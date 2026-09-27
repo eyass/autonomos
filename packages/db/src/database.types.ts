@@ -495,13 +495,13 @@ isOneToOne: false
                   ]
                 },"discovery_sessions": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"department_id": string | null,"department_name": string | null,"extracted": NonNullable<Json>,"id": string,"messages": NonNullable<Json>,"method": Database["public"]['Enums']["discovery_source"],"organization_id": string,"status": string,"updated_at": string
+                    "created_at": string,"created_by": string | null,"department_id": string | null,"department_name": string | null,"extracted": NonNullable<Json>,"id": string,"messages": NonNullable<Json>,"method": Database["public"]['Enums']["discovery_source"],"organization_id": string,"pending_answer": string | null,"pending_since": string | null,"status": string,"suggestions": NonNullable<Json>,"turn_error": string | null,"updated_at": string
                   }
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"department_id"?: string | null,"department_name"?: string | null,"extracted"?: NonNullable<Json>,"id"?: string,"messages"?: NonNullable<Json>,"method"?: Database["public"]['Enums']["discovery_source"],"organization_id": string,"status"?: string,"updated_at"?: string
+                    "created_at"?: string,"created_by"?: string | null,"department_id"?: string | null,"department_name"?: string | null,"extracted"?: NonNullable<Json>,"id"?: string,"messages"?: NonNullable<Json>,"method"?: Database["public"]['Enums']["discovery_source"],"organization_id": string,"pending_answer"?: string | null,"pending_since"?: string | null,"status"?: string,"suggestions"?: NonNullable<Json>,"turn_error"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"department_id"?: string | null,"department_name"?: string | null,"extracted"?: NonNullable<Json>,"id"?: string,"messages"?: NonNullable<Json>,"method"?: Database["public"]['Enums']["discovery_source"],"organization_id"?: string,"status"?: string,"updated_at"?: string
+                    "created_at"?: string,"created_by"?: string | null,"department_id"?: string | null,"department_name"?: string | null,"extracted"?: NonNullable<Json>,"id"?: string,"messages"?: NonNullable<Json>,"method"?: Database["public"]['Enums']["discovery_source"],"organization_id"?: string,"pending_answer"?: string | null,"pending_since"?: string | null,"status"?: string,"suggestions"?: NonNullable<Json>,"turn_error"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {

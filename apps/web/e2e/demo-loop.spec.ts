@@ -82,8 +82,19 @@ test("demo loop", async ({ page }) => {
   await page.getByRole("button", { name: "Start interview" }).click();
   await page.getByRole("button", { name: /Answer tickets, approve refunds/ }).click();
   await expect(page.getByLabel("Your answer")).toHaveValue(/Answer tickets, approve refunds/);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (e) => pageErrors.push(e.message));
   await page.getByRole("button", { name: "Send" }).click();
+  // The answer is worked on by the server: switching tabs meanwhile neither breaks the page
+  // nor loses the answer, and a reload picks the interview back up.
+  await page.getByRole("tab", { name: "Document" }).click();
+  await expect(page).toHaveURL(/tab=document/);
+  await expect(page.getByText("Import a document")).toBeVisible();
+  await page.getByRole("tab", { name: "Interview" }).click();
   await expect(page.getByText("Refund request handling")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Refund request handling")).toBeVisible();
+  expect(pageErrors).toEqual([]);
   await shot(page, "interview");
   await page.getByRole("button", { name: /Save \d+ to inventory/ }).click();
   await expect(page).toHaveURL(/\/processes/);
