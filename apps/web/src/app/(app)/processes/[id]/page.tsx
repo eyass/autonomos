@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { LevelChange, Scores, StatusBadge } from "@/components/domain";
@@ -9,14 +10,17 @@ import { ProcessEditor } from "./editor";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
 import { StatStrip } from "@/components/app/stat-card";
+import { processGaps } from "@/lib/process-gaps";
+import { LifecycleHelp } from "@/components/app/lifecycle-help";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const SOURCE_LABEL = { interview: "AI interview", document: "Imported document", integration: "Connected systems", manual: "Added manually", website: "Drafted from your website" } as const;
 
-export default async function ProcessPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProcessPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
   const { id } = await params;
+  const { edit } = await searchParams;
   const session = await requireSession();
   const supabase = await createClient();
   const { data: p } = await supabase
@@ -54,6 +58,7 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
   ).sort((a, b) => a.position - b.position);
   const systems = ((p.process_systems as unknown as Array<{ system: string }>) ?? []).map((s) => s.system);
   const roles = ((p.process_people as unknown as Array<{ role: string }>) ?? []).map((r) => r.role);
+  const gaps = processGaps({ ...p, stepsCount: steps.length, systemsCount: systems.length });
   // Structured picks for the editor: connected systems first, then what other processes use.
   const connectedKeys = new Set((connected ?? []).map((c) => c.integration_key));
   const systemOptions = uniqueOptions([
@@ -86,6 +91,7 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={p.status} />
             <span>{dept?.name ?? "No department"}</span>
+            <LifecycleHelp kind="process" />
             {p.confidence !== null && Number(p.confidence) < 0.6 ? <Badge variant="warning">AI confidence {pct(Number(p.confidence))}</Badge> : null}
           </span>
         }
@@ -102,7 +108,12 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
               </ActionButton>
             ) : null}
             {p.status !== "archived" ? (
-              <ActionButton variant="ghost" confirm="Archive this process?" confirmLabel="Archive" action={setProcessStatusAction.bind(null, id, "archived")}>
+              <ActionButton
+                variant="ghost"
+                confirm="Archive this process? It leaves lists and metrics; Restore undoes it."
+                confirmLabel="Archive"
+                action={setProcessStatusAction.bind(null, id, "archived")}
+              >
                 Archive
               </ActionButton>
             ) : (
@@ -119,13 +130,21 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
           <AlertDescription>Draft. Check the steps and numbers, then approve to find its automation opportunities.</AlertDescription>
         </Alert>
       ) : null}
-      {p.missing_information.length ? (
+      {gaps.length ? (
         <Alert variant="warning" className="mb-4">
           <AlertDescription>
-            <div className="font-medium">Missing information</div>
-            <ul className="mt-1 list-inside list-disc">
-              {p.missing_information.map((m) => (
-                <li key={m}>{m}</li>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">To make the numbers reliable, add</span>
+              <Link href={`/processes/${id}?edit=1#edit`} className="text-xs font-medium underline">
+                Add now
+              </Link>
+            </div>
+            <ul className="mt-1 space-y-0.5">
+              {gaps.map((m) => (
+                <li key={m} className="flex items-start gap-2">
+                  <span className="mt-1.5 size-2 shrink-0 rounded-sm border border-current" aria-hidden />
+                  {m}
+                </li>
               ))}
             </ul>
           </AlertDescription>
@@ -178,6 +197,7 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
             </CardContent>
           </Card>
           <ProcessEditor
+            startOpen={edit === "1"}
             id={id}
             departments={departments ?? []}
             systemOptions={systemOptions}

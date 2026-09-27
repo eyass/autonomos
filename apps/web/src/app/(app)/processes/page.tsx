@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { processGaps } from "@/lib/process-gaps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const metadata = { title: "Processes" };
@@ -32,7 +33,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     supabase
       .from("processes")
       .select(
-        "id, title, status, frequency, department_id, estimated_occurrences_per_month, estimated_minutes_per_occurrence, current_autonomy_level, potential_autonomy_level, business_value, automation_difficulty, risk_level, confidence, departments(name)",
+        "id, title, status, frequency, department_id, estimated_occurrences_per_month, estimated_minutes_per_occurrence, missing_information, current_autonomy_level, potential_autonomy_level, business_value, automation_difficulty, risk_level, confidence, departments(name)",
       )
       .eq("organization_id", session.org.id),
     supabase.from("agents").select("process_id, autonomy_level").eq("organization_id", session.org.id).eq("status", "active"),
@@ -148,16 +149,16 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
       >
         <Input name="q" placeholder="Search processes" defaultValue={q.q} aria-label="Search processes" className="flex-1 sm:max-w-72" />
       </FilterBar>
-      <Card className="gap-0 overflow-hidden py-0 sm:py-0">
+      <Card className="@container gap-0 overflow-hidden py-0 sm:py-0">
         <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 sm:[&_td:first-child]:pl-6 sm:[&_th:first-child]:pl-6">
           <TableHeader>
             <TableRow>
               <TableHead>Process</TableHead>
-              <TableHead className="hidden lg:table-cell">Department</TableHead>
-              <TableHead className="hidden md:table-cell">Monthly time</TableHead>
-              <TableHead className="hidden md:table-cell">Autonomy</TableHead>
-              <TableHead className="hidden lg:table-cell">Scores</TableHead>
-              <TableHead className="text-right sm:text-left">Status</TableHead>
+              <TableHead className="hidden @4xl:table-cell">Department</TableHead>
+              <TableHead className="hidden @2xl:table-cell">Monthly time</TableHead>
+              <TableHead className="hidden @2xl:table-cell">Autonomy</TableHead>
+              <TableHead className="hidden @4xl:table-cell">Scores</TableHead>
+              <TableHead className="text-right @lg:text-left">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -165,29 +166,37 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
               const dept = (p.departments as unknown as { name: string } | null)?.name;
               return (
                 <TableRow key={p.id} className="hover:bg-muted/50">
-                  <TableCell>
-                    <Link href={`/processes/${p.id}`} className="font-medium hover:underline">
+                  <TableCell className="w-full max-w-0 whitespace-normal">
+                    <Link href={`/processes/${p.id}`} title={p.title} className="line-clamp-2 font-medium break-words hover:underline">
                       {p.title}
                     </Link>
-                    <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground md:hidden">
+                    <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground @2xl:hidden">
                       <span>{hours(monthly(p))} / month</span>
                       <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
                     </div>
-                    <div className="hidden text-xs text-muted-foreground md:block lg:hidden">{dept}</div>
-                    {p.confidence !== null && Number(p.confidence) < 0.6 ? <div className="text-xs text-warning">Low confidence, needs review</div> : null}
+                    <div className="hidden text-xs text-muted-foreground @2xl:block @4xl:hidden">{dept}</div>
+                    {(() => {
+                      const gaps = processGaps(p);
+                      return gaps.length ? (
+                        <Link href={`/processes/${p.id}?edit=1#edit`} className="block text-xs text-warning hover:underline">
+                          Add: {gaps.slice(0, 2).join(", ").toLowerCase()}
+                          {gaps.length > 2 ? ` and ${gaps.length - 2} more` : ""}
+                        </Link>
+                      ) : null;
+                    })()}
                   </TableCell>
-                  <TableCell className="hidden text-muted-foreground lg:table-cell">{dept ?? "–"}</TableCell>
-                  <TableCell className="hidden tabular-nums md:table-cell">
+                  <TableCell className="hidden text-muted-foreground @4xl:table-cell">{dept ?? "–"}</TableCell>
+                  <TableCell className="hidden tabular-nums @2xl:table-cell">
                     {hours(monthly(p))}
                     <div className="text-xs text-muted-foreground">{FREQUENCY_LABEL[p.frequency]}</div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  <TableCell className="hidden @2xl:table-cell">
                     <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
+                  <TableCell className="hidden @4xl:table-cell">
                     <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />
                   </TableCell>
-                  <TableCell className="text-right sm:text-left">
+                  <TableCell className="text-right @lg:text-left">
                     <StatusBadge status={p.status} />
                   </TableCell>
                 </TableRow>

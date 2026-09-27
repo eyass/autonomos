@@ -56,15 +56,15 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
         <EmptyState title={rejected ? "No rejected opportunities." : "No open opportunities."} />
       ) : (
         <>
-          <Card className="mb-6 gap-0 overflow-hidden py-0 sm:py-0">
+          <Card className="@container mb-6 gap-0 overflow-hidden py-0 sm:py-0">
             <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 sm:[&_td:first-child]:pl-6 sm:[&_th:first-child]:pl-6">
               <TableHeader>
                 <TableRow>
                   <TableHead>Opportunity</TableHead>
-                  <TableHead className="hidden sm:table-cell">Hours saved</TableHead>
-                  <TableHead className="hidden lg:table-cell">Scores</TableHead>
-                  <TableHead className="hidden md:table-cell">Autonomy</TableHead>
-                  <TableHead className="hidden md:table-cell">Status</TableHead>
+                  <TableHead className="hidden @lg:table-cell">Hours saved</TableHead>
+                  <TableHead className="hidden @4xl:table-cell">Scores</TableHead>
+                  <TableHead className="hidden @2xl:table-cell">Autonomy</TableHead>
+                  <TableHead className="hidden @2xl:table-cell">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -72,29 +72,29 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                   const proc = o.processes as unknown as { id: string; title: string } | null;
                   return (
                     <TableRow key={o.id} className="hover:bg-muted/50">
-                      <TableCell>
-                        <Link href={`/opportunities/${o.id}`} className="font-medium hover:underline">
+                      <TableCell className="w-full max-w-0 whitespace-normal">
+                        <Link href={`/opportunities/${o.id}`} title={o.title} className="line-clamp-2 font-medium break-words hover:underline">
                           {o.title}
                         </Link>
                         <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground">
                           {proc ? <span>{proc.title}</span> : null}
-                          <span className="sm:hidden">{num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month</span>
-                          <span className="md:hidden">
+                          <span className="@lg:hidden">{num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month</span>
+                          <span className="@2xl:hidden">
                             <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden tabular-nums sm:table-cell">
+                      <TableCell className="hidden tabular-nums @lg:table-cell">
                         {num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month
                         <div className="text-xs text-muted-foreground">{money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}</div>
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell">
+                      <TableCell className="hidden @4xl:table-cell">
                         <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} />
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
+                      <TableCell className="hidden @2xl:table-cell">
                         <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
+                      <TableCell className="hidden @2xl:table-cell">
                         <StatusBadge status={o.status} />
                       </TableCell>
                     </TableRow>

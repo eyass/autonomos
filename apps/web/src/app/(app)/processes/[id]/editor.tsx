@@ -41,14 +41,16 @@ export function ProcessEditor({
   departments,
   systemOptions,
   roleOptions,
+  startOpen = false,
 }: {
   id: string;
   initial: Initial;
   departments: Array<{ id: string; name: string }>;
   systemOptions: TagOption[];
   roleOptions: TagOption[];
+  startOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [v, setV] = useState(initial);
   const dirty = open && JSON.stringify(v) !== JSON.stringify(initial);
   // Leaving the page with unsaved edits asks first.
@@ -75,7 +77,7 @@ export function ProcessEditor({
 
   if (!open) {
     return (
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button id="edit" variant="outline" onClick={() => setOpen(true)}>
         Edit process
       </Button>
     );
@@ -94,7 +96,7 @@ export function ProcessEditor({
   );
 
   return (
-    <Card>
+    <Card id="edit" className="scroll-mt-4">
       <CardHeader>
         <CardTitle>Edit process</CardTitle>
         <CardDescription>Your corrections are kept and used for opportunity analysis.</CardDescription>

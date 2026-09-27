@@ -11,6 +11,7 @@ import { setOpportunityStatusAction } from "../actions";
 import { ButtonLink } from "@/components/app/button-link";
 import { PageHeader } from "@/components/app/page-header";
 import { StatStrip } from "@/components/app/stat-card";
+import { LifecycleHelp } from "@/components/app/lifecycle-help";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
             <Link href={`/processes/${proc.id}`} className="hover:underline">
               {proc.title}
             </Link>
+            <LifecycleHelp kind="opportunity" />
           </span>
         }
         actions={
@@ -82,18 +84,28 @@ export default async function OpportunityPage({ params, searchParams }: { params
                 </ActionButton>
               ) : (
                 <>
-                  <ActionButton variant="ghost" action={setOpportunityStatusAction.bind(null, id, "archived")} confirm="Mark this opportunity as done?" confirmLabel="Mark done">
+                  <ActionButton
+                    variant="outline"
+                    action={setOpportunityStatusAction.bind(null, id, "archived")}
+                    confirm="Mark this opportunity as done? It stays in the list as done; Reopen undoes it."
+                    confirmLabel="Mark done"
+                  >
                     Mark done
                   </ActionButton>
                   <ActionButton
-                    variant="ghost"
+                    variant="outline"
                     action={setOpportunityStatusAction.bind(null, id, "reviewing")}
-                    confirm="Put this opportunity on hold? A live agent is paused."
+                    confirm="Put this opportunity on hold? A live agent is paused until you reopen it."
                     confirmLabel="Put on hold"
                   >
                     Hold
                   </ActionButton>
-                  <ActionButton variant="ghost" action={setOpportunityStatusAction.bind(null, id, "rejected")} confirm="Reject this opportunity? A live agent is paused." confirmLabel="Reject">
+                  <ActionButton
+                    variant="outline"
+                    action={setOpportunityStatusAction.bind(null, id, "rejected")}
+                    confirm="Reject this opportunity? A live agent is paused. Reopen undoes it."
+                    confirmLabel="Reject"
+                  >
                     Reject
                   </ActionButton>
                 </>
@@ -114,7 +126,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
                 </ActionButton>
               ) : null}
               {o.status !== "rejected" ? (
-                <ActionButton variant="ghost" action={setOpportunityStatusAction.bind(null, id, "rejected")}>
+                <ActionButton variant="outline" action={setOpportunityStatusAction.bind(null, id, "rejected")} confirm="Reject this opportunity? Reopen undoes it." confirmLabel="Reject">
                   Reject
                 </ActionButton>
               ) : (
