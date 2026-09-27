@@ -1,6 +1,9 @@
-import { ArrowRight, Bot, Check, FileSearch, Gauge, ListChecks, Lock, OctagonX, ScrollText, ShieldCheck, Target, Wallet } from "lucide-react";
+import { OG_IMAGES } from "@/components/marketing/config";
+import { ArrowRight, Bot, Check, FileSearch, ListChecks, Lock, OctagonX, ScrollText, ShieldCheck, Target, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import { CONTACT_EMAIL } from "@/components/marketing/site";
+import { HeroRun } from "@/components/marketing/hero-run";
+import { LevelMeter } from "@/components/brand/logo";
 import { ButtonLink } from "@/components/app/button-link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -12,7 +15,7 @@ export const metadata: Metadata = {
   title: { absolute: title },
   description,
   alternates: { canonical: "/" },
-  openGraph: { title, description, url: "/", type: "website", siteName: "AutonomOS" },
+  openGraph: { title, description, url: "/", type: "website", siteName: "AutonomOS", images: OG_IMAGES },
 };
 
 const STEPS = [
@@ -57,31 +60,43 @@ export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-border bg-brand-strong text-white">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60rem_30rem_at_85%_-10%,rgba(232,85,45,0.28),transparent_60%),radial-gradient(40rem_24rem_at_0%_110%,rgba(94,158,151,0.35),transparent_60%)]"
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium">
-            <span aria-hidden className="size-1.5 rounded-full bg-highlight" />
-            Now accepting design partners
-          </span>
-          <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl sm:leading-[1.05]">
-            Automate the recurring work, with agents you can <span className="text-highlight">trust with real actions.</span>
-          </h1>
-          <p className="mt-6 max-w-2xl text-base text-white/75 sm:text-lg">
-            Recurring operational work eats your team&apos;s time. Most AI automation projects stall anyway, because nobody knows what to automate first, or trusts an agent to issue a refund or update
-            a customer record.
-          </p>
-          <p className="mt-4 max-w-2xl text-base font-medium text-white sm:text-lg">{description}</p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <ButtonLink href="/signup" size="lg" className="bg-white text-brand-strong hover:bg-white/90">
-              Start free <ArrowRight size={16} />
-            </ButtonLink>
-            <ButtonLink href="#how-it-works" size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white">
-              See how it works
-            </ButtonLink>
+      <section className="relative overflow-hidden border-b border-border bg-ink text-ink-foreground">
+        <div aria-hidden className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_70%_30%,black,transparent_75%)]" />
+        <div aria-hidden className="pointer-events-none absolute -right-40 -top-40 size-[36rem] rounded-full bg-highlight/20 blur-3xl" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
+          <div>
+            <span className="eyebrow inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-white/80">
+              <span aria-hidden className="signal-pulse size-1.5 rounded-full bg-highlight" />
+              Now accepting design partners
+            </span>
+            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.03em] sm:text-6xl sm:leading-[1.02]">
+              Automate the recurring work, with agents you can <span className="text-highlight">trust with real actions.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-base text-white/70 sm:text-lg">
+              Most AI automation stalls: nobody knows what to automate first, or trusts an agent to issue a refund or update a customer record. {description}
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <ButtonLink href="/signup" size="lg" className="bg-highlight text-highlight-foreground hover:bg-highlight/90">
+                Start free <ArrowRight size={16} />
+              </ButtonLink>
+              <ButtonLink href="#how-it-works" size="lg" variant="outline" className="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                See how it works
+              </ButtonLink>
+            </div>
+            <dl className="mt-10 flex flex-wrap gap-x-8 gap-y-3 font-mono text-xs text-white/55">
+              <div className="flex items-center gap-2">
+                <LevelMeter level={5} tone="inverted" className="h-3" />
+                <dt className="sr-only">Autonomy</dt>
+                <dd>L1 to L5, raised one level at a time</dd>
+              </div>
+              <div>
+                <dt className="sr-only">Safety</dt>
+                <dd>Every write checked in code</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="flex justify-center pb-8 lg:justify-end">
+            <HeroRun />
           </div>
         </div>
       </section>
@@ -97,11 +112,11 @@ export default function LandingPage() {
               <li key={s.label}>
                 <Card className="h-full p-5">
                   <div className="flex items-center gap-3">
-                    <span className="flex size-9 items-center justify-center rounded-md bg-highlight-soft text-highlight-strong">
+                    <span className="flex size-9 items-center justify-center rounded-md bg-brand text-white">
                       <s.icon size={18} />
                     </span>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Step {i + 1} · {s.label}
+                    <span className="eyebrow text-muted-foreground">
+                      {String(i + 1).padStart(2, "0")} · {s.label}
                     </span>
                   </div>
                   <h3 className="mt-4 text-base font-semibold">{s.title}</h3>
@@ -119,16 +134,20 @@ export default function LandingPage() {
           <SectionHeading eyebrow="Control plane" title="Autonomy you raise one level at a time">
             Every agent runs at an explicit autonomy level. You move it up when its record earns it, and down the moment it does not.
           </SectionHeading>
-          <ol className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <ol className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
             {LEVELS.map((l, i) => (
-              <li key={l.level} className="rounded-lg border border-border bg-background p-4">
-                <div className="flex items-center gap-2">
-                  <span className="rounded px-1.5 py-0.5 text-xs font-semibold text-white" style={{ background: `var(--level-${i + 1})` }}>
+              <li key={l.level} className="flex flex-col rounded-lg border border-border bg-background p-4 lg:min-h-[var(--h)]" style={{ "--h": `${9 + i * 2.25}rem` } as React.CSSProperties}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold" style={{ color: `var(--level-${Math.max(i + 1, 3)})` }}>
                     {l.level}
                   </span>
-                  <span className="text-sm font-semibold">{l.name}</span>
+                  <LevelMeter level={i + 1} tone={i === 4 ? "signal" : "levels"} />
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{l.body}</p>
+                <span className="mt-3 text-sm font-semibold">{l.name}</span>
+                <p className="mt-1 text-sm text-muted-foreground">{l.body}</p>
+                <span aria-hidden className="mt-auto block pt-4">
+                  <span className="block h-1 rounded-full" style={{ background: i === 4 ? "var(--highlight)" : `var(--level-${i + 1})` }} />
+                </span>
               </li>
             ))}
           </ol>
@@ -218,10 +237,10 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section>
+      <section className="bg-grid-light">
         <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-16 sm:px-6 sm:py-20 md:flex-row md:items-center md:justify-between">
           <div className="flex gap-3">
-            <Gauge size={22} className="mt-1 shrink-0 text-primary" />
+            <LevelMeter level={5} tone="signal" className="mt-1.5 h-5" />
             <div>
               <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">How autonomous is your company?</h2>
               <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">Set up your company in a few minutes. Your first agent runs on sandbox data before it touches a live account.</p>
@@ -244,7 +263,10 @@ export default function LandingPage() {
 function SectionHeading({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
   return (
     <div className="max-w-2xl">
-      <p className="text-xs font-medium uppercase tracking-wide text-highlight-strong">{eyebrow}</p>
+      <p className="eyebrow flex items-center gap-2 text-highlight-strong">
+        <span aria-hidden className="h-3 w-1 rounded-full bg-highlight" />
+        {eyebrow}
+      </p>
       <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
       {children ? <p className="mt-3 text-sm text-muted-foreground sm:text-base">{children}</p> : null}
     </div>

@@ -3,7 +3,21 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Pages anyone can read. They render without Supabase, so they also work on a deployment
 // that has no Supabase configuration.
-const SITE_PATHS = ["/landing", "/security", "/docs", "/terms", "/privacy", "/login", "/signup", "/forgot-password", "/reset-password", "/robots.txt", "/sitemap.xml"];
+const SITE_PATHS = [
+  "/landing",
+  "/security",
+  "/docs",
+  "/terms",
+  "/privacy",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/opengraph-image",
+  "/apple-icon",
+];
 // Public, but they need Supabase to do anything useful.
 const AUTH_PATHS = ["/auth", "/api/webhooks", "/api/integrations/callback"];
 const LANDING = "/landing";

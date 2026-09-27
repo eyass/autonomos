@@ -1,3 +1,4 @@
+import { OG_IMAGES } from "@/components/marketing/config";
 import type { Metadata } from "next";
 import { CONTACT_EMAIL, DraftNotice, PageIntro, Prose, SubprocessorTable } from "@/components/marketing/site";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   title: "Privacy policy",
   description,
   alternates: { canonical: "/privacy" },
-  openGraph: { title: "Privacy policy · AutonomOS", description, url: "/privacy", type: "article" },
+  openGraph: { title: "Privacy policy · AutonomOS", description, url: "/privacy", type: "article", images: OG_IMAGES },
 };
 
 export default function PrivacyPage() {

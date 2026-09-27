@@ -1,3 +1,4 @@
+import { OG_IMAGES } from "@/components/marketing/config";
 import type { Metadata } from "next";
 import { PageIntro, Prose, SECURITY_EMAIL, SubprocessorTable } from "@/components/marketing/site";
 
@@ -7,7 +8,7 @@ export const metadata: Metadata = {
   title: "Security",
   description,
   alternates: { canonical: "/security" },
-  openGraph: { title: "Security · AutonomOS", description, url: "/security", type: "article" },
+  openGraph: { title: "Security · AutonomOS", description, url: "/security", type: "article", images: OG_IMAGES },
 };
 
 const FLOW = [

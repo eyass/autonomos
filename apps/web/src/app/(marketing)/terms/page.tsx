@@ -1,3 +1,4 @@
+import { OG_IMAGES } from "@/components/marketing/config";
 import type { Metadata } from "next";
 import { CONTACT_EMAIL, DraftNotice, PageIntro, Prose } from "@/components/marketing/site";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   title: "Terms of service",
   description,
   alternates: { canonical: "/terms" },
-  openGraph: { title: "Terms of service · AutonomOS", description, url: "/terms", type: "article" },
+  openGraph: { title: "Terms of service · AutonomOS", description, url: "/terms", type: "article", images: OG_IMAGES },
 };
 
 export default function TermsPage() {
