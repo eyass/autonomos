@@ -16,8 +16,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await requireSession();
   if (!session.org.onboardingCompletedAt) redirect(session.org.onboardingStep === "connect" ? "/onboarding/connect" : "/onboarding/about");
   const supabase = await createClient();
-  const [{ count: pending }, { data: notifications }, { data: connections }] = await Promise.all([
+  const [{ count: pending }, { count: handoffs }, { data: notifications }, { data: connections }] = await Promise.all([
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "pending"),
+    supabase.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("outcome", "escalated").is("handled_at", null),
     supabase.from("notifications").select("id, title, body, link, created_at, read_at").eq("organization_id", session.org.id).order("created_at", { ascending: false }).limit(15),
     supabase.from("integration_connections").select("provider").eq("organization_id", session.org.id).eq("status", "connected"),
   ]);
@@ -29,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar
-        pendingApprovals={pending ?? 0}
+        pendingApprovals={(pending ?? 0) + (handoffs ?? 0)}
         orgName={session.org.name}
         orgId={session.org.id}
         workspaces={workspaces}

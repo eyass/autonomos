@@ -126,7 +126,7 @@ export function ProposalReview({ run, onReadAgain }: { run: DiscoveryRunView; on
               ) : (
                 <Badge variant="outline">Likely for a company like yours</Badge>
               )}
-              {current.kind === "improvement" ? <Badge variant="info">New opportunity</Badge> : null}
+              {current.kind === "improvement" ? <Badge variant="info">New idea</Badge> : null}
               {current.department ? <Badge variant="secondary">{current.department}</Badge> : null}
               {current.confidence > INFERRED && current.confidence < 0.5 ? <Badge variant="warning">Weak evidence</Badge> : null}
             </div>

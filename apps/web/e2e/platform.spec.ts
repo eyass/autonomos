@@ -15,7 +15,7 @@ test("sample workspace, approval limits and API keys", async ({ page, request })
   await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");
   await page.getByRole("button", { name: "Create company" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Processes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Work" })).toBeVisible();
   await page.goto("/");
   await expect(page.getByText("Your first agent")).toBeVisible();
 

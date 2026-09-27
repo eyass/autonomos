@@ -17,7 +17,7 @@ const LIFECYCLES = {
     flow: ["Draft", "Reviewed", "Active", "Archived"],
     notes: [
       ["Draft", "Drafted by AutonomOS or someone on the team. Check it, then approve."],
-      ["Reviewed", "Approved. AutonomOS looks for automation opportunities in it."],
+      ["Reviewed", "Approved. AutonomOS looks for ideas to automate it."],
       ["Active", "An agent handles part of this work."],
       ["Archived", "Hidden from lists and metrics. Restore to undo."],
     ],

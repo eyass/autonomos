@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ButtonLink } from "@/components/app/button-link";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
+import { WorkTabs } from "@/components/app/work-tabs";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -71,7 +72,8 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
   if (!rows?.length) {
     return (
       <>
-        <PageHeader title="Processes" description="The recurring work your teams do today." actions={actions} />
+        <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." actions={actions} />
+        <WorkTabs active="processes" />
         <EmptyState
           title="No processes yet."
           description="Describe how your team works and AutonomOS turns it into a structured inventory you can review."
@@ -84,7 +86,8 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
   const active = [q.department, q.status, q.autonomy, q.risk, q.value].filter(Boolean).length;
   return (
     <>
-      <PageHeader title="Processes" description="The recurring work your teams do today." actions={actions} />
+      <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." actions={actions} />
+      <WorkTabs active="processes" />
       {q.drafted ? (
         <Alert variant="agent" className="mb-4">
           <Sparkles />

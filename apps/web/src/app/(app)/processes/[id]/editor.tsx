@@ -99,7 +99,7 @@ export function ProcessEditor({
     <Card id="edit" className="scroll-mt-4">
       <CardHeader>
         <CardTitle>Edit process</CardTitle>
-        <CardDescription>Your corrections are kept and used for opportunity analysis.</CardDescription>
+        <CardDescription>Your corrections are kept and used when looking for automation ideas.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <FormField label="Name">

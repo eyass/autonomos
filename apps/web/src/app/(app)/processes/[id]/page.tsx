@@ -85,7 +85,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
   return (
     <>
       <PageHeader
-        back={{ href: "/processes", label: "Processes" }}
+        back={{ href: "/processes", label: "Work" }}
         title={p.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -98,13 +98,13 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
         actions={
           <>
             {p.status === "draft" ? (
-              <ActionButton action={approveProcessAction.bind(null, id)} pendingLabel="Approving and finding opportunities…">
+              <ActionButton action={approveProcessAction.bind(null, id)} pendingLabel="Approving and finding automation ideas…">
                 Approve process
               </ActionButton>
             ) : null}
             {p.status !== "draft" && p.status !== "archived" ? (
               <ActionButton action={generateOpportunitiesAction.bind(null, id)} pendingLabel="Analysing…">
-                {opportunities?.length ? "Find more opportunities" : "Create automation opportunity"}
+                {opportunities?.length ? "Find more ideas" : "Find automation ideas"}
               </ActionButton>
             ) : null}
             {p.status !== "archived" ? (
@@ -127,7 +127,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
 
       {p.status === "draft" ? (
         <Alert variant="info" className="mb-4">
-          <AlertDescription>Draft. Check the steps and numbers, then approve to find its automation opportunities.</AlertDescription>
+          <AlertDescription>Draft. Check the steps and numbers, then approve to find ideas for automating it.</AlertDescription>
         </Alert>
       ) : null}
       {gaps.length ? (
@@ -252,7 +252,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
           {opportunities?.length || agents?.length ? (
             <Card>
               <CardHeader>
-                <CardTitle>Opportunities and agents</CardTitle>
+                <CardTitle>Automation ideas and agents</CardTitle>
               </CardHeader>
               <div>
                 {(agents ?? []).map((a) => (

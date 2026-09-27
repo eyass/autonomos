@@ -63,7 +63,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
   return (
     <>
       <PageHeader
-        back={{ href: "/opportunities", label: "Opportunities" }}
+        back={{ href: "/opportunities", label: "Automation ideas" }}
         title={o.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -87,7 +87,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
                   <ActionButton
                     variant="outline"
                     action={setOpportunityStatusAction.bind(null, id, "archived")}
-                    confirm="Mark this opportunity as done? It stays in the list as done; Reopen undoes it."
+                    confirm="Mark this idea as done? It stays in the list as done; Reopen undoes it."
                     confirmLabel="Mark done"
                   >
                     Mark done
@@ -95,7 +95,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
                   <ActionButton
                     variant="outline"
                     action={setOpportunityStatusAction.bind(null, id, "reviewing")}
-                    confirm="Put this opportunity on hold? A live agent is paused until you reopen it."
+                    confirm="Put this idea on hold? A live agent is paused until you reopen it."
                     confirmLabel="Put on hold"
                   >
                     Hold
@@ -103,7 +103,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
                   <ActionButton
                     variant="outline"
                     action={setOpportunityStatusAction.bind(null, id, "rejected")}
-                    confirm="Reject this opportunity? A live agent is paused. Reopen undoes it."
+                    confirm="Reject this idea? A live agent is paused. Reopen undoes it."
                     confirmLabel="Reject"
                   >
                     Reject
@@ -126,7 +126,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
                 </ActionButton>
               ) : null}
               {o.status !== "rejected" ? (
-                <ActionButton variant="outline" action={setOpportunityStatusAction.bind(null, id, "rejected")} confirm="Reject this opportunity? Reopen undoes it." confirmLabel="Reject">
+                <ActionButton variant="outline" action={setOpportunityStatusAction.bind(null, id, "rejected")} confirm="Reject this idea? Reopen undoes it." confirmLabel="Reject">
                   Reject
                 </ActionButton>
               ) : (
@@ -184,7 +184,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
           {evidence.length ? (
             <Card>
               <CardHeader>
-                <CardTitle>Why this opportunity</CardTitle>
+                <CardTitle>Why this idea</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3 text-sm">

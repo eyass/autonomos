@@ -26,11 +26,7 @@ export default async function AgentsPage() {
     return (
       <>
         <PageHeader title="Agents" description="Agents that run your processes, with what they can do and how they perform." />
-        <EmptyState
-          title="You haven't deployed any agents."
-          description="Agents are created from automation opportunities."
-          action={<ButtonLink href="/opportunities">Review automation opportunities</ButtonLink>}
-        />
+        <EmptyState title="You haven't deployed any agents." description="Agents are built from automation ideas." action={<ButtonLink href="/opportunities">See automation ideas</ButtonLink>} />
       </>
     );
   }
