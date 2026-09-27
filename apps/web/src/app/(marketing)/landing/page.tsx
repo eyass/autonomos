@@ -3,6 +3,7 @@ import { ArrowRight, Bot, Check, FileSearch, ListChecks, Lock, OctagonX, ScrollT
 import type { Metadata } from "next";
 import { CONTACT_EMAIL } from "@/components/marketing/site";
 import { HeroRun } from "@/components/marketing/hero-run";
+import { AgentVisual, HoursByLevel, InventoryVisual, OpportunityVisual, PolicyFlow } from "@/components/marketing/visuals";
 import { LevelMeter } from "@/components/brand/logo";
 import { ButtonLink } from "@/components/app/button-link";
 import { Badge } from "@/components/ui/badge";
@@ -21,18 +22,21 @@ export const metadata: Metadata = {
 const STEPS = [
   {
     icon: FileSearch,
+    visual: InventoryVisual,
     label: "Process",
     title: "Map the work",
     body: "AutonomOS reads your website and connected systems and drafts your process inventory. You review, correct and approve each process.",
   },
   {
     icon: Target,
+    visual: OpportunityVisual,
     label: "Opportunity",
     title: "Choose what to automate",
     body: "Every process is ranked by value, difficulty and risk, with the evidence behind each score, so you start where an agent is both useful and safe.",
   },
   {
     icon: Bot,
+    visual: AgentVisual,
     label: "Agent",
     title: "Deploy under control",
     body: "AutonomOS builds a constrained agent, tests it with every action simulated, then runs it under approvals at an autonomy level from L1 to L5.",
@@ -45,6 +49,12 @@ const LEVELS = [
   { level: "L3", name: "Agent proposes", body: "The agent prepares each action and a person approves it." },
   { level: "L4", name: "Agent executes", body: "The agent acts on routine cases and escalates exceptions." },
   { level: "L5", name: "Autonomous", body: "The agent runs the process end to end within its limits." },
+];
+
+const FACTS = [
+  { value: "30 days", label: "of history read to find recurring work" },
+  { value: "5 levels", label: "of autonomy, raised one at a time" },
+  { value: "0", label: "live writes while an agent is tested" },
 ];
 
 const CONTROLS = [
@@ -101,6 +111,32 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Proof strip: what it reads and the facts that hold for every agent */}
+      <section aria-label="At a glance" className="border-b border-border bg-card">
+        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 md:grid-cols-[1.2fr_2fr] md:items-center">
+          <div>
+            <p className="eyebrow text-muted-foreground">Reads the systems you already use</p>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {["Zendesk", "Stripe", "Gmail", "Slack"].map((n) => (
+                <li key={n} className="rounded-md border border-border bg-background px-2.5 py-1 font-mono text-xs font-semibold">
+                  {n}
+                </li>
+              ))}
+              <li className="rounded-md border border-dashed border-border px-2.5 py-1 font-mono text-xs text-muted-foreground">more via OAuth</li>
+            </ul>
+          </div>
+          <dl className="grid grid-cols-3 gap-4 border-t border-border pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-8">
+            {FACTS.map((f) => (
+              <div key={f.label}>
+                <dt className="sr-only">{f.label}</dt>
+                <dd className="font-display text-2xl font-semibold tracking-tight sm:text-4xl">{f.value}</dd>
+                <dd className="mt-1 text-xs text-muted-foreground sm:text-sm">{f.label}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
       {/* How it works */}
       <section id="how-it-works" className="scroll-mt-16 border-b border-border">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
@@ -110,7 +146,10 @@ export default function LandingPage() {
           <ol className="mt-10 grid gap-4 md:grid-cols-3">
             {STEPS.map((s, i) => (
               <li key={s.label}>
-                <Card className="h-full p-5">
+                <Card className="h-full gap-0 p-5 sm:gap-0">
+                  <div className="-mx-1 -mt-1 mb-5 rounded-xl bg-grid-light bg-muted/60 p-3">
+                    <s.visual />
+                  </div>
                   <div className="flex items-center gap-3">
                     <span className="flex size-9 items-center justify-center rounded-md bg-brand text-white">
                       <s.icon size={18} />
@@ -151,7 +190,14 @@ export default function LandingPage() {
               </li>
             ))}
           </ol>
-          <div className="mt-10 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 max-w-2xl">
+            <h3 className="text-lg font-semibold tracking-tight sm:text-xl">Every action passes the same checks, in code</h3>
+            <p className="mt-2 text-sm text-muted-foreground sm:text-base">The model proposes; the policy engine decides. Here is the €72 refund from the top of the page.</p>
+          </div>
+          <div className="mt-6">
+            <PolicyFlow />
+          </div>
+          <div className="mt-12 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
             {CONTROLS.map((c) => (
               <div key={c.title} className="flex gap-3">
                 <c.icon size={18} className="mt-0.5 shrink-0 text-primary" />
@@ -202,6 +248,9 @@ export default function LandingPage() {
                 ))}
               </ul>
             </Card>
+          </div>
+          <div className="mt-4">
+            <HoursByLevel />
           </div>
         </div>
       </section>
