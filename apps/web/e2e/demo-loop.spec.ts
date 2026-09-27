@@ -113,16 +113,18 @@ test("demo loop", async ({ page }) => {
   const current = review.getByTestId("proposal").getByRole("heading");
   // Analyst proposals built on what is connected come with the ones seen in the data.
   await expect(review.getByText(/of \d+/)).toBeVisible();
-  for (let i = 0; i < 20 && (await current.textContent()) !== "Order status enquiries"; i++) {
+  for (let i = 0; i < 20 && (await current.textContent()) !== "Customer invoice requests"; i++) {
     const before = await current.textContent();
     await page.keyboard.press("ArrowDown");
     await expect(current).not.toHaveText(before!);
   }
-  await expect(current).toHaveText("Order status enquiries");
+  await expect(current).toHaveText("Customer invoice requests");
   await expect(review.getByText(/Zendesk:/)).toBeVisible();
+  // Every suggestion says why it is worth it; low-value ones are left out (and counted).
+  await expect(review.getByTestId("proposal-value")).toContainText(/money, customers or growth|take over about/);
   await shot(page, "system-discovery");
-  await review.getByRole("button", { name: "Approve Order status enquiries" }).click();
-  await expect(current).not.toHaveText("Order status enquiries");
+  await review.getByRole("button", { name: "Approve Customer invoice requests" }).click();
+  await expect(current).not.toHaveText("Customer invoice requests");
   const rejectedTitle = (await current.textContent())!;
   await review.getByRole("button", { name: `Reject ${rejectedTitle}` }).click();
   await expect(current).not.toHaveText(rejectedTitle);
@@ -145,9 +147,9 @@ test("demo loop", async ({ page }) => {
     if (total > 1) await expect(current).not.toHaveText(title);
   }
   expect(seen).not.toContain(rejectedTitle);
-  expect(seen).not.toContain("Order status enquiries");
+  expect(seen).not.toContain("Customer invoice requests");
   await page.goto("/processes?status=draft");
-  await page.getByRole("link", { name: "Order status enquiries" }).click();
+  await page.getByRole("link", { name: "Customer invoice requests" }).click();
   await expect(page.getByText("Found in your systems")).toBeVisible();
   // The agent action proposed in discovery is kept with the process.
   await expect(page.getByText("What an agent would do")).toBeVisible();

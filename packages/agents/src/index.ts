@@ -8,3 +8,4 @@ export * from "./mock-decision";
 export { MemoryRunStore } from "./memory-store";
 export * from "./readiness";
 export * from "./quality";
+export * from "./value";

@@ -9,7 +9,7 @@ import {
   type CompanyContext,
   type InterviewMessage,
 } from "@autonomos/ai";
-import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk, isThin, qualityGaps, sensitiveAreas, tempered } from "@autonomos/agents";
+import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk, isThin, qualityGaps, rankByValue, sensitiveAreas, tempered } from "@autonomos/agents";
 import { DEPARTMENTS, DiscoveredProcessSchema, tidyTitle, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
@@ -658,9 +658,11 @@ export async function draftInitialInventory(session: Session, evidence?: string[
   });
   const rejected = await rejectedTitles(session);
   await track(session, "process_discovery_started", { method: "website" });
-  return saveDiscoveredProcesses(
-    session,
+  // The first inventory is a shortlist of work worth automating, not everything a company does.
+  const { kept } = rankByValue(
     processes.filter((p) => !rejected.some((r) => sameProcess(r, p.title))),
-    profile ? "website" : "integration",
+    session.org.defaultHourlyCost,
+    15,
   );
+  return saveDiscoveredProcesses(session, kept, profile ? "website" : "integration");
 }

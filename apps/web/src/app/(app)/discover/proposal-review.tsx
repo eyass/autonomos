@@ -145,6 +145,12 @@ export function ProposalReview({ run, onReadAgain }: { run: DiscoveryRunView; on
                 <dt className="text-xs text-muted-foreground">Volume</dt>
                 <dd>{volume(current)}</dd>
               </div>
+              {current.value ? (
+                <div className="sm:col-span-2" data-testid="proposal-value">
+                  <dt className="text-xs text-muted-foreground">Why it is worth it</dt>
+                  <dd>{current.value.why}.</dd>
+                </div>
+              ) : null}
             </dl>
             {current.automation ? (
               <div className="rounded-lg border border-highlight/30 bg-highlight-soft/40 p-3">
