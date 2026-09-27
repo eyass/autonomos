@@ -17,3 +17,34 @@ describe("process quality", () => {
     expect(sensitiveAreas("Weekly status reporting")).toEqual([]);
   });
 });
+
+describe("compliance guardrails", () => {
+  const base = {
+    autonomyLevel: 5,
+    tools: ["zendesk.send_reply", "stripe.create_refund"],
+    policy: { approvalRequiredFor: [], amountThresholds: [{ tool: "stripe.create_refund", field: "amount", maxWithoutApproval: 200 }], hardLimits: [] },
+  };
+  it("caps collections at L3 and puts every write behind approval", async () => {
+    const { applyGuardrails } = await import("../src");
+    const c = applyGuardrails(base, ["debt collection"], ["zendesk.send_reply", "stripe.create_refund"]);
+    expect(c.autonomyLevel).toBe(3);
+    expect(c.policy.approvalRequiredFor).toEqual(["zendesk.send_reply", "stripe.create_refund"]);
+  });
+  it("limits money for refunds and payments", async () => {
+    const { applyGuardrails, MONEY_APPROVAL_ABOVE, MONEY_HARD_LIMIT } = await import("../src");
+    const c = applyGuardrails(base, ["refunds and payments"], ["zendesk.send_reply", "stripe.create_refund"]);
+    expect(c.autonomyLevel).toBe(4);
+    expect(c.policy.amountThresholds[0]!.maxWithoutApproval).toBe(MONEY_APPROVAL_ABOVE);
+    expect(c.policy.hardLimits).toEqual([{ tool: "stripe.create_refund", field: "amount", max: MONEY_HARD_LIMIT }]);
+  });
+  it("never limits tools that only read payments", async () => {
+    const { applyGuardrails } = await import("../src");
+    const c = applyGuardrails({ ...base, tools: [...base.tools, "stripe.list_payments"] }, ["refunds and payments"], ["zendesk.send_reply", "stripe.create_refund"]);
+    expect(c.policy.hardLimits.map((l) => l.tool)).toEqual(["stripe.create_refund"]);
+    expect(c.policy.amountThresholds.map((l) => l.tool)).toEqual(["stripe.create_refund"]);
+  });
+  it("leaves other work alone", async () => {
+    const { applyGuardrails } = await import("../src");
+    expect(applyGuardrails(base, [], [])).toEqual(base);
+  });
+});

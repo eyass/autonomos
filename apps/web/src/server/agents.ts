@@ -1,5 +1,5 @@
 import "server-only";
-import { policyForTools } from "@autonomos/agents";
+import { applyGuardrails, guardrailsFor, policyForTools } from "@autonomos/agents";
 import { createRun, RunNotAllowedError } from "@autonomos/db";
 import { buildSandboxTicket, getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
 import { AgentConfigSchema, PolicyConfigSchema, type AgentConfig, type PolicyConfig } from "@autonomos/schemas";
@@ -10,6 +10,7 @@ import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
 import { connectedIntegrationKeys } from "./opportunities";
 import { agentReadiness, enqueueOrFail } from "./readiness";
 import { assertAgentAllowance } from "@/server/platform";
+import { processGate } from "@/server/processes";
 
 function mapRunError(error: unknown): never {
   if (error instanceof RunNotAllowedError) throw new HttpError(409, error.message);
@@ -51,8 +52,22 @@ async function insertVersion(session: Session, agentId: string, version: number,
   return data.id;
 }
 
+// Before an agent exists for a process: the process must be described well enough, and work in a
+// regulated area gets its guardrails (autonomy cap, approvals, money limits) applied in code.
+async function guardedConfig(session: Session, processId: string, config: AgentConfig, mode: "create" | "update") {
+  const gate = await processGate(session, processId);
+  if (gate.gaps.length) throw new HttpError(409, `The process is not described well enough for an agent yet: ${gate.gaps.join("; ")}. Fill it in first.`);
+  if (gate.sensitive.length && !gate.complianceOwner) throw new HttpError(409, `The process involves ${gate.sensitive.join(" and ")}. Name who signs off on compliance on the process first.`);
+  const caps = guardrailsFor(gate.sensitive);
+  if (mode === "update" && config.autonomyLevel > caps.maxLevel) {
+    throw new HttpError(409, `Work involving ${gate.sensitive.join(" and ")} runs at L${caps.maxLevel} at most.`);
+  }
+  const writes = config.tools.filter((t) => getTool(t)?.access === "write");
+  return AgentConfigSchema.parse(applyGuardrails(config, gate.sensitive, writes));
+}
+
 export async function createAgent(session: Session, input: { processId: string; opportunityId: string | null; config: AgentConfig }) {
-  const config = AgentConfigSchema.parse(input.config);
+  const config = await guardedConfig(session, input.processId, AgentConfigSchema.parse(input.config), "create");
   await assertToolsAllowed(session, config.tools);
   const db = adminDb();
   const { data: process } = await db.from("processes").select("id, department_id").eq("organization_id", session.org.id).eq("id", input.processId).maybeSingle();
@@ -109,9 +124,9 @@ export async function loadAgentConfig(session: Session, agentId: string, version
 
 // Every configuration change creates a new immutable version (PRD section 85).
 export async function updateAgentConfig(session: Session, agentId: string, next: AgentConfig, note: string) {
-  const config = AgentConfigSchema.parse(next);
-  await assertToolsAllowed(session, config.tools);
   const { agent, version, config: previous } = await loadAgentConfig(session, agentId);
+  const config = await guardedConfig(session, agent.process_id, AgentConfigSchema.parse(next), "update");
+  await assertToolsAllowed(session, config.tools);
   const versionId = await insertVersion(session, agentId, version.version + 1, config, note);
   const db = adminDb();
   await db

@@ -6,9 +6,10 @@ import { SupabaseRunStore } from "@autonomos/db";
 import { enqueueRun, triggerConfigured } from "@autonomos/workflows";
 import { after } from "next/server";
 import { adminDb, type Session } from "@/lib/session";
+import { processGate } from "@/server/processes";
 
 export type ReadinessCheck = {
-  key: "runtime" | "model" | "approvers" | "integrations" | "tools" | "test";
+  key: "runtime" | "model" | "approvers" | "integrations" | "tools" | "process" | "test";
   label: string;
   ok: boolean;
   // What is wrong and what to do about it, in customer language.
@@ -95,6 +96,21 @@ export async function agentReadiness(session: Session, agent: AgentForReadiness,
   );
   checks.push({ key: "tools", label: "It can read the work", ok: coverage.ok, detail: coverage.detail, href: `/agents/${agent.id}/edit`, blocking: true });
   if (purpose === "activate") {
+    // Agents made before the quality floor existed: the work itself must still be described well
+    // enough, and a regulated area needs its compliance owner, before the agent may go live.
+    const { data: row } = await db.from("agents").select("process_id").eq("organization_id", session.org.id).eq("id", agent.id).maybeSingle();
+    const work = row ? await processGate(session, row.process_id) : null;
+    if (work) {
+      const problems = [...work.gaps, ...(work.sensitive.length && !work.complianceOwner ? [`name a compliance owner (${work.sensitive.join(", ")})`] : [])];
+      checks.push({
+        key: "process",
+        label: "Its process is described well enough",
+        ok: problems.length === 0,
+        detail: problems.length ? `On the process: ${problems.join("; ")}.` : "Workflow, numbers and sign-off are in place.",
+        href: `/processes/${row!.process_id}?edit=1#edit`,
+        blocking: true,
+      });
+    }
     const { data: runs } = await db
       .from("agent_runs")
       .select("status, outcome, success, input, agent_version_id, summary")

@@ -18,13 +18,25 @@ const ATTENTION = ["warning", "error", "waiting"];
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 
 type Row = { id: string; occurred_at: string; actor_type: string; action_type: string; status: string; title: string; agent_run_id: string | null };
-// Runs of the same kind of event in a row (twelve "Mapped a process") collapse into one line.
-function grouped<T extends Row>(list: T[]): Array<{ first: T; rest: T[] }> {
-  const out: Array<{ first: T; rest: T[] }> = [];
+// One row per run (all its steps under "and N more"), and repeated similar events folded together.
+// The run's row shows its most serious status, so a failure inside a run is never hidden.
+const SEVERITY: Record<string, number> = { error: 4, warning: 3, waiting: 2, success: 1, info: 0 };
+function grouped<T extends Row>(list: T[]): Array<{ first: T; rest: T[]; status: string }> {
+  const out: Array<{ first: T; rest: T[]; status: string }> = [];
+  const byRun = new Map<string, number>();
   for (const e of list) {
+    if (e.agent_run_id && byRun.has(e.agent_run_id)) {
+      const g = out[byRun.get(e.agent_run_id)!]!;
+      g.rest.push(e);
+      if ((SEVERITY[e.status] ?? 0) > (SEVERITY[g.status] ?? 0)) g.status = e.status;
+      continue;
+    }
     const last = out.at(-1);
     if (last && !e.agent_run_id && !last.first.agent_run_id && last.first.action_type === e.action_type && last.first.status === e.status && last.first.actor_type === e.actor_type) last.rest.push(e);
-    else out.push({ first: e, rest: [] });
+    else {
+      out.push({ first: e, rest: [], status: e.status });
+      if (e.agent_run_id) byRun.set(e.agent_run_id, out.length - 1);
+    }
   }
   return out;
 }
@@ -138,7 +150,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
             <Card key={day}>
               <div className="border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
               <ul>
-                {grouped(list).map(({ first: e, rest }) => {
+                {grouped(list).map(({ first: e, rest, status }) => {
                   const who =
                     e.actor_type === "agent"
                       ? (e.agents as unknown as { name: string } | null)?.name
@@ -159,7 +171,9 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                         <div>{e.title}</div>
                         {rest.length ? (
                           <details className="mt-1 text-xs text-muted-foreground">
-                            <summary className="cursor-pointer select-none hover:text-foreground">and {rest.length} more like it</summary>
+                            <summary className="cursor-pointer select-none hover:text-foreground">
+                              {e.agent_run_id ? `and ${rest.length} more step${rest.length === 1 ? "" : "s"} in this run` : `and ${rest.length} more like it`}
+                            </summary>
                             <ul className="mt-1 space-y-0.5">
                               {rest.map((r) => (
                                 <li key={r.id}>
@@ -175,9 +189,9 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                           Test
                         </Badge>
                       ) : null}
-                      {e.status !== "info" && e.status !== "success" ? (
-                        <Badge variant={TONES[e.status] ?? "secondary"} className="shrink-0 capitalize">
-                          {e.status}
+                      {status !== "info" && status !== "success" ? (
+                        <Badge variant={TONES[status] ?? "secondary"} className="shrink-0 capitalize">
+                          {status}
                         </Badge>
                       ) : null}
                     </div>

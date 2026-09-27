@@ -117,8 +117,12 @@ export default async function SettingsPage() {
           <SettingsSection
             id="execution"
             title="Execution"
-            description={readiness.ready ? "Ready. Agents can be tested and go live." : "Not ready yet. Fix the items below before agents can run."}
-            action={<Badge variant={readiness.ready ? "success" : "warning"}>{readiness.ready ? "Ready" : "Not ready"}</Badge>}
+            description={
+              readiness.ready
+                ? "The workspace is set up: agents can be tested. Each agent goes live only once its own checks pass, a passed test on real input and the tools to read its work, shown on the agent."
+                : "Not ready yet. Fix the items below before agents can run."
+            }
+            action={<Badge variant={readiness.ready ? "success" : "warning"}>{readiness.ready ? "Ready to test" : "Not ready"}</Badge>}
             defaultOpen={!readiness.ready}
           >
             <ReadinessChecklist checks={readiness.checks} />

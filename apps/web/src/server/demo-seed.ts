@@ -3,7 +3,7 @@
  * departments, reviewed processes, sandbox Zendesk, Stripe and Slack with sample records,
  * a refund policy and the approved Refund Agent opportunity. Everything is fictional.
  */
-import { opportunityScore } from "@autonomos/agents";
+import { opportunityScore, sensitiveAreas } from "@autonomos/agents";
 import { sandboxStore, type DbClient } from "@autonomos/db";
 import { sandboxSeed } from "@autonomos/integrations";
 
@@ -224,6 +224,9 @@ export async function seedDemoOrganization(db: DbClient, userId: string, options
         status: "reviewed",
         discovery_source: "interview",
         confidence: 0.8,
+        // Sample processes in regulated areas come with a named (fictional) compliance owner.
+        compliance_owner: sensitiveAreas(`${p.title} ${p.description} ${p.steps.map((x) => x.title).join(" ")}`).length ? "Finance and compliance team (sample)" : null,
+        compliance_confirmed_at: new Date().toISOString(),
         reviewed_by: userId,
         reviewed_at: new Date().toISOString(),
         created_by: userId,
@@ -231,8 +234,22 @@ export async function seedDemoOrganization(db: DbClient, userId: string, options
       .select("id")
       .single();
     processIds.set(p.title, data!.id);
-    await db.from("process_steps").insert(p.steps.map((s, i) => ({ organization_id: org.id, process_id: data!.id, position: i + 1, ...s })));
-    await db.from("process_systems").insert(p.systems.map((system) => ({ organization_id: org.id, process_id: data!.id, system })));
+    // Every row gets every column: in a batch insert a missing key is sent as null, and
+    // requires_judgement is not nullable, which silently dropped all the sample steps before.
+    const { error: stepsError } = await db.from("process_steps").insert(
+      p.steps.map((s, i) => ({
+        organization_id: org.id,
+        process_id: data!.id,
+        position: i + 1,
+        title: s.title,
+        performed_by: s.performed_by ?? null,
+        system: "system" in s ? (s.system ?? null) : null,
+        requires_judgement: "requires_judgement" in s ? Boolean(s.requires_judgement) : false,
+      })),
+    );
+    if (stepsError) throw new Error(`sample steps: ${stepsError.message}`);
+    const { error: systemsError } = await db.from("process_systems").insert(p.systems.map((system) => ({ organization_id: org.id, process_id: data!.id, system })));
+    if (systemsError) throw new Error(`sample systems: ${systemsError.message}`);
   }
 
   // 5. The approved refund opportunity. The agent is created live in the demo.

@@ -28,6 +28,15 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
     </section>
   );
   const live = connected.filter((i) => i.provider !== "sandbox");
+  // With many systems, filter the connected ones instead of scrolling past all of them.
+  const [filter, setFilter] = useState<"all" | "live" | "sample" | "used">("all");
+  const shown = connected.filter((i) => (filter === "live" ? i.provider !== "sandbox" : filter === "sample" ? i.provider === "sandbox" : filter === "used" ? i.agents.length > 0 : true));
+  const filters = [
+    ["all", `All (${connected.length})`],
+    ["live", `Live (${live.length})`],
+    ["sample", `Sample data (${connected.length - live.length})`],
+    ["used", `In use by agents (${connected.filter((i) => i.agents.length).length})`],
+  ] as const;
   const others = (
     <>
       {found.length ? section("Found on your website", found, "Detected from your website and email setup.") : null}
@@ -56,7 +65,22 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
           {connected.length - live.length ? `; ${connected.length - live.length} on sample data` : ""}.
         </p>
       ) : null}
-      {connected.length ? section("Connected", connected) : null}
+      {connected.length > 4 && !compact ? (
+        <div role="group" aria-label="Show connected systems" className="flex flex-wrap gap-2 text-sm">
+          {filters.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={filter === key}
+              onClick={() => setFilter(key)}
+              className={`rounded-full border px-3 py-1 ${filter === key ? "border-primary bg-primary/10 font-medium" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {connected.length ? section("Connected", compact ? connected : shown) : null}
       {connected.length && !compact ? (
         <details className="group space-y-6">
           <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">Add another system ({found.length + rest.length} available)</summary>
@@ -111,6 +135,26 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
                 {inventoryLine(i.inventory)}
               </p>
             ) : null}
+            {/* Connecting grants no agent access by itself: say which agents may do what here. */}
+            <div className="text-xs" data-testid={`agents-${i.key}`}>
+              {i.agents.length ? (
+                <ul className="space-y-0.5">
+                  {i.agents.map((a) => (
+                    <li key={a.id}>
+                      <a href={`/agents/${a.id}`} className="font-medium hover:underline">
+                        {a.name}
+                      </a>{" "}
+                      <span className="text-muted-foreground">
+                        ({a.status === "active" ? "live" : a.status}): {a.reads.length ? `reads ${a.reads.join(", ").toLowerCase()}` : "reads nothing"}
+                        {a.acts.length ? `; can ${a.acts.join(", ").toLowerCase()}` : "; changes nothing"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="text-muted-foreground">No agent uses it. Being connected gives agents no access on its own.</span>
+              )}
+            </div>
             <Collapsible className="text-xs">
               <CollapsibleTrigger asChild>
                 <Button variant="link" size="sm" className="group h-auto px-0 text-xs text-muted-foreground">

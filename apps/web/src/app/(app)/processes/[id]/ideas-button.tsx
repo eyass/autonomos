@@ -28,7 +28,7 @@ export function IdeasButton({
 }) {
   const [owner, setOwner] = useState("");
   const needsOwner = sensitive.length > 0 && !complianceOwner;
-  const blocked = approve && blockedBy.length > 0;
+  const blocked = blockedBy.length > 0;
   return (
     <span className="inline-flex flex-col items-start gap-1.5">
       {needsOwner && !blocked ? (
@@ -46,7 +46,11 @@ export function IdeasButton({
       >
         {label}
       </JobButton>
-      {blocked ? <span className="max-w-72 text-xs text-muted-foreground">Approve unlocks once these are filled in: {blockedBy.join("; ").toLowerCase()}.</span> : null}
+      {blocked ? (
+        <span className="max-w-72 text-xs text-muted-foreground">
+          {approve ? "Approve" : "Ideas"} unlock once these are filled in: {blockedBy.join("; ").toLowerCase()}.
+        </span>
+      ) : null}
     </span>
   );
 }
