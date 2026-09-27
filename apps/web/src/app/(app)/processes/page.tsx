@@ -18,9 +18,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export const metadata = { title: "Processes" };
 
+// Long inventories are paged, so the list stays quick to scan and to render.
+const PAGE_SIZE = 25;
+
 const SORTS = {
+  time: "Most hours per month",
   potential: "Highest automation potential",
-  time: "Highest time consumption",
   value: "Highest business value",
   difficulty: "Lowest difficulty",
 } as const;
@@ -46,19 +49,32 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
 
   const monthly = (p: { estimated_occurrences_per_month: number | null; estimated_minutes_per_occurrence: number | null }) =>
     Number(p.estimated_occurrences_per_month ?? 0) * Number(p.estimated_minutes_per_occurrence ?? 0);
-  let list = (rows ?? []).filter((p) => (q.status ? p.status === q.status : p.status !== "archived"));
+  // Drafts waiting for a person come first: with any, the list opens on them.
+  const toReview = (rows ?? []).filter((p) => p.status === "draft").length;
+  const view = q.status ? "filtered" : (q.view ?? (toReview ? "review" : "all"));
+  let list = (rows ?? []).filter((p) => (q.status ? p.status === q.status : view === "review" ? p.status === "draft" : p.status !== "archived"));
   if (q.department) list = list.filter((p) => p.department_id === q.department);
   if (q.autonomy) list = list.filter((p) => String(effective(p)) === q.autonomy);
   if (q.risk) list = list.filter((p) => (q.risk === "high" ? p.risk_level >= 4 : q.risk === "low" ? p.risk_level <= 2 : p.risk_level === 3));
   if (q.value) list = list.filter((p) => (q.value === "high" ? p.business_value >= 4 : p.business_value <= 3));
   if (q.q) list = list.filter((p) => p.title.toLowerCase().includes(q.q!.toLowerCase()));
-  const sort = (q.sort ?? "potential") as keyof typeof SORTS;
+  const sort = (q.sort && q.sort in SORTS ? q.sort : "time") as keyof typeof SORTS;
   list.sort((a, b) => {
     if (sort === "time") return monthly(b) - monthly(a);
     if (sort === "value") return b.business_value - a.business_value;
     if (sort === "difficulty") return a.automation_difficulty - b.automation_difficulty;
     return b.potential_autonomy_level - effective(b) - (a.potential_autonomy_level - effective(a)) || monthly(b) - monthly(a);
   });
+
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const page = Math.min(pages, Math.max(1, Number(q.page) || 1));
+  list = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => Boolean(e[1]) && e[0] !== "page"));
+    if (n > 1) params.set("page", String(n));
+    return `/processes${params.size ? `?${params}` : ""}`;
+  };
 
   const actions = (
     <>
@@ -72,7 +88,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
   if (!rows?.length) {
     return (
       <>
-        <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." actions={actions} />
+        <PageHeader title="Work" description="Your recurring work, and ideas to automate it." actions={actions} />
         <WorkTabs active="processes" />
         <EmptyState
           title="No processes yet."
@@ -86,8 +102,26 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
   const active = [q.department, q.status, q.autonomy, q.risk, q.value].filter(Boolean).length;
   return (
     <>
-      <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." actions={actions} />
+      <PageHeader title="Work" description="Your recurring work, and ideas to automate it." actions={actions} />
       <WorkTabs active="processes" />
+      {!q.status && toReview ? (
+        <nav aria-label="Which processes" className="mb-3 flex flex-wrap gap-2 text-sm">
+          <Link
+            href="/processes?view=review"
+            aria-current={view === "review" ? "page" : undefined}
+            className={`rounded-full border px-3 py-1 ${view === "review" ? "border-primary bg-primary/10 font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Needs review ({toReview})
+          </Link>
+          <Link
+            href="/processes?view=all"
+            aria-current={view === "all" ? "page" : undefined}
+            className={`rounded-full border px-3 py-1 ${view === "all" ? "border-primary bg-primary/10 font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            All ({(rows ?? []).filter((p) => p.status !== "archived").length})
+          </Link>
+        </nav>
+      ) : null}
       {q.drafted ? (
         <Alert variant="agent" className="mb-4">
           <Sparkles />
@@ -150,6 +184,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
           </>
         }
       >
+        {view === "review" || view === "all" ? <input type="hidden" name="view" value={view} /> : null}
         <Input name="q" placeholder="Search processes" defaultValue={q.q} aria-label="Search processes" className="flex-1 sm:max-w-72" />
       </FilterBar>
       <Card className="@container gap-0 overflow-hidden py-0 sm:py-0">
@@ -168,9 +203,14 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
             {list.map((p) => {
               const dept = (p.departments as unknown as { name: string } | null)?.name;
               return (
-                <TableRow key={p.id} className="hover:bg-muted/50">
+                // The title link covers the whole row, so the row opens on a tap, click or Enter.
+                <TableRow key={p.id} className="relative hover:bg-muted/50 focus-within:bg-muted/50">
                   <TableCell className="w-full max-w-0 whitespace-normal">
-                    <Link href={`/processes/${p.id}`} title={p.title} className="line-clamp-2 font-medium break-words hover:underline">
+                    <Link
+                      href={`/processes/${p.id}`}
+                      title={p.title}
+                      className="line-clamp-2 font-medium break-words outline-none after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+                    >
                       {p.title}
                     </Link>
                     <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground @2xl:hidden">
@@ -186,7 +226,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                           href={`/processes/${p.id}?edit=1#edit`}
                           title={`Missing: ${gaps.join("; ")}`}
                           aria-label={`${gaps.length} gap${gaps.length === 1 ? "" : "s"}: ${gaps.join("; ")}. Review`}
-                          className="mt-0.5 inline-block text-xs text-warning hover:underline"
+                          className="relative z-10 mt-0.5 inline-block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                         >
                           {gaps.length} gap{gaps.length === 1 ? "" : "s"} · Review
                         </Link>
@@ -220,6 +260,25 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
           </TableBody>
         </Table>
       </Card>
+      {pages > 1 ? (
+        <nav aria-label="Pages" className="mt-4 flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </span>
+          <span className="flex gap-2">
+            {page > 1 ? (
+              <ButtonLink href={pageHref(page - 1)} variant="outline" size="sm">
+                Previous
+              </ButtonLink>
+            ) : null}
+            {page < pages ? (
+              <ButtonLink href={pageHref(page + 1)} variant="outline" size="sm">
+                Next
+              </ButtonLink>
+            ) : null}
+          </span>
+        </nav>
+      ) : null}
     </>
   );
 }

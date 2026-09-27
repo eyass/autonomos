@@ -31,8 +31,8 @@ export function DiscoverTabs({ initial, panels }: { initial: DiscoverTab; panels
   return (
     <>
       <Tabs value={tab} onValueChange={choose} className="mb-4">
-        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TabsList>
+        <div className="flex flex-wrap items-center gap-2">
+          <TabsList className="max-w-full overflow-x-auto">
             {TABS.map((t) => (
               <TabsTrigger key={t.value} value={t.value} className="data-[state=active]:text-brand">
                 {t.label}

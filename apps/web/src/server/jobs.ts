@@ -207,6 +207,8 @@ export async function latestJob(opts: { userId: string; organizationId: string |
   const { data } = await q.maybeSingle();
   if (!data) return null;
   if (data.status === "queued" || data.status === "running") return toView(await revive(data));
+  // A recent failure is returned too, so the page can say what went wrong and offer a retry.
+  if (data.status === "failed") return toView(data);
   return opts.includeDone && data.status === "done" ? toView(data) : null;
 }
 

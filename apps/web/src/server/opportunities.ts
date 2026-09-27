@@ -4,7 +4,7 @@ import type { AgentConfig } from "@autonomos/schemas";
 import { generateAgentDraft, generateOpportunities, type ProcessForAnalysis } from "@autonomos/ai";
 import { blendScore, opportunityScore } from "@autonomos/agents";
 import { toolsForIntegrations } from "@autonomos/integrations";
-import type { AutonomyLevel } from "@autonomos/schemas";
+import { tidyTitle, type AutonomyLevel } from "@autonomos/schemas";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
 import { companyContext, connectedSystemEvidence } from "./processes";
@@ -61,7 +61,8 @@ export async function generateOpportunitiesForProcess(session: Session, processI
   // Asking again (or a job run a second time) never adds an idea the process already has.
   const { data: had } = await db.from("automation_opportunities").select("title").eq("organization_id", session.org.id).eq("process_id", processId);
   const known = new Set((had ?? []).map((h) => h.title.trim().toLowerCase()));
-  for (const o of generated) {
+  for (const g of generated) {
+    const o = { ...g, title: tidyTitle(g.title) };
     if (known.has(o.title.trim().toLowerCase())) continue;
     known.add(o.title.trim().toLowerCase());
     const current = Math.max(1, Math.min(5, o.currentAutonomyLevel)) as AutonomyLevel;

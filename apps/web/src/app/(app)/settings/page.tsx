@@ -89,7 +89,10 @@ export default async function SettingsPage() {
       <PageHeader title="Settings" />
       <div className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-8">
         {/* A sticky list of sections beside the page on wide screens; a scrollable row on small ones. */}
-        <nav aria-label="Settings sections" className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 lg:sticky lg:top-4 lg:mb-0 lg:self-start lg:overflow-visible">
+        <nav
+          aria-label="Settings sections"
+          className="sticky top-14 z-10 -mx-4 mb-4 overflow-x-auto bg-background/95 px-4 py-2 backdrop-blur sm:mx-0 sm:px-0 lg:top-18 lg:mb-0 lg:self-start lg:overflow-visible lg:bg-transparent lg:py-0 lg:backdrop-blur-none"
+        >
           <ul className="flex gap-2 pb-1 lg:flex-col lg:gap-0.5">
             {sections.map(([id, label]) => (
               <li key={id} className="shrink-0">

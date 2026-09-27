@@ -13,7 +13,7 @@ import { dateTime, hours, money, pct, relative, aiMoney } from "@/lib/format";
 import { adminDb, HttpError, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { loadAgentConfig } from "@/server/agents";
-import { agentReadiness } from "@/server/readiness";
+import { agentState } from "@/server/readiness";
 import { diffVersions, type VersionSnapshot } from "@/lib/version-diff";
 import { ReadinessChecklist } from "@/components/app/readiness-checklist";
 import { activateAction, pauseAction } from "../actions";
@@ -72,8 +72,8 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
     computeOrgMetrics(adminDb(), session.org.id, new Date(0)),
   ]);
   const stats = metrics.perAgent.get(id);
-  const readiness = await agentReadiness(session, id, config.tools, agent.status === "active" ? "test" : "activate");
-  const runtimeReady = readiness.checks.find((c) => c.key === "runtime")?.ok ?? false;
+  const state = await agentState(session, { id, status: agent.status }, config.tools);
+  const readiness = state.readiness;
   const recommendation = stats ? autonomyRecommendation(agent.autonomy_level, stats, agent.name) : null;
   const ticketDriven = config.tools.includes("zendesk.read_ticket");
   const samples = SAMPLE_TICKETS.map((s) => ({ key: s.key, label: s.label }));
@@ -126,7 +126,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 Pause
               </ActionButton>
             ) : isAdmin(session) ? (
-              <ActionButton action={activateAction.bind(null, id)} disabled={!readiness.ready}>
+              <ActionButton action={activateAction.bind(null, id)} disabled={!state.canActivate}>
                 Activate agent
               </ActionButton>
             ) : null}
@@ -167,25 +167,18 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-start-3 lg:row-start-1">
-          {agent.status !== "active" || !readiness.ready ? (
-            <Card>
+          {state.phase !== "live" || !readiness.ready ? (
+            <Card data-testid="agent-state" data-phase={state.phase}>
               <CardHeader>
-                <CardTitle>{agent.status === "active" ? "Needs attention" : readiness.ready ? "Ready to go live" : "Before going live"}</CardTitle>
-                <CardDescription>{readiness.ready ? "Everything this agent needs is in place." : "Activate is available once these are done."}</CardDescription>
+                <CardTitle>{state.title}</CardTitle>
+                <CardDescription>{state.description}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ReadinessChecklist checks={readiness.checks} />
               </CardContent>
             </Card>
           ) : null}
-          <TestPanel
-            agentId={id}
-            ticketDriven={ticketDriven}
-            samples={samples}
-            blockedReason={runtimeReady ? null : "Tests start once the agent runtime is connected."}
-            warnings={testWarnings}
-            sampleInput={JSON.stringify(sampleInput, null, 2)}
-          />
+          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} blockedReason={state.testBlockedReason} warnings={testWarnings} sampleInput={JSON.stringify(sampleInput, null, 2)} />
           {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
           <Card id="autonomy">
             <CardHeader>

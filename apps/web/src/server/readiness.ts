@@ -102,6 +102,30 @@ export async function agentReadiness(session: Session, agentId: string, tools: s
   return summarise(checks);
 }
 
+// One state for an agent, derived in one place, so the page cannot say "Ready to go live"
+// while also refusing to test. Tests run on this server with simulated writes, so they only
+// need the AI model; going live needs every blocking check, including a finished test.
+export type AgentPhase = "live" | "paused" | "blocked" | "needs_test" | "ready";
+export type AgentState = { phase: AgentPhase; title: string; description: string; canActivate: boolean; testBlockedReason: string | null; readiness: Readiness };
+
+export async function agentState(session: Session, agent: { id: string; status: string }, tools: string[]): Promise<AgentState> {
+  const readiness = await agentReadiness(session, agent.id, tools, "activate");
+  const failing = readiness.checks.filter((c) => c.blocking && !c.ok);
+  const model = readiness.checks.find((c) => c.key === "model");
+  const testBlockedReason = model && !model.ok ? model.detail : null;
+  const others = failing.filter((c) => c.key !== "test");
+  const phase: AgentPhase = agent.status === "active" ? "live" : others.length ? "blocked" : failing.some((c) => c.key === "test") ? "needs_test" : agent.status === "paused" ? "paused" : "ready";
+  const words: Record<AgentPhase, [string, string]> = {
+    live: others.length ? ["Needs attention", "Live, but something it depends on is missing."] : ["Live", "Everything this agent needs is in place."],
+    paused: ["Paused", "Ready to go live again whenever you activate it."],
+    blocked: ["Before going live", `${others.length} thing${others.length === 1 ? "" : "s"} to fix first.`],
+    needs_test: ["Test it next", "Run a test to see exactly what it would do. Activate unlocks after a finished test."],
+    ready: ["Ready to go live", "Everything this agent needs is in place, including a finished test."],
+  };
+  const [title, description] = words[phase];
+  return { phase, title, description, canActivate: agent.status !== "active" && failing.length === 0, testBlockedReason, readiness };
+}
+
 // Enqueues a run; if it cannot start, the run is marked failed (with the reason) and shows
 // up in Activity instead of sitting in "queued" forever.
 // Test runs are short and only simulate writes, so they run right here on the server; they do

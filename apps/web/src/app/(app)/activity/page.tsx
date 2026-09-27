@@ -49,14 +49,19 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   else if (f.type) q = q.ilike("action_type", `%${f.type}%`);
   if (f.date) q = q.gte("occurred_at", `${f.date}T00:00:00Z`).lte("occurred_at", `${f.date}T23:59:59Z`);
   // "Needs attention" is the default whenever something does; "Everything" shows the rest.
+  // Tests are expected to hand off and fail sometimes; they have their own tab so that
+  // "Needs attention" only holds what happened for real.
+  const NOT_TEST = "detail->>mode.is.null,detail->>mode.neq.test";
   const { count: attention } = await supabase
     .from("activity_events")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", session.org.id)
     .in("status", ATTENTION)
+    .or(NOT_TEST)
     .gte("occurred_at", daysAgo(14));
-  const view = f.view ?? (attention && !f.status ? "attention" : "all");
-  if (view === "attention" && !f.status) q = q.in("status", ATTENTION);
+  const view = f.view ?? (attention && !f.status && !f.type ? "attention" : "all");
+  if (view === "attention" && !f.status) q = q.in("status", ATTENTION).or(NOT_TEST);
+  if (view === "tests") q = q.eq("detail->>mode", "test");
   const [{ data: events }, { data: agents }, { data: departments }] = await Promise.all([
     q,
     supabase.from("agents").select("id, name").eq("organization_id", session.org.id),
@@ -76,6 +81,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         items={[
           { href: `/activity?view=attention`, label: `Needs attention${attention ? ` (${attention})` : ""}`, active: view === "attention" },
           { href: `/activity?view=all`, label: "Everything", active: view === "all" },
+          { href: `/activity?view=tests`, label: "Tests", active: view === "tests" },
         ]}
       />
       <FilterBar

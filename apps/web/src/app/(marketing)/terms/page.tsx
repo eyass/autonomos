@@ -4,6 +4,8 @@ import { CONTACT_EMAIL, DraftNotice, PageIntro, Prose } from "@/components/marke
 const description = "The terms that apply when you use AutonomOS.";
 
 export const metadata: Metadata = {
+  // Draft until counsel signs off: readable by design partners, kept out of search results.
+  robots: { index: false, follow: true },
   title: "Terms of service",
   description,
   alternates: { canonical: "/terms" },

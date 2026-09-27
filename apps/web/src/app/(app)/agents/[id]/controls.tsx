@@ -43,6 +43,8 @@ export function TestPanel({
   const run = () =>
     start(async () => {
       setError(null);
+      // The button stays usable; running past a warning still needs the box ticked.
+      if (needsAck && !acknowledged) return setError('Tick "Run the test with these warnings" to run it anyway, or fix them first.');
       let r;
       if (ticketDriven) r = await testRunSampleAction(agentId, sample);
       else {
@@ -124,7 +126,7 @@ export function TestPanel({
           </Alert>
         ) : null}
         {blockedReason ? <p className="text-xs text-muted-foreground">{blockedReason}</p> : null}
-        <Button onClick={run} disabled={pending || Boolean(blockedReason) || errors.length > 0 || (needsAck && !acknowledged)} variant={needsAck ? "outline" : "default"}>
+        <Button onClick={run} disabled={pending || Boolean(blockedReason) || errors.length > 0} variant={needsAck ? "outline" : "default"}>
           {pending ? "Starting…" : needsAck ? "Run test anyway" : "Run test"}
         </Button>
       </CardContent>

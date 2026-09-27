@@ -14,13 +14,13 @@ export function AutonomyTrend({ data }: { data: Array<{ period: string; value: n
   const change = first && last ? (last.value - first.value) * 100 : 0;
   const summary =
     first && last
-      ? `Company autonomy went from ${asPct(first.value)} in ${first.period} to ${asPct(last.value)} in ${last.period}, ${change === 0 ? "no change" : `${change > 0 ? "up" : "down"} ${Math.abs(change).toFixed(1)} points`}.`
+      ? `Work that runs without people went from ${asPct(first.value)} in ${first.period} to ${asPct(last.value)} in ${last.period}, ${change === 0 ? "no change" : `${change > 0 ? "up" : "down"} ${Math.abs(change).toFixed(1)} points`}.`
       : "No autonomy history yet.";
   return (
     <figure>
       <figcaption className="sr-only">{summary}</figcaption>
       <table className="sr-only">
-        <caption>Company autonomy by period</caption>
+        <caption>Share of work that runs without people, by period</caption>
         <thead>
           <tr>
             <th scope="col">Period</th>
