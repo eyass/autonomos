@@ -10,7 +10,7 @@ const heading = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-head
 const body = Instrument_Sans({ subsets: ["latin"], variable: "--font-body" });
 const code = JetBrains_Mono({ subsets: ["latin"], variable: "--font-code" });
 
-export const viewport = { themeColor: "#0e5e5a" };
+export const viewport = { themeColor: "#0f4c47" };
 
 export const metadata: Metadata = {
   title: { default: "AutonomOS", template: "%s · AutonomOS" },

@@ -1,3 +1,4 @@
+import { LevelMeter } from "@/components/brand/logo";
 import { autonomyRecommendation } from "@autonomos/agents";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { computeOrgMetrics } from "@autonomos/db";
@@ -122,7 +123,9 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <StatusBadge status={agent.status} />
-            <span>L{agent.autonomy_level}</span>
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold" title={`Autonomy L${agent.autonomy_level}`}>
+              <LevelMeter level={agent.autonomy_level} className="h-3" />L{agent.autonomy_level}
+            </span>
             <span>·</span>
             <Link className="hover:underline" href={`/processes/${process?.id}`}>
               {process?.title}

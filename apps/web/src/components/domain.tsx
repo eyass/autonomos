@@ -18,10 +18,10 @@ export function AutonomyLadder({ current, target, size = "md" }: { current: numb
             className={cn(
               "inline-flex items-center justify-center rounded font-semibold tabular-nums",
               size === "sm" ? "h-5 w-6 text-[10px]" : "h-6 w-8 text-xs",
-              isCurrent ? "text-white" : reached ? "text-white/90" : "bg-muted text-muted-foreground",
+              isCurrent ? "text-white" : reached ? "bg-brand-soft text-brand-strong" : "bg-muted text-muted-foreground",
               isTarget && "ring-2 ring-primary ring-offset-1 ring-offset-surface text-primary bg-primary/10",
             )}
-            style={reached ? { background: `var(--level-${l.level})`, opacity: isCurrent ? 1 : 0.55 } : undefined}
+            style={isCurrent ? { background: `var(--level-${Math.max(l.level, 3)})` } : undefined}
           >
             {l.code}
           </span>

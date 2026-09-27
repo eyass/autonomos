@@ -3,6 +3,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /* AutonomOS brand.
+   The signature is the autonomy scale: five rising bars from L1 to L5 (the logo, LevelMeter,
+   the level colours). Deep pine carries identity, signal orange marks what agents do, and the
+   mono face labels the system ("OS", eyebrows, levels, IDs).
    Brand teal is for identity and action: logo, primary buttons, links, focus, active nav.
    Signal orange (--highlight) is for agent activity and attention: what an agent is doing,
    AI-drafted work, pending approvals. Use it sparingly so it keeps meaning something.
@@ -10,13 +13,13 @@
    AutonomOS status tones. */
 :root {
   --radius: 0.625rem;
-  --background: #f6f5f1;
-  --foreground: #161a19;
+  --background: #f5f3ee;
+  --foreground: #121816;
   --card: #ffffff;
-  --card-foreground: #161a19;
+  --card-foreground: #121816;
   --popover: #ffffff;
-  --popover-foreground: #161a19;
-  --primary: #0e5e5a;
+  --popover-foreground: #121816;
+  --primary: #0f4c47;
   --primary-foreground: #ffffff;
   --secondary: #eef0ec;
   --secondary-foreground: #161a19;
@@ -27,29 +30,29 @@
   --destructive: #b3261e;
   --border: #e2e1da;
   --input: #d8d7cf;
-  --ring: #0e5e5a;
+  --ring: #0f4c47;
 
-  --brand: #0e5e5a;
-  --brand-strong: #0a4744;
-  --brand-soft: #e1efec;
-  --highlight: #e8552d;
-  --highlight-strong: #b53d17;
-  --highlight-soft: #fdebe4;
+  --brand: #0f4c47;
+  --brand-strong: #0a3330;
+  --brand-soft: #e2eeea;
+  --highlight: #f0561f;
+  --highlight-strong: #b53f10;
+  --highlight-soft: #fde9de;
   --highlight-foreground: #ffffff;
 
-  --chart-1: #0e5e5a;
-  --chart-2: #e8552d;
+  --chart-1: #0f4c47;
+  --chart-2: #f0561f;
   --chart-3: #5e9e97;
   --chart-4: #f2a07f;
   --chart-5: #2e4e7e;
   --sidebar: #fbfaf7;
   --sidebar-foreground: #3a3e3c;
-  --sidebar-primary: #0e5e5a;
+  --sidebar-primary: #0f4c47;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e1efec;
-  --sidebar-accent-foreground: #0a4744;
+  --sidebar-accent: #e2eeea;
+  --sidebar-accent-foreground: #0a3330;
   --sidebar-border: #e2e1da;
-  --sidebar-ring: #0e5e5a;
+  --sidebar-ring: #0f4c47;
 
   --success: #1f6b45;
   --success-soft: #e2f1e8;
@@ -58,11 +61,14 @@
   --info: #2e4e7e;
   --info-soft: #e6ecf5;
   --destructive-soft: #f9e4e1;
-  --level-1: #c4c3bc;
-  --level-2: #a9cbc6;
-  --level-3: #5e9e97;
-  --level-4: #2c7a74;
-  --level-5: #0e5e5a;
+  --level-1: #c9c4b6;
+  --level-2: #9fc2bb;
+  --level-3: #52918a;
+  --level-4: #266b64;
+  --level-5: #0f4c47;
+  /* The dark brand surface: hero, auth panel, share images. */
+  --ink: #0a1f1d;
+  --ink-foreground: #f5f3ee;
 }
 
 @theme inline {
@@ -118,6 +124,8 @@
   --color-highlight-strong: var(--highlight-strong);
   --color-highlight-soft: var(--highlight-soft);
   --color-highlight-foreground: var(--highlight-foreground);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
 }
 
 @layer base {
@@ -148,4 +156,43 @@
   content: "·";
   margin-right: 0.5rem;
   color: var(--muted-foreground);
+}
+
+/* Section labels in the system voice: mono, spaced, with a signal tick. */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The measured-grid texture behind dark brand surfaces. */
+@utility bg-grid {
+  background-image: linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+@utility bg-grid-light {
+  background-image: linear-gradient(to right, rgb(15 76 71 / 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgb(15 76 71 / 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* A slow pulse on the dot that means "an agent is working". */
+@keyframes signal-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(240 86 31 / 0.55);
+  }
+  60% {
+    box-shadow: 0 0 0 6px rgb(240 86 31 / 0);
+  }
+}
+@utility signal-pulse {
+  animation: signal-pulse 2.4s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .signal-pulse {
+    animation: none;
+  }
 }

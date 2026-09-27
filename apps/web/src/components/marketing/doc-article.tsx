@@ -1,3 +1,4 @@
+import { OG_IMAGES } from "./config";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DOCS, type DocPage } from "./docs";
@@ -9,7 +10,7 @@ export function docMetadata(doc: DocPage): Metadata {
     title,
     description: doc.description,
     alternates: { canonical: doc.href },
-    openGraph: { title: `${title} · AutonomOS`, description: doc.description, url: doc.href, type: "article" },
+    openGraph: { title: `${title} · AutonomOS`, description: doc.description, url: doc.href, type: "article", images: OG_IMAGES },
   };
 }
 
