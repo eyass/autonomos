@@ -3,7 +3,7 @@ import { ArrowRight, Bot, Check, FileSearch, ListChecks, Lock, OctagonX, ScrollT
 import type { Metadata } from "next";
 import { CONTACT_EMAIL } from "@/components/marketing/site";
 import { HeroRun } from "@/components/marketing/hero-run";
-import { AgentVisual, HoursByLevel, InventoryVisual, OpportunityVisual, PolicyFlow } from "@/components/marketing/visuals";
+import { AgentVisual, HoursByLevel, InventoryVisual, OpportunityVisual, PolicyFlow, SetupFlow, TOOL_COUNT } from "@/components/marketing/visuals";
 import { LevelMeter } from "@/components/brand/logo";
 import { ButtonLink } from "@/components/app/button-link";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,7 @@ const LEVELS = [
 ];
 
 const FACTS = [
-  { value: "30 days", label: "of history read to find recurring work" },
+  { value: TOOL_COUNT, label: "tools you can connect" },
   { value: "5 levels", label: "of autonomy, raised one at a time" },
   { value: "0", label: "live writes while an agent is tested" },
 ];
@@ -100,6 +100,10 @@ export default function LandingPage() {
                 <dd>L1 to L5, raised one level at a time</dd>
               </div>
               <div>
+                <dt className="sr-only">Tools</dt>
+                <dd>{TOOL_COUNT} tools, connected in minutes</dd>
+              </div>
+              <div>
                 <dt className="sr-only">Safety</dt>
                 <dd>Every write checked in code</dd>
               </div>
@@ -115,14 +119,18 @@ export default function LandingPage() {
       <section aria-label="At a glance" className="border-b border-border bg-card">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 md:grid-cols-[1.2fr_2fr] md:items-center">
           <div>
-            <p className="eyebrow text-muted-foreground">Reads the systems you already use</p>
+            <p className="eyebrow text-muted-foreground">Connects to the tools you already use</p>
             <ul className="mt-3 flex flex-wrap gap-2">
-              {["Zendesk", "Stripe", "Gmail", "Slack"].map((n) => (
+              {["Gmail", "Slack", "HubSpot", "Stripe", "Zendesk"].map((n) => (
                 <li key={n} className="rounded-md border border-border bg-background px-2.5 py-1 font-mono text-xs font-semibold">
                   {n}
                 </li>
               ))}
-              <li className="rounded-md border border-dashed border-border px-2.5 py-1 font-mono text-xs text-muted-foreground">more via OAuth</li>
+              <li>
+                <a href="#setup" className="block rounded-md border border-dashed border-border px-2.5 py-1 font-mono text-xs text-muted-foreground hover:text-foreground">
+                  + {TOOL_COUNT} more
+                </a>
+              </li>
             </ul>
           </div>
           <dl className="grid grid-cols-3 gap-4 border-t border-border pt-6 md:border-t-0 md:border-l md:pt-0 md:pl-8">
@@ -134,6 +142,23 @@ export default function LandingPage() {
               </div>
             ))}
           </dl>
+        </div>
+      </section>
+
+      {/* Setup */}
+      <section id="setup" className="scroll-mt-16 border-b border-border bg-brand-soft/50">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <SectionHeading eyebrow="Setup" title="Up and running in minutes">
+              Add your website, connect the tools you already use, and build your first agent. No engineers, no integration project.
+            </SectionHeading>
+            <ButtonLink href="/signup" size="lg" className="shrink-0 self-start md:self-auto">
+              Start free <ArrowRight size={16} />
+            </ButtonLink>
+          </div>
+          <div className="mt-10">
+            <SetupFlow />
+          </div>
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 import { AUTONOMY_COEFFICIENTS, AUTONOMY_LEVELS, type AutonomyLevel } from "@autonomos/schemas";
-import { ArrowRight, Ban, FlaskConical, Hand, Play } from "lucide-react";
+import { ArrowRight, Ban, Check, FlaskConical, Hand, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LevelMeter } from "@/components/brand/logo";
 
@@ -238,5 +238,91 @@ export function HoursByLevel() {
       </ol>
       <p className="mt-4 text-xs text-muted-foreground">Illustrative: 320 requests at about 8 minutes each. Levels move one at a time, and an agent only moves up when its record earns it.</p>
     </figure>
+  );
+}
+
+// Setup, as the person does it: website, tools, first agent. The tool count is Composio's
+// directory (1,562 toolkits in September 2026); the popular ones all support one-click sign-in.
+export const TOOL_COUNT = "1,500+";
+const POPULAR = ["Gmail", "Slack", "HubSpot", "Stripe", "Zendesk", "Salesforce", "Outlook", "Notion", "Jira", "Intercom", "Google Drive", "Asana"];
+const CONNECTED = new Set(["Gmail", "Zendesk", "Stripe"]);
+
+function SetupStep({ n, title, body, children }: { n: number; title: string; body: string; children: React.ReactNode }) {
+  return (
+    <li className="relative flex flex-col rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink font-mono text-xs font-bold text-white">{n}</span>
+        <h3 className="text-base font-semibold">{title}</h3>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+      <div className="mt-5 flex-1 rounded-xl bg-grid-light bg-muted/60 p-3">{children}</div>
+    </li>
+  );
+}
+
+export function SetupFlow() {
+  return (
+    <ol className="grid gap-4 lg:grid-cols-3">
+      <SetupStep n={1} title="Add your website" body="AutonomOS reads it and drafts your company profile: what you sell, your teams and the tools you likely use.">
+        <Frame label="Example: a website address entered, and a company profile drafted from it">
+          <p className="eyebrow text-muted-foreground">Company website</p>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="flex h-8 flex-1 items-center rounded-md border border-border bg-background px-2 font-mono text-xs">acme-furniture.com</span>
+            <span className="inline-flex h-8 items-center rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground">Read</span>
+          </div>
+          <ul className="mt-3 space-y-1.5 text-[11px]">
+            {["Second-hand furniture marketplace", "Support, Operations, Finance, Sales", "Likely uses Zendesk and Stripe"].map((t) => (
+              <li key={t} className="flex items-center gap-2">
+                <Check size={12} className="shrink-0 text-success" />
+                {t}
+              </li>
+            ))}
+          </ul>
+        </Frame>
+      </SetupStep>
+      <SetupStep n={2} title="Connect your tools" body="Over 1,500 tools. The most used connect in one click with their own sign-in; for the rest we set up sign-in once for your workspace.">
+        <Frame label={`Example: popular tools such as Gmail, Slack, HubSpot and Stripe, three of them connected, and ${TOOL_COUNT} more`}>
+          <ul className="grid grid-cols-3 gap-1.5">
+            {POPULAR.map((t) => (
+              <li
+                key={t}
+                className={cn(
+                  "flex h-8 items-center justify-center gap-1 truncate rounded-md border px-1 text-[11px] font-medium",
+                  CONNECTED.has(t) ? "border-success/40 bg-success-soft text-success" : "border-border bg-background",
+                )}
+              >
+                {CONNECTED.has(t) ? <Check size={11} className="shrink-0" /> : null}
+                <span className="truncate">{t}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2.5 flex items-center justify-between gap-2 rounded-md bg-ink px-2.5 py-2 text-white">
+            <span className="font-display text-lg font-semibold leading-none">{TOOL_COUNT}</span>
+            <span className="text-[11px] text-white/70">tools ready to connect</span>
+          </p>
+        </Frame>
+      </SetupStep>
+      <SetupStep n={3} title="Build your first agent" body="Pick one of the ideas found in your work. AutonomOS builds the agent and tests it on sandbox data before it touches a live account.">
+        <Frame label="Example: a refund agent being built and tested, the test passed">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Refund agent</p>
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-brand-strong">
+              <LevelMeter level={3} className="h-2.5" /> L3
+            </span>
+          </div>
+          <ol className="mt-2.5 space-y-1.5 text-[11px]">
+            {["Instructions written from the process", "Tools allowed: Zendesk, Stripe", "Approval above €50"].map((t) => (
+              <li key={t} className="flex items-center gap-2 text-muted-foreground">
+                <Check size={12} className="shrink-0 text-success" />
+                {t}
+              </li>
+            ))}
+          </ol>
+          <p className="mt-2.5 flex items-center gap-2 rounded-md bg-success-soft px-2 py-1.5 text-[11px] font-medium text-success">
+            <FlaskConical size={12} /> Test passed on sandbox data
+          </p>
+        </Frame>
+      </SetupStep>
+    </ol>
   );
 }
