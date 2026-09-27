@@ -40,7 +40,10 @@ export default async function RunPage({ params, searchParams }: { params: Promis
   const agent = run.agents as unknown as { id: string; name: string };
   const proc = run.processes as unknown as { id: string; title: string };
   const version = run.agent_versions as unknown as { version: number; autonomy_level: number };
-  const active = ["queued", "running"].includes(run.status);
+  // A run nobody picked up, or one that stopped reporting, is shown as stuck and the page stops
+  // refreshing instead of polling forever.
+  const stuck = isStuck(run);
+  const active = ["queued", "running"].includes(run.status) && !stuck;
   const duration = run.started_at && run.finished_at ? (new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000 : null;
   const lastDecision = [...(steps ?? [])].reverse().find((s) => s.type === "decision");
   const output = (run.output ?? {}) as { result?: string; wouldRequireApproval?: Array<{ tool: string; args: Record<string, unknown>; reasons: string[] }> };
@@ -77,7 +80,18 @@ export default async function RunPage({ params, searchParams }: { params: Promis
           </AlertDescription>
         </Alert>
       ) : null}
-      {run.status === "queued" ? (
+      {stuck ? (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>
+            {run.status === "queued"
+              ? "This run was never picked up, so nothing has happened yet. Agents cannot run in this workspace right now: check Settings, Execution, or contact support."
+              : "This run stopped reporting progress. It may have been cut off; start it again from the agent."}{" "}
+            <Link href={`/agents/${agent.id}`} className="font-medium underline">
+              Open the agent
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : run.status === "queued" ? (
         <Alert variant="info" className="mb-4">
           <AlertDescription>Queued. It starts in a moment. If it is still waiting after a few minutes, ask your administrator to check that agents can run (Settings, Execution).</AlertDescription>
         </Alert>
@@ -222,4 +236,10 @@ export default async function RunPage({ params, searchParams }: { params: Promis
       </div>
     </>
   );
+}
+
+// Queued for 3 minutes means no worker took it; running for 15 means it stopped reporting.
+function isStuck(run: { status: string; queued_at: string; started_at: string | null }) {
+  const idle = Date.now() - new Date(run.started_at ?? run.queued_at).getTime();
+  return (run.status === "queued" && idle > 3 * 60_000) || (run.status === "running" && idle > 15 * 60_000);
 }

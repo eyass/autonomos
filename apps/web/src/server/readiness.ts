@@ -1,7 +1,10 @@
 import "server-only";
 import { isMockMode } from "@autonomos/ai";
 import { getTool } from "@autonomos/integrations";
+import { executeRun, markRunFailed, RetryableRunError } from "@autonomos/agents";
+import { SupabaseRunStore } from "@autonomos/db";
 import { enqueueRun, triggerConfigured } from "@autonomos/workflows";
+import { after } from "next/server";
 import { adminDb, type Session } from "@/lib/session";
 
 export type ReadinessCheck = {
@@ -101,7 +104,15 @@ export async function agentReadiness(session: Session, agentId: string, tools: s
 
 // Enqueues a run; if it cannot start, the run is marked failed (with the reason) and shows
 // up in Activity instead of sitting in "queued" forever.
+// Test runs are short and only simulate writes, so they run right here on the server; they do
+// not depend on the background runner being set up. Production runs, which can wait hours for
+// an approval, go to the background runner.
 export async function enqueueOrFail(organizationId: string, runId: string, idempotencyKey?: string): Promise<{ started: boolean; error?: string }> {
+  const { data: meta } = await adminDb().from("agent_runs").select("mode").eq("organization_id", organizationId).eq("id", runId).maybeSingle();
+  if (meta?.mode === "test") {
+    after(() => runInline(runId));
+    return { started: true };
+  }
   try {
     await enqueueRun(runId, idempotencyKey);
     return { started: true };
@@ -127,5 +138,20 @@ export async function enqueueOrFail(organizationId: string, runId: string, idemp
       detail: {} as never,
     });
     return { started: false, error: message };
+  }
+}
+
+async function runInline(runId: string) {
+  const store = new SupabaseRunStore(adminDb());
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await executeRun(runId, store);
+      return;
+    } catch (e) {
+      if (e instanceof RetryableRunError && attempt < 3) continue;
+      console.error("test run failed", runId, e);
+      await markRunFailed(runId, store, e instanceof Error ? e.message : String(e)).catch((err) => console.error("could not mark run failed", runId, err));
+      return;
+    }
   }
 }
