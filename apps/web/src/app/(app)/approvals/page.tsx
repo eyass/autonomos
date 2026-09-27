@@ -116,8 +116,12 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         </div>
       ) : !liveHandoffs.length ? (
         <EmptyState
-          title="Nothing needs a person right now."
-          description="Actions an agent prepares for approval, and work it hands to a person, appear here and you get notified. Run a test from an agent to see one."
+          title={testHandoffs.length ? "Nothing live needs a person." : "Nothing needs a person right now."}
+          description={
+            testHandoffs.length
+              ? "Only test runs are listed below. They show what a test ran into; no customer or system is waiting on them."
+              : "Actions an agent prepares for approval, and work it hands to a person, appear here and you get notified. Run a test from an agent to see one."
+          }
         />
       ) : null}
       {liveHandoffs.length ? (

@@ -22,8 +22,8 @@ export const DOCS: DocPage[] = [
   {
     slug: "approvals",
     href: "/docs/approvals",
-    title: "Approvals",
-    description: "How approvals, money thresholds and hard limits work.",
+    title: "Approvals and the Inbox",
+    description: "How approvals, money thresholds and hard limits work, and where they wait.",
     body: Approvals,
   },
   {
@@ -129,7 +129,10 @@ function AutonomyLevels() {
 function Approvals() {
   return (
     <>
-      <p>When an agent reaches an action that needs a person, the run pauses and an approval request appears on the Approvals page. The run continues once someone decides.</p>
+      <p>When an agent reaches an action that needs a person, the run pauses and an approval request appears in the Inbox. The run continues once someone decides.</p>
+      <p>
+        The Inbox also lists work an agent handed to a person. Hand-offs from tests are grouped separately and labelled Test: nothing real waits on them, and they are not counted in the Inbox badge.
+      </p>
       <h2>What needs approval</h2>
       <ul>
         <li>Every action the agent&apos;s autonomy level does not allow it to take alone.</li>
@@ -160,8 +163,8 @@ function Integrations() {
       </p>
       <h2>Live accounts</h2>
       <p>
-        Connecting a live account opens that system&apos;s own sign-in page. Our connection partner holds the sign-in tokens; AutonomOS stores only the connected account id. Production runs act on the live
-        account once it is connected.
+        Connecting a live account opens that system&apos;s own sign-in page. Our connection partner holds the sign-in tokens; AutonomOS stores only the connected account id. Production runs act on the
+        live account once it is connected.
       </p>
       <h2>Test runs</h2>
       <p>Test runs simulate every write, whichever way an integration is connected.</p>

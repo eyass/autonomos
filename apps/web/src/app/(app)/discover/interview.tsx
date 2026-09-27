@@ -62,6 +62,9 @@ async function fetchInterview(id: string, signal?: AbortSignal): Promise<Intervi
   }
 }
 
+// Too little to trust yet: low confidence, no real workflow, or no numbers (same rule as the server).
+const thin = (p: DiscoveredProcess) => p.confidence < 0.5 || p.steps.length < 2 || !p.estimatedOccurrencesPerMonth || !p.estimatedMinutesPerOccurrence;
+
 // Wall-clock reads live here, outside render.
 const nowMs = () => Date.now();
 
@@ -98,7 +101,8 @@ export function Interview({ departments, defaultDepartment, resumable }: { depar
     // New processes start selected; ones the person unticked stay unticked.
     setSelected((prev) => {
       const next = new Set([...prev].filter((t) => s.processes.some((p) => p.title === t)));
-      for (const p of s.processes) if (!known.current.has(p.title)) next.add(p.title);
+      // Thin finds are not ticked by default; saved anyway, they wait as candidates.
+      for (const p of s.processes) if (!known.current.has(p.title) && !thin(p)) next.add(p.title);
       known.current = new Set(s.processes.map((p) => p.title));
       return next;
     });
@@ -423,6 +427,7 @@ export function Interview({ departments, defaultDepartment, resumable }: { depar
                       </Badge>
                     ))}
                     <Badge variant={p.confidence < 0.6 ? "warning" : "secondary"}>confidence {pct(p.confidence)}</Badge>
+                    {thin(p) ? <Badge variant="outline">Candidate: needs more detail</Badge> : null}
                   </div>
                   {p.missingInformation.length ? <p className="mt-2 text-xs text-warning">Still missing: {p.missingInformation.join("; ")}</p> : null}
                 </div>

@@ -9,7 +9,7 @@ import {
   type CompanyContext,
   type InterviewMessage,
 } from "@autonomos/ai";
-import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk } from "@autonomos/agents";
+import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk, isThin, qualityGaps, sensitiveAreas, tempered } from "@autonomos/agents";
 import { DEPARTMENTS, DiscoveredProcessSchema, tidyTitle, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
@@ -97,6 +97,13 @@ export async function saveDiscoveredProcesses(
   // process found twice is kept once: the first version stays, for the team to refine.
   const { data: existing } = await db.from("processes").select("title").eq("organization_id", session.org.id).neq("status", "archived");
   const known = new Set((existing ?? []).map((e) => e.title.trim().toLowerCase()));
+  // Provenance: what kind of data systems-based discovery read (interviews and documents have none).
+  let sourceData: "sandbox" | "live" | "mixed" | null = null;
+  if (source === "integration" || source === "website") {
+    const { data: conns } = await db.from("integration_connections").select("provider").eq("organization_id", session.org.id).eq("status", "connected");
+    const kinds = new Set((conns ?? []).map((c) => (c.provider === "sandbox" ? "sandbox" : "live")));
+    sourceData = kinds.size === 2 ? "mixed" : kinds.has("live") ? "live" : kinds.has("sandbox") ? "sandbox" : null;
+  }
   for (const raw of processes) {
     const parsed = DiscoveredProcessSchema.parse(raw);
     const p = { ...parsed, title: tidyTitle(parsed.title) };
@@ -105,6 +112,20 @@ export async function saveDiscoveredProcesses(
     known.add(key);
     const departmentId = await ensureDepartment(session, p.department);
     const signals = signalsFrom(p, session.org.defaultHourlyCost);
+    // Thin drafts (low confidence, no workflow, no numbers) wait as candidates outside the
+    // working inventory, with their claimed value and target held back until filled in.
+    const thin =
+      source !== "manual" &&
+      isThin({
+        confidence: p.confidence,
+        stepsCount: p.steps.length,
+        estimatedOccurrencesPerMonth: p.estimatedOccurrencesPerMonth ?? null,
+        estimatedMinutesPerOccurrence: p.estimatedMinutesPerOccurrence ?? null,
+      });
+    const scores = tempered(
+      { businessValue: blendScore(deterministicBusinessValue(signals), p.businessValue), potentialAutonomyLevel: p.potentialAutonomyLevel, currentAutonomyLevel: p.currentAutonomyLevel },
+      thin,
+    );
     const { data, error } = await db
       .from("processes")
       .insert({
@@ -117,8 +138,8 @@ export async function saveDiscoveredProcesses(
         estimated_occurrences_per_month: p.estimatedOccurrencesPerMonth ?? null,
         estimated_minutes_per_occurrence: p.estimatedMinutesPerOccurrence ?? null,
         current_autonomy_level: p.currentAutonomyLevel,
-        potential_autonomy_level: p.potentialAutonomyLevel,
-        business_value: blendScore(deterministicBusinessValue(signals), p.businessValue),
+        potential_autonomy_level: scores.potentialAutonomyLevel,
+        business_value: scores.businessValue,
         automation_difficulty: blendScore(deterministicDifficulty(signals), p.automationDifficulty),
         risk_level: blendScore(deterministicRisk(signals), p.riskLevel),
         inputs: p.inputs,
@@ -126,8 +147,9 @@ export async function saveDiscoveredProcesses(
         decision_points: p.decisionPoints,
         exceptions: p.exceptions,
         missing_information: p.missingInformation,
-        status: "draft",
+        status: thin ? "candidate" : "draft",
         discovery_source: source,
+        source_data: sourceData,
         discovery_session_id: links.discoverySessionId ?? null,
         document_id: links.documentId ?? null,
         confidence: p.confidence,
@@ -241,16 +263,64 @@ export async function updateProcess(session: Session, id: string, input: z.infer
       risk_level: input.riskLevel,
       notes: input.notes,
       missing_information: [],
+      // A person has now written or checked the details, so the AI's confidence no longer applies.
+      confidence: null,
     })
     .eq("organization_id", session.org.id)
     .eq("id", id);
   if (error) throw new Error(error.message);
   await replaceChildren(id, session.org.id, input.steps, input.systems, input.roles);
+  // A candidate that now has its workflow and numbers joins the inventory as a draft.
+  if (
+    existing.status === "candidate" &&
+    !isThin({ confidence: null, stepsCount: input.steps.length, estimatedOccurrencesPerMonth: input.estimatedOccurrencesPerMonth, estimatedMinutesPerOccurrence: input.estimatedMinutesPerOccurrence })
+  ) {
+    await db.from("processes").update({ status: "draft" }).eq("organization_id", session.org.id).eq("id", id);
+  }
   await audit(session, { action: "process.updated", processId: id, input });
+}
+
+// What stands between a process and approval, and whether it needs a compliance owner.
+export async function processGate(session: Session, id: string) {
+  const db = adminDb();
+  const { data: p } = await db
+    .from("processes")
+    .select("title, description, status, confidence, estimated_occurrences_per_month, estimated_minutes_per_occurrence, compliance_owner, process_steps(title)")
+    .eq("organization_id", session.org.id)
+    .eq("id", id)
+    .maybeSingle();
+  if (!p) throw new HttpError(404, "Process not found");
+  const steps = (p.process_steps as unknown as Array<{ title: string }> | null) ?? [];
+  const gaps = qualityGaps({
+    confidence: p.confidence === null ? null : Number(p.confidence),
+    stepsCount: steps.length,
+    estimatedOccurrencesPerMonth: p.estimated_occurrences_per_month === null ? null : Number(p.estimated_occurrences_per_month),
+    estimatedMinutesPerOccurrence: p.estimated_minutes_per_occurrence === null ? null : Number(p.estimated_minutes_per_occurrence),
+  });
+  const sensitive = sensitiveAreas(`${p.title} ${p.description} ${steps.map((s) => s.title).join(" ")}`);
+  return { gaps, sensitive, complianceOwner: p.compliance_owner, status: p.status };
+}
+
+// Records who signs off on compliance for a process in a sensitive area.
+export async function setComplianceOwner(session: Session, id: string, owner: string) {
+  const name = owner.trim().slice(0, 120);
+  if (name.length < 2) throw new HttpError(400, "Name the person or team who signs off on compliance");
+  const { error } = await adminDb()
+    .from("processes")
+    .update({ compliance_owner: name, compliance_confirmed_at: new Date().toISOString(), compliance_confirmed_by: session.user.id })
+    .eq("organization_id", session.org.id)
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  await audit(session, { action: "process.compliance_owner_set", processId: id, input: { owner: name } });
 }
 
 export async function setProcessStatus(session: Session, id: string, status: "reviewed" | "active" | "archived" | "draft") {
   const db = adminDb();
+  // Approval means the process is real and described: no approving thin drafts or candidates.
+  if (status === "reviewed") {
+    const gate = await processGate(session, id);
+    if (gate.gaps.length) throw new HttpError(409, `Fill in the details before approving: ${gate.gaps.join("; ")}.`);
+  }
   const { data, error } = await db
     .from("processes")
     .update({

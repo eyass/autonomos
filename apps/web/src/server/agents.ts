@@ -202,7 +202,7 @@ export async function activateAgent(session: Session, agentId: string) {
   const db = adminDb();
   const { agent, version, config } = await loadAgentConfig(session, agentId);
   if (config.autonomyLevel < 2) throw new HttpError(409, "An L1 agent cannot be activated; L1 means humans do the work");
-  const readiness = await agentReadiness(session, agentId, config.tools, "activate");
+  const readiness = await agentReadiness(session, { id: agentId, versionId: version.id }, config, "activate");
   const blocking = readiness.checks.filter((c) => c.blocking && !c.ok);
   if (blocking.length) throw new HttpError(409, `Not ready to go live: ${blocking.map((c) => `${c.label}: ${c.detail}`).join(" ")}`);
   await assertToolsAllowed(session, config.tools);

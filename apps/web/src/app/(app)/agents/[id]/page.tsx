@@ -72,7 +72,22 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
     computeOrgMetrics(adminDb(), session.org.id, new Date(0)),
   ]);
   const stats = metrics.perAgent.get(id);
-  const state = await agentState(session, { id, status: agent.status }, config.tools);
+  const state = await agentState(session, { id, status: agent.status, versionId: version.id }, config);
+  // Before going live: which of its systems are real accounts, and what it can change there.
+  const { data: conns } = await adminDb().from("integration_connections").select("integration_key, provider, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected");
+  const connOf = new Map((conns ?? []).map((c) => [c.integration_key, c]));
+  const toolDefs = config.tools.map((t) => getTool(t)).filter((d): d is NonNullable<ReturnType<typeof getTool>> => Boolean(d) && d!.integration !== "knowledge");
+  const systemName = (key: string) => (connOf.get(key)?.integrations as unknown as { name: string } | null)?.name ?? key;
+  const liveSystems = [...new Set(toolDefs.filter((d) => connOf.get(d.integration)?.provider !== "sandbox" && connOf.has(d.integration)).map((d) => systemName(d.integration)))];
+  const writeScopes = toolDefs
+    .filter((d) => d.access === "write")
+    .map((d) => ({
+      key: d.key,
+      label: d.label,
+      system: systemName(d.integration),
+      live: connOf.has(d.integration) && connOf.get(d.integration)?.provider !== "sandbox",
+      approval: config.autonomyLevel <= 3 || config.policy.approvalRequiredFor.includes(d.key),
+    }));
   const readiness = state.readiness;
   const recommendation = stats ? autonomyRecommendation(agent.autonomy_level, stats, agent.name) : null;
   const ticketDriven = config.tools.includes("zendesk.read_ticket");
@@ -126,7 +141,41 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 Pause
               </ActionButton>
             ) : isAdmin(session) ? (
-              <ActionButton action={activateAction.bind(null, id)} disabled={!state.canActivate}>
+              <ActionButton
+                action={activateAction.bind(null, id)}
+                disabled={!state.canActivate}
+                confirm={liveSystems.length ? `Go live in real systems: ${liveSystems.join(", ")}?` : "Go live on sandbox data?"}
+                confirmLabel="Activate"
+                confirmDetail={
+                  <>
+                    <p>
+                      {liveSystems.length
+                        ? "These are live accounts. From now on this agent acts on real customers and data within its autonomy level."
+                        : "Only sandbox systems are connected, so nothing real changes."}{" "}
+                      It runs at L{agent.autonomy_level}.
+                    </p>
+                    {writeScopes.length ? (
+                      <div>
+                        <div className="font-medium text-foreground">What it can change</div>
+                        <ul className="list-inside list-disc">
+                          {writeScopes.map((w) => (
+                            <li key={w.key}>
+                              {w.label}{" "}
+                              <span className="text-muted-foreground">
+                                ({w.system}, {w.live ? "live" : "sandbox"}
+                                {w.approval ? ", needs approval" : ""})
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p>It cannot change anything; it only reads and reports.</p>
+                    )}
+                    <p className="text-xs">This is recorded in the audit log. Pause stops it at any time.</p>
+                  </>
+                }
+              >
                 Activate agent
               </ActionButton>
             ) : null}

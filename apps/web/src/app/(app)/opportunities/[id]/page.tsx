@@ -5,7 +5,7 @@ import { ActionButton } from "@/components/action-button";
 import { JobButton } from "@/components/app/job";
 import { latestJob } from "@/server/jobs";
 import { BeforeAfter, LevelChange, Scores, StatusBadge } from "@/components/domain";
-import { money, num } from "@/lib/format";
+import { dateTime, money, num } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { setOpportunityStatusAction } from "../actions";
@@ -27,17 +27,34 @@ export default async function OpportunityPage({ params, searchParams }: { params
   const supabase = await createClient();
   const { data: o } = await supabase
     .from("automation_opportunities")
-    .select("*, processes(id, title, description, process_steps(position, title, performed_by))")
+    .select("*, processes(id, title, description, estimated_occurrences_per_month, estimated_minutes_per_occurrence, departments(hourly_labour_cost), process_steps(position, title, performed_by))")
     .eq("organization_id", session.org.id)
     .eq("id", id)
     .maybeSingle();
   if (!o) notFound();
   const buildJob = await latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "build_agent", subject: id });
   const [{ data: connections }, { data: agent }] = await Promise.all([
-    supabase.from("integration_connections").select("integration_key, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected"),
+    supabase.from("integration_connections").select("integration_key, provider, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected"),
     supabase.from("agents").select("id, name, status, autonomy_level").eq("organization_id", session.org.id).eq("opportunity_id", id).maybeSingle(),
   ]);
-  const proc = o.processes as unknown as { id: string; title: string; description: string; process_steps: Array<{ position: number; title: string; performed_by: string | null }> };
+  const proc = o.processes as unknown as {
+    id: string;
+    title: string;
+    description: string;
+    estimated_occurrences_per_month: number | null;
+    estimated_minutes_per_occurrence: number | null;
+    departments: { hourly_labour_cost: number | null } | null;
+    process_steps: Array<{ position: number; title: string; performed_by: string | null }>;
+  };
+  // The savings formula, in the open: today's time, what the agent takes over, what stays with people.
+  const perMonth = Number(proc.estimated_occurrences_per_month ?? 0);
+  const perItem = Number(proc.estimated_minutes_per_occurrence ?? 0);
+  const todayHours = (perMonth * perItem) / 60;
+  const savedHours = Math.min(Number(o.estimated_hours_saved_monthly ?? 0), todayHours || Infinity);
+  const keptHours = Math.max(0, todayHours - savedHours);
+  const rate = Number(proc.departments?.hourly_labour_cost ?? session.org.defaultHourlyCost);
+  // Where each piece of evidence came from: sample (sandbox) data or a live account.
+  const providerByName = new Map((connections ?? []).map((c) => [((c.integrations as unknown as { name: string } | null)?.name ?? c.integration_key).toLowerCase(), c.provider]));
   const today = [...(proc.process_steps ?? [])].sort((a, b) => a.position - b.position).map((s) => ({ title: s.title, performedBy: s.performed_by }));
   const connectedNames = (connections ?? []).map((c) => ((c.integrations as unknown as { name: string } | null)?.name ?? c.integration_key).toLowerCase());
   const agentSpec = o.proposed_agent as { name?: string; objective?: string; responsibilities?: string[] };
@@ -183,20 +200,67 @@ export default async function OpportunityPage({ params, searchParams }: { params
               <BeforeAfter today={today} proposed={(o.future_state_steps as FutureStep[]) ?? []} />
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>How the savings are estimated</CardTitle>
+              <CardDescription>Estimates from the process as mapped, not measured results. They firm up once the agent has run live.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm">
+              {todayHours ? (
+                <dl className="grid gap-2 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Today</dt>
+                    <dd className="font-medium tabular-nums">{num(Math.round(todayHours))} h/mo</dd>
+                    <dd className="text-xs text-muted-foreground">
+                      {num(perMonth)} a month × {num(perItem)} min
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">The agent takes over</dt>
+                    <dd className="font-medium tabular-nums">{num(Math.round(savedHours))} h/mo</dd>
+                    <dd className="text-xs text-muted-foreground">
+                      ≈ {money(savedHours * rate, session.org.currency)} at {money(rate, session.org.currency)}/h
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Stays with people</dt>
+                    <dd className="font-medium tabular-nums">{num(Math.round(keptHours))} h/mo</dd>
+                    <dd className="text-xs text-muted-foreground">Approvals, reviews and exceptions</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="text-muted-foreground">
+                  The process has no volume or time per item yet, so the {num(Number(o.estimated_hours_saved_monthly ?? 0))} h/mo is a rough model estimate.{" "}
+                  <Link className="underline" href={`/processes/${proc.id}?edit=1#edit`}>
+                    Add the numbers
+                  </Link>{" "}
+                  to see the calculation.
+                </p>
+              )}
+            </CardContent>
+          </Card>
           {evidence.length ? (
             <Card>
               <CardHeader>
-                <CardTitle>Why this idea</CardTitle>
+                <CardTitle>Mapping evidence</CardTitle>
+                <CardDescription>What discovery saw in your systems. It shows the work exists; it is not proof of how an agent would perform.</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3 text-sm">
-                  {evidence.map((e, i) => (
-                    <li key={i}>
-                      <div className="text-xs font-medium text-muted-foreground">{e.source}</div>
-                      <div>{e.detail}</div>
-                    </li>
-                  ))}
+                  {evidence.map((e, i) => {
+                    const provider = providerByName.get(e.source.toLowerCase());
+                    return (
+                      <li key={i}>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          {e.source}
+                          {provider ? <Badge variant={provider === "sandbox" ? "warning" : "success"}>{provider === "sandbox" ? "Sample data" : "Live account"}</Badge> : null}
+                        </div>
+                        <div>{e.detail}</div>
+                      </li>
+                    );
+                  })}
                 </ul>
+                <p className="mt-3 text-xs text-muted-foreground">Found {dateTime(o.created_at)}.</p>
               </CardContent>
             </Card>
           ) : null}

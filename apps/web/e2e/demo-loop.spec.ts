@@ -160,6 +160,8 @@ test("demo loop", async ({ page }) => {
   await page.getByRole("link", { name: "Refund request handling" }).click();
   await expect(page).toHaveURL(/\/processes\/[0-9a-f-]+/);
   const processUrl = page.url();
+  // Refunds are a regulated area: approving asks who signs off on compliance.
+  await page.getByLabel("Compliance sign-off by").fill("Finance (Jo Park)");
   await page.getByRole("button", { name: "Approve process" }).click();
   await expect(page).toHaveURL(/\/opportunities\/[0-9a-f-]+/);
   await expect(page.getByText("Proposed", { exact: true })).toBeVisible();
@@ -172,12 +174,16 @@ test("demo loop", async ({ page }) => {
   const agentUrl = new URL((await page.getByRole("link", { name: "Open agent" }).getAttribute("href"))!, page.url()).toString();
 
   // Test run: simulated, lists the approvals production would need
-  await expect(page.getByText("Test finished")).toBeVisible();
+  await expect(page.getByText("Test passed")).toBeVisible();
   await expect(page.getByText("Approvals needed in production")).toBeVisible();
 
   // Activate and send a live sandbox ticket
   await page.goto(agentUrl);
   await page.getByRole("button", { name: "Activate agent" }).click();
+  // Going live is confirmed, with the systems and what the agent can change there.
+  const golive = page.getByRole("alertdialog");
+  await expect(golive.getByText("What it can change")).toBeVisible();
+  await golive.getByRole("button", { name: "Activate" }).click();
   await expect(page.getByRole("button", { name: "Send ticket" })).toBeVisible();
   await page.getByRole("button", { name: "Send ticket" }).click();
   await expect(page).toHaveURL(/\/activity\/[0-9a-f-]+/);

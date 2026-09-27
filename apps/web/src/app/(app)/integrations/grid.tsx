@@ -27,15 +27,43 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
       </div>
     </section>
   );
-  return (
-    <div className="space-y-6">
-      {connected.length ? section("Connected", connected) : null}
+  const live = connected.filter((i) => i.provider !== "sandbox");
+  const others = (
+    <>
       {found.length ? section("Found on your website", found, "Detected from your website and email setup.") : null}
       {categories.map((cat) =>
         section(
           found.length || connected.length ? `Other ${cat.toLowerCase()} tools` : cat,
           rest.filter((i) => i.category === cat),
         ),
+      )}
+    </>
+  );
+  return (
+    <div className="space-y-6">
+      {connected.length && !compact ? (
+        // One line to scan before anything else: how many real accounts agents could act in.
+        <p className="rounded-md border px-3 py-2 text-sm" data-testid="connections-summary">
+          <span className="font-medium">{connected.length} connected</span>
+          {": "}
+          {live.length ? (
+            <>
+              <span className="font-medium text-success">{live.length} live</span> ({live.map((i) => i.name).join(", ")}), where agent actions change real data
+            </>
+          ) : (
+            "none live"
+          )}
+          {connected.length - live.length ? `; ${connected.length - live.length} on sample data` : ""}.
+        </p>
+      ) : null}
+      {connected.length ? section("Connected", connected) : null}
+      {connected.length && !compact ? (
+        <details className="group space-y-6">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">Add another system ({found.length + rest.length} available)</summary>
+          <div className="mt-4 space-y-6">{others}</div>
+        </details>
+      ) : (
+        others
       )}
     </div>
   );

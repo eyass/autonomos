@@ -7,7 +7,7 @@ import { analyseWebsite, refreshWebsiteProfile } from "@/server/company-profile"
 import { createSampleWorkspace } from "@/server/demo";
 import type { JobKind } from "@/server/jobs";
 import { defaultAgentConfig, generateOpportunitiesForProcess } from "@/server/opportunities";
-import { DocumentImportSchema, importDocument, setProcessStatus } from "@/server/processes";
+import { DocumentImportSchema, importDocument, setComplianceOwner, setProcessStatus } from "@/server/processes";
 
 // What each background job does. Each one can run a second time after its server stopped
 // part way, so each is safe to repeat: work already done is found and reused, not redone.
@@ -40,7 +40,10 @@ export const HANDLERS: Record<JobKind, (ctx: Context) => Promise<Result>> = {
   // Approving a process (optional) and finding its automation ideas.
   opportunities: async (ctx) => {
     const session = needSession(ctx);
-    const { processId, approve } = z.object({ processId: z.string().uuid(), approve: z.boolean().default(false) }).parse(ctx.input);
+    const { processId, approve, complianceOwner } = z
+      .object({ processId: z.string().uuid(), approve: z.boolean().default(false), complianceOwner: z.string().trim().max(120).optional() })
+      .parse(ctx.input);
+    if (complianceOwner) await setComplianceOwner(session, processId, complianceOwner);
     if (approve) await setProcessStatus(session, processId, "reviewed");
     let ids: string[];
     try {

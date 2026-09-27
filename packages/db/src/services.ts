@@ -85,7 +85,8 @@ export async function computeOrgMetrics(db: DbClient, organizationId: string, si
       .from("processes")
       .select("id, department_id, status, current_autonomy_level, estimated_occurrences_per_month, estimated_minutes_per_occurrence")
       .eq("organization_id", organizationId)
-      .neq("status", "archived"),
+      // Candidates are not part of the inventory until someone fills them in.
+      .not("status", "in", "(archived,candidate)"),
     db.from("agents").select("id, process_id, status, autonomy_level").eq("organization_id", organizationId),
     db
       .from("agent_runs")
@@ -194,6 +195,8 @@ export async function snapshotMetrics(db: DbClient, organizationId: string) {
   const period = new Date().toISOString().slice(0, 10);
   const rows = [
     { metric: "autonomy_score", dimension: "", value: m.autonomyScore ?? 0 },
+    // The part live agents add on top of what existing software already does.
+    { metric: "autonomy_live", dimension: "", value: Math.max(0, (m.autonomyScore ?? 0) - (m.baselineAutonomy ?? 0)) },
     { metric: "hours_saved_mtd", dimension: "", value: m.hoursSaved },
     { metric: "ai_cost_mtd", dimension: "", value: m.aiCost },
     ...m.departmentAutonomy.map((d) => ({ metric: "department_autonomy", dimension: d.departmentId ?? "none", value: d.score ?? 0 })),
