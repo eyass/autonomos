@@ -2,9 +2,9 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { ActionButton } from "@/components/action-button";
-import { connectOAuthAction, connectSandboxAction, disconnectAction, rotateWebhookSecretAction } from "./actions";
+import { connectOAuthAction, connectSandboxAction, disconnectAction, refreshInventoryAction, rotateWebhookSecretAction } from "./actions";
 import { SystemLogo } from "./add-systems";
-import type { IntegrationView } from "./data";
+import type { IntegrationView, InventoryView } from "./data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,8 +79,15 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
               {i.connectedAtLabel ?? "–"}
               {i.connectedBy ? ` by ${i.connectedBy}` : ""}
             </dd>
+            {i.inventory ? (
+              <>
+                <dt className="text-muted-foreground">Holds</dt>
+                <dd data-testid={`inventory-${i.key}`}>{inventoryLine(i.inventory)}</dd>
+              </>
+            ) : null}
           </dl>
         ) : null}
+        {connected && !compact && i.inventory?.groups.length ? <InventoryDetails inventory={i.inventory} /> : null}
         {review || (connected && !compact) ? (
           <div className="grid gap-3 rounded-md bg-muted p-3 text-xs sm:grid-cols-2">
             <div>
@@ -114,6 +121,11 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
               {i.oauthAvailable && i.provider === "composio" ? (
                 <ActionButton size="sm" variant="outline" action={() => connectOAuthAction(i.key)}>
                   Reconnect
+                </ActionButton>
+              ) : null}
+              {i.inventory && i.inventory.state !== "running" ? (
+                <ActionButton size="sm" variant="outline" action={() => refreshInventoryAction(i.key)}>
+                  Map again
                 </ActionButton>
               ) : null}
               <ActionButton
@@ -152,6 +164,42 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
         </CardFooter>
       ) : null}
     </Card>
+  );
+}
+
+function inventoryLine(inv: InventoryView) {
+  if (inv.state === "running") return "Mapping what it holds…";
+  if (inv.state === "failed") return `Could not map it${inv.error ? `: ${inv.error}` : ""}. Map again to retry.`;
+  if (inv.state === "none" || !inv.summary) return "Not mapped yet. It is mapped on the next read.";
+  return `${inv.summary} (mapped ${inv.takenAtLabel})`;
+}
+
+const KIND_LABEL: Record<string, string> = { mailbox: "Mailbox", "sample data": "Sample data", "readable record": "Readable records" };
+
+// Everything the inventory found, by kind: projects, tables, ad accounts, pipelines…
+function InventoryDetails({ inventory }: { inventory: InventoryView }) {
+  return (
+    <Collapsible className="text-xs">
+      <CollapsibleTrigger asChild>
+        <Button variant="link" size="sm" className="group h-auto max-w-full justify-start whitespace-normal px-0 text-left text-xs text-muted-foreground">
+          What AutonomOS found
+          <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 space-y-2 rounded-md bg-muted p-3">
+        {inventory.groups.map((g) => (
+          <div key={g.kind}>
+            <div className="font-medium">{KIND_LABEL[g.kind] ?? `${g.kind.charAt(0).toUpperCase()}${g.kind.slice(1)}s`}</div>
+            <p className="break-words text-muted-foreground">
+              {g.items.join(", ")}
+              {g.more ? `, and ${g.more} more` : ""}
+            </p>
+          </div>
+        ))}
+        {inventory.notes.length ? <p className="text-muted-foreground">{inventory.notes.join(" ")}</p> : null}
+        <p className="text-muted-foreground">Only names, fields and counts are kept, never the records themselves.</p>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

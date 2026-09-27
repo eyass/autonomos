@@ -1,10 +1,11 @@
 import "server-only";
 import { proposeProcessesFromSystems, type SystemSample } from "@autonomos/ai";
 import { sandboxStore } from "@autonomos/db";
-import { describeScan, sandboxHistory, scanSystem, SCANNABLE, type SystemScan } from "@autonomos/integrations";
+import { describeInventory, describeScan, sandboxHistory, scanSystem, SCANNABLE, type SystemScan } from "@autonomos/integrations";
 import { SystemProcessProposalSchema, type SystemProcessProposal } from "@autonomos/schemas";
 import { activity, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
+import { inventoryFor } from "@/server/inventory";
 import { companyContext, rejectedTitles, saveDiscoveredProcesses } from "@/server/processes";
 
 // Discovery from connected systems, as a run the browser drives step by step so people see
@@ -41,7 +42,7 @@ export type DiscoveryRunView = {
 async function connections(session: Session) {
   const { data } = await adminDb()
     .from("integration_connections")
-    .select("integration_key, provider, external_account_id, integrations(name)")
+    .select("integration_key, provider, external_account_id, inventory, integrations(name)")
     .eq("organization_id", session.org.id)
     .eq("status", "connected");
   return (data ?? []).map((c) => ({
@@ -49,6 +50,7 @@ async function connections(session: Session) {
     name: (c.integrations as unknown as { name: string } | null)?.name ?? c.integration_key,
     provider: c.provider as "sandbox" | "composio",
     externalAccountId: c.external_account_id,
+    inventory: c.inventory as unknown,
   }));
 }
 
@@ -142,16 +144,28 @@ export async function scanRunSystem(session: Session, runId: string, key: string
   try {
     if (!conn) throw new Error("No longer connected");
     if (conn.provider === "sandbox") await ensureSandboxHistory(session, key);
+    // What the system holds was mapped when it was connected; systems connected earlier are mapped now, once.
+    const inventory = await inventoryFor(session.org.id, key, conn.inventory);
     const scan: SystemScan = await scanSystem(key, {
       organizationId: session.org.id,
       connection: { integration: key, provider: conn.provider, externalAccountId: conn.externalAccountId },
       sandbox: sandboxStore(adminDb(), session.org.id),
+      inventory,
     });
+    const mapped = inventory && (inventory.resources.length || inventory.readers.length) ? describeInventory(inventory, conn.name) : undefined;
     updated = scan.unsupported
-      ? { ...target, state: "skipped", line: scan.unsupported }
+      ? { ...target, state: mapped ? "done" : "skipped", line: mapped ? `${conn.name}: ${inventory!.summary} (${scan.unsupported})` : scan.unsupported }
       : { ...target, state: "done", sampled: scan.sampled, itemKind: scan.itemKind, periodDays: scan.periodDays, estimatedTotal: scan.estimatedTotal ?? null, line: describeScan(scan, conn.name) };
-    if (!scan.unsupported && scan.sampled)
-      sample = { system: conn.name, itemKind: scan.itemKind, summary: describeScan(scan, conn.name), periodDays: scan.periodDays, items: scan.items.slice(0, 100) };
+    // A system whose records cannot be read still counts when its inventory says what it holds.
+    if ((!scan.unsupported && scan.sampled) || mapped)
+      sample = {
+        system: conn.name,
+        itemKind: scan.unsupported ? "what the system holds" : scan.itemKind,
+        summary: scan.unsupported ? `${conn.name}: records not read (${scan.unsupported})` : describeScan(scan, conn.name),
+        periodDays: scan.periodDays,
+        items: scan.unsupported ? [] : scan.items.slice(0, 100),
+        ...(mapped ? { inventory: mapped } : {}),
+      };
   } catch (e) {
     console.error("system scan failed", key, e);
     updated = { ...target, state: "failed", line: `Could not read ${target.name}: ${e instanceof Error ? e.message.slice(0, 160) : "unknown error"}` };
@@ -303,12 +317,15 @@ export async function readConnectedSystems(session: Session): Promise<string[]> 
     }
     try {
       if (c.provider === "sandbox") await ensureSandboxHistory(session, c.key);
+      const inventory = await inventoryFor(session.org.id, c.key, c.inventory);
       const scan = await scanSystem(c.key, {
         organizationId: session.org.id,
         connection: { integration: c.key, provider: c.provider, externalAccountId: c.externalAccountId },
         sandbox: sandboxStore(adminDb(), session.org.id),
+        inventory,
       });
       lines.push(describeScan(scan, c.name));
+      if (inventory?.resources.length) lines.push(describeInventory(inventory, c.name, 1500));
     } catch (e) {
       console.error("read connected system failed", c.key, e);
       lines.push(`${c.name} is connected but could not be read.`);

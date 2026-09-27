@@ -26,7 +26,7 @@ jobs:
     steps:
       - name: Skip when not configured
         if: env.TRIGGER_ACCESS_TOKEN == ''
-        run: echo "TRIGGER_ACCESS_TOKEN is not set; add it as a repository secret to enable worker deploys."
+        run: echo "::warning title=Worker not deployed::TRIGGER_ACCESS_TOKEN is not set, so the Trigger.dev worker was not deployed. Production agent runs and approvals keep running the last worker deployed by hand. Add a Trigger.dev personal access token as the TRIGGER_ACCESS_TOKEN repository secret."
       - uses: actions/checkout@v4
         if: env.TRIGGER_ACCESS_TOKEN != ''
       - uses: pnpm/action-setup@v4
@@ -41,13 +41,14 @@ jobs:
       - name: Write worker env file from secrets
         if: env.TRIGGER_ACCESS_TOKEN != ''
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # The project URL is public (it ships in the web app); a secret or variable overrides it.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL || 'https://nuyumoqvfnffrqwhvnii.supabase.co' }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
           COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL || 'https://autonom-ten.vercel.app' }}
         run: |
           umask 077
           : > .env.local
@@ -56,6 +57,9 @@ jobs:
             if [ -n "$value" ]; then printf '%s=%s\n' "$name" "$value" >> .env.local; fi
           done
           echo "AI_PROVIDER=google" >> .env.local
+          for name in SUPABASE_SERVICE_ROLE_KEY GOOGLE_GENERATIVE_AI_API_KEY COMPOSIO_API_KEY; do
+            if [ -z "${!name}" ]; then echo "::warning title=Missing worker secret::$name is not set as a repository secret; the worker keeps the value already in Trigger.dev, if any."; fi
+          done
       - name: Deploy
         if: env.TRIGGER_ACCESS_TOKEN != ''
         run: pnpm --filter @autonomos/workflows exec trigger deploy --env-file ../../.env.local --skip-update-check

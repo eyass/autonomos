@@ -366,6 +366,9 @@ export type SystemSample = {
   summary: string;
   periodDays: number | null;
   items: Array<{ title: string; detail?: string; date?: string | null; labels?: string[]; amount?: number; from?: string | null }>;
+  // What the system holds (projects, tables and columns, accounts, pipelines), from the
+  // inventory taken when it was connected.
+  inventory?: string;
 };
 
 // Caps on what one discovery run proposes. Wide on purpose: people untick what does not
@@ -450,7 +453,11 @@ export async function proposeProcessesFromSystems(input: {
   const known = [...input.existingProcesses, ...rejected];
   const context = [section("company_context", input.company), section("existing_processes", input.existingProcesses), section("rejected_processes", rejected.length ? rejected : "none")];
   const dataSection = (s: SystemSample, items = s.items) =>
-    section(`system_data_${s.system.toLowerCase().replace(/[^a-z]+/g, "_")}`, { system: s.system, holds: s.itemKind ?? "records", summary: s.summary, periodDays: s.periodDays, items }, false);
+    section(
+      `system_data_${s.system.toLowerCase().replace(/[^a-z]+/g, "_")}`,
+      { system: s.system, holds: s.itemKind ?? "records", summary: s.summary, periodDays: s.periodDays, ...(s.inventory ? { inventory: s.inventory } : {}), items },
+      false,
+    );
   const shared = [
     "Every process needs evidence: name the source and what in it shows the work, with counts where the data has them, e.g. '7 of 15 tickets are tagged refund' or '4 supplier invoices from one domain in 26 days'.",
     "Estimate estimatedOccurrencesPerMonth from the counts and the sampled period (scale to 30 days, and to the total when the summary says the sample is part of a larger number). Say in missingInformation that the sample may not show everything.",

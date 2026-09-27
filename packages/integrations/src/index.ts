@@ -5,3 +5,4 @@ export * from "./sandbox-seed";
 export * from "./sandbox-history";
 export * from "./scan";
 export * from "./directory";
+export * from "./inventory";
