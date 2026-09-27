@@ -52,69 +52,65 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
           <SystemLogo src={i.logo} name={i.name} className="size-6" />
           {i.name}
         </CardTitle>
-        <CardDescription className="line-clamp-2">{i.description}</CardDescription>
-        <CardAction>
+        <CardDescription className={connected || review ? "line-clamp-2" : "line-clamp-1"}>{i.description}</CardDescription>
+        <CardAction className="flex items-center gap-2">
           {connected ? (
             <Badge variant="success">Connected{i.provider === "sandbox" ? " · sandbox" : ""}</Badge>
-          ) : found ? (
-            <Badge variant="info">Detected</Badge>
           ) : (
-            <Badge variant="secondary">Not connected</Badge>
+            <>
+              {found ? <Badge variant="info">Detected</Badge> : null}
+              {canManage && available && !review ? (
+                <Button size="sm" variant="outline" onClick={() => setReview(true)}>
+                  Connect
+                </Button>
+              ) : !available ? (
+                <Badge variant="secondary">Soon</Badge>
+              ) : null}
+            </>
           )}
         </CardAction>
       </CardHeader>
-      <CardContent className="space-y-3 empty:hidden">
+      <CardContent className="space-y-2 empty:hidden">
         {connected && !compact ? (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs [&>dd]:min-w-0 [&>dd]:truncate">
-            <dt className="text-muted-foreground">Mode</dt>
-            <dd>{i.provider === "sandbox" ? "Sandbox: sample data held in AutonomOS" : "Live account"}</dd>
-            <dt className="text-muted-foreground">Account</dt>
-            <dd>{i.accountLabel ?? "–"}</dd>
-            <dt className="text-muted-foreground">Health</dt>
-            <dd>{i.status === "connected" ? "Connected" : "Needs attention"}</dd>
-            <dt className="text-muted-foreground">Last used</dt>
-            <dd>{i.lastUsedLabel ? `by an agent ${i.lastUsedLabel}` : "Not used by an agent yet"}</dd>
-            <dt className="text-muted-foreground">Connected</dt>
-            <dd>
-              {i.connectedAtLabel ?? "–"}
-              {i.connectedBy ? ` by ${i.connectedBy}` : ""}
-            </dd>
+          <>
             {i.inventory ? (
-              <>
-                <dt className="text-muted-foreground">Holds</dt>
-                <dd data-testid={`inventory-${i.key}`}>{inventoryLine(i.inventory)}</dd>
-              </>
+              <p className="text-sm" data-testid={`inventory-${i.key}`}>
+                {inventoryLine(i.inventory)}
+              </p>
             ) : null}
-          </dl>
+            <Collapsible className="text-xs">
+              <CollapsibleTrigger asChild>
+                <Button variant="link" size="sm" className="group h-auto px-0 text-xs text-muted-foreground">
+                  {i.inventory?.groups.length ? "What AutonomOS found" : "Details"}
+                  <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 space-y-3">
+                {i.inventory?.groups.length ? <InventoryDetails inventory={i.inventory} /> : null}
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 [&>dd]:min-w-0 [&>dd]:truncate">
+                  <dt className="text-muted-foreground">Account</dt>
+                  <dd>
+                    {i.accountLabel ?? "–"}
+                    {i.provider === "sandbox" ? " (sample data held in AutonomOS)" : ""}
+                  </dd>
+                  <dt className="text-muted-foreground">Last used</dt>
+                  <dd>{i.lastUsedLabel ? `by an agent ${i.lastUsedLabel}` : "Not used by an agent yet"}</dd>
+                  <dt className="text-muted-foreground">Connected</dt>
+                  <dd>
+                    {i.connectedAtLabel ?? "–"}
+                    {i.connectedBy ? ` by ${i.connectedBy}` : ""}
+                  </dd>
+                </dl>
+                <Access i={i} />
+                {i.webhook ? <WebhookInfo integrationKey={i.key} webhook={i.webhook} /> : null}
+              </CollapsibleContent>
+            </Collapsible>
+          </>
+        ) : review ? (
+          <Access i={i} />
         ) : null}
-        {connected && !compact && i.inventory?.groups.length ? <InventoryDetails inventory={i.inventory} /> : null}
-        {review || (connected && !compact) ? (
-          <div className="grid gap-3 rounded-md bg-muted p-3 text-xs sm:grid-cols-2">
-            <div>
-              <div className="mb-1 font-medium">Access AutonomOS asks for</div>
-              <ul className="list-inside list-disc space-y-0.5 text-muted-foreground">
-                {i.permissions.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <div className="mb-1 font-medium">What an agent can be allowed to do</div>
-              {i.agentReads.length ? <p className="text-muted-foreground">Look up: {i.agentReads.join(", ").toLowerCase()}.</p> : null}
-              {i.agentActs.length ? <p className="text-muted-foreground">Act: {i.agentActs.join(", ").toLowerCase()}.</p> : null}
-              {!i.agentReads.length && !i.agentActs.length ? <p className="text-muted-foreground">Used for discovery only for now.</p> : null}
-              <p className="mt-1 text-muted-foreground">Each agent gets only the actions you tick for it.</p>
-            </div>
-            <p className="text-muted-foreground sm:col-span-2">
-              {i.provider === "composio"
-                ? "Sign-in tokens are held by our secure connection partner; AutonomOS stores only the account id. Data an agent reads is kept in that run's history."
-                : "Sandbox data never leaves AutonomOS. Data an agent reads is kept in that run's history."}
-            </p>
-          </div>
-        ) : null}
-        {connected && !compact && i.webhook ? <WebhookInfo integrationKey={i.key} webhook={i.webhook} /> : null}
       </CardContent>
-      {canManage ? (
+      {canManage && (connected || review) ? (
         <CardFooter className="flex-wrap gap-2">
           {connected ? (
             <>
@@ -138,13 +134,7 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
                 Disconnect
               </ActionButton>
             </>
-          ) : !available ? (
-            <span className="text-xs text-muted-foreground">Available soon</span>
-          ) : !review ? (
-            <Button size="sm" variant="outline" onClick={() => setReview(true)}>
-              Connect
-            </Button>
-          ) : (
+          ) : !available || !review ? null : (
             <>
               {i.oauthAvailable ? (
                 <ActionButton size="sm" action={() => connectOAuthAction(i.key)}>
@@ -170,7 +160,7 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
 function inventoryLine(inv: InventoryView) {
   if (inv.state === "running") return "Mapping what it holds…";
   if (inv.state === "failed") return `Could not map it${inv.error ? `: ${inv.error}` : ""}. Map again to retry.`;
-  if (inv.state === "none" || !inv.summary) return "Not mapped yet. It is mapped on the next read.";
+  if (inv.state === "none" || !inv.summary) return "Not mapped yet. Maps on the next read.";
   return `${inv.summary} (mapped ${inv.takenAtLabel})`;
 }
 
@@ -179,27 +169,42 @@ const KIND_LABEL: Record<string, string> = { mailbox: "Mailbox", "sample data": 
 // Everything the inventory found, by kind: projects, tables, ad accounts, pipelines…
 function InventoryDetails({ inventory }: { inventory: InventoryView }) {
   return (
-    <Collapsible className="text-xs">
-      <CollapsibleTrigger asChild>
-        <Button variant="link" size="sm" className="group h-auto max-w-full justify-start whitespace-normal px-0 text-left text-xs text-muted-foreground">
-          What AutonomOS found
-          <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2 space-y-2 rounded-md bg-muted p-3">
-        {inventory.groups.map((g) => (
-          <div key={g.kind}>
-            <div className="font-medium">{KIND_LABEL[g.kind] ?? `${g.kind.charAt(0).toUpperCase()}${g.kind.slice(1)}s`}</div>
-            <p className="break-words text-muted-foreground">
-              {g.items.join(", ")}
-              {g.more ? `, and ${g.more} more` : ""}
-            </p>
-          </div>
-        ))}
-        {inventory.notes.length ? <p className="text-muted-foreground">{inventory.notes.join(" ")}</p> : null}
-        <p className="text-muted-foreground">Only names, fields and counts are kept, never the records themselves.</p>
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="space-y-2 rounded-md bg-muted p-3">
+      {inventory.groups.map((g) => (
+        <div key={g.kind}>
+          <div className="font-medium">{KIND_LABEL[g.kind] ?? `${g.kind.charAt(0).toUpperCase()}${g.kind.slice(1)}s`}</div>
+          <p className="break-words text-muted-foreground">
+            {g.items.join(", ")}
+            {g.more ? `, and ${g.more} more` : ""}
+          </p>
+        </div>
+      ))}
+      {inventory.notes.length ? <p className="text-muted-foreground">{inventory.notes.join(" ")}</p> : null}
+      <p className="text-muted-foreground">Only names, fields and counts are kept, never the records.</p>
+    </div>
+  );
+}
+
+// What connecting grants, and what agents may be allowed to do with it.
+function Access({ i }: { i: IntegrationView }) {
+  return (
+    <div className="grid gap-3 rounded-md bg-muted p-3 text-xs sm:grid-cols-2">
+      <div>
+        <div className="mb-1 font-medium">Access AutonomOS asks for</div>
+        <ul className="list-inside list-disc space-y-0.5 text-muted-foreground">
+          {i.permissions.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <div className="mb-1 font-medium">What an agent can be allowed to do</div>
+        {i.agentReads.length ? <p className="text-muted-foreground">Look up: {i.agentReads.join(", ").toLowerCase()}.</p> : null}
+        {i.agentActs.length ? <p className="text-muted-foreground">Act: {i.agentActs.join(", ").toLowerCase()}.</p> : null}
+        {!i.agentReads.length && !i.agentActs.length ? <p className="text-muted-foreground">Used for discovery only for now.</p> : null}
+        <p className="mt-1 text-muted-foreground">Each agent gets only the actions you tick for it.</p>
+      </div>
+    </div>
   );
 }
 

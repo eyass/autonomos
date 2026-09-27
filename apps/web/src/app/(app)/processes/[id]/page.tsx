@@ -8,7 +8,7 @@ import { approveProcessAction, generateOpportunitiesAction, setProcessStatusActi
 import { ProcessEditor } from "./editor";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
-import { StatCard } from "@/components/app/stat-card";
+import { StatStrip } from "@/components/app/stat-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,10 +116,7 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
 
       {p.status === "draft" ? (
         <Alert variant="info" className="mb-4">
-          <AlertDescription>
-            AI-generated processes are drafts until someone who knows the work reviews them. Check the steps and numbers, fix anything wrong, then approve. Approving finds its automation
-            opportunities.
-          </AlertDescription>
+          <AlertDescription>Draft. Check the steps and numbers, then approve to find its automation opportunities.</AlertDescription>
         </Alert>
       ) : null}
       {p.missing_information.length ? (
@@ -135,23 +132,21 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
         </Alert>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Human time"
-          value={`${hours(monthlyMinutes)}`}
-          hint={
-            p.estimated_occurrences_per_month
-              ? `${num(Number(p.estimated_occurrences_per_month))}× a month${p.estimated_minutes_per_occurrence ? `, ${num(Number(p.estimated_minutes_per_occurrence))} min each` : ""}`
-              : FREQUENCY_LABEL[p.frequency]
-          }
-        />
-        <StatCard label="Estimated cost" value={money((monthlyMinutes / 60) * rate, session.org.currency)} hint={`per month at ${money(rate, session.org.currency)}/h`} />
-        <StatCard label="Autonomy" value={<LevelChange from={effective} to={p.potential_autonomy_level} />} hint={activeAgent ? `with ${activeAgent.name}` : "now → potential"} />
-        <Card className="px-4 py-3">
-          <div className="mb-2 text-xs font-medium text-muted-foreground">Scores</div>
-          <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} className="flex-col items-start gap-1.5" />
-        </Card>
-      </div>
+      <StatStrip
+        className="mb-6"
+        items={[
+          {
+            label: "Human time",
+            value: `${hours(monthlyMinutes)}/mo`,
+            hint: p.estimated_occurrences_per_month
+              ? `${num(Number(p.estimated_occurrences_per_month))}×${p.estimated_minutes_per_occurrence ? `, ${num(Number(p.estimated_minutes_per_occurrence))} min each` : ""}`
+              : FREQUENCY_LABEL[p.frequency],
+          },
+          { label: "Cost", value: `${money((monthlyMinutes / 60) * rate, session.org.currency)}/mo`, hint: `at ${money(rate, session.org.currency)}/h` },
+          { label: "Autonomy", value: <LevelChange from={effective} to={p.potential_autonomy_level} />, hint: activeAgent ? `with ${activeAgent.name}` : undefined },
+          { label: "Scores", value: <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} className="mt-1 gap-x-2" /> },
+        ]}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="min-w-0 space-y-6 lg:col-span-2">
@@ -212,7 +207,6 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
             <Card className="border-highlight/30">
               <CardHeader>
                 <CardTitle>What an agent would do</CardTitle>
-                <CardDescription>Proposed by discovery from your data. Opportunities build on it.</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm">{p.proposed_automation}</p>
@@ -223,7 +217,6 @@ export default async function ProcessPage({ params }: { params: Promise<{ id: st
             <Card>
               <CardHeader>
                 <CardTitle>Found in your systems</CardTitle>
-                <CardDescription>Why AutonomOS proposed this process.</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-1.5 text-sm">

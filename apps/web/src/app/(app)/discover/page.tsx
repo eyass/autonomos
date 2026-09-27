@@ -36,7 +36,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
   const fresh = latest?.status === "ready" && latest.recent;
   return (
     <>
-      <PageHeader title="Discover processes" description="AutonomOS reads your connected systems and proposes the recurring work it finds. Everything starts as a draft for you to review." />
+      <PageHeader title="Discover processes" description="AutonomOS reads your connected systems and proposes the work it finds." />
       {welcome ? (
         <Card className="mb-4 border-primary/40">
           <CardContent>

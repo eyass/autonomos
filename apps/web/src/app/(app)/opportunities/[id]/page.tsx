@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { buildAndTestAgentAction } from "@/app/(app)/agents/actions";
 import { notFound } from "next/navigation";
@@ -10,10 +10,11 @@ import { createClient } from "@/lib/supabase/server";
 import { setOpportunityStatusAction } from "../actions";
 import { ButtonLink } from "@/components/app/button-link";
 import { PageHeader } from "@/components/app/page-header";
-import { StatCard } from "@/components/app/stat-card";
+import { StatStrip } from "@/components/app/stat-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type FutureStep = { title: string; actor: "agent" | "human" | "system"; approval?: boolean };
 
@@ -40,6 +41,24 @@ export default async function OpportunityPage({ params, searchParams }: { params
   const evidence = (o.evidence as Array<{ source: string; detail: string }> | null) ?? [];
   const missing = o.required_integrations.filter((s) => !connectedNames.includes(s.toLowerCase()));
 
+  const statusNote =
+    o.status === "live"
+      ? `Live at L${agent?.autonomy_level}. Putting this on hold or rejecting it pauses the agent.`
+      : o.status === "reviewing"
+        ? "On hold. The agent is paused."
+        : o.status === "rejected"
+          ? "Rejected."
+          : o.status === "archived"
+            ? "Done."
+            : agent
+              ? "The agent is being tested with simulated actions. This goes live when the agent is activated."
+              : null;
+  const controls = [
+    { title: "Still done by people", items: o.human_involvement },
+    { title: "Needs approval", items: o.required_approvals },
+    { title: "Risks", items: o.major_risks },
+  ].filter((g) => g.items.length);
+
   return (
     <>
       <PageHeader
@@ -55,7 +74,31 @@ export default async function OpportunityPage({ params, searchParams }: { params
         }
         actions={
           agent ? (
-            <ButtonLink href={`/agents/${agent.id}`}>Open {agent.name}</ButtonLink>
+            <>
+              <ButtonLink href={`/agents/${agent.id}`}>Open agent</ButtonLink>
+              {o.status === "rejected" || o.status === "archived" || o.status === "reviewing" ? (
+                <ActionButton variant="outline" action={setOpportunityStatusAction.bind(null, id, "building")}>
+                  Reopen
+                </ActionButton>
+              ) : (
+                <>
+                  <ActionButton variant="ghost" action={setOpportunityStatusAction.bind(null, id, "archived")} confirm="Mark this opportunity as done?" confirmLabel="Mark done">
+                    Mark done
+                  </ActionButton>
+                  <ActionButton
+                    variant="ghost"
+                    action={setOpportunityStatusAction.bind(null, id, "reviewing")}
+                    confirm="Put this opportunity on hold? A live agent is paused."
+                    confirmLabel="Put on hold"
+                  >
+                    Hold
+                  </ActionButton>
+                  <ActionButton variant="ghost" action={setOpportunityStatusAction.bind(null, id, "rejected")} confirm="Reject this opportunity? A live agent is paused." confirmLabel="Reject">
+                    Reject
+                  </ActionButton>
+                </>
+              )}
+            </>
           ) : (
             <>
               <ActionButton action={buildAndTestAgentAction.bind(null, id)} pendingLabel="Building and testing…">
@@ -66,7 +109,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
                 Customise first
               </ButtonLink>
               {o.status === "suggested" ? (
-                <ActionButton variant="outline" action={setOpportunityStatusAction.bind(null, id, "approved")}>
+                <ActionButton variant="ghost" action={setOpportunityStatusAction.bind(null, id, "approved")}>
                   Approve
                 </ActionButton>
               ) : null}
@@ -84,86 +127,10 @@ export default async function OpportunityPage({ params, searchParams }: { params
         }
       />
 
-      {agent ? (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle>
-              {o.status === "live"
-                ? `Live: ${agent.name} handles this work at L${agent.autonomy_level}`
-                : o.status === "rejected"
-                  ? "Rejected"
-                  : o.status === "archived"
-                    ? "Done"
-                    : o.status === "reviewing"
-                      ? "On hold"
-                      : `Building: ${agent.name} was created from this opportunity`}
-            </CardTitle>
-            <CardDescription>
-              {o.status === "live"
-                ? "It stays live until the agent is paused. Rejecting or putting this on hold pauses the agent too."
-                : o.status === "rejected" || o.status === "archived"
-                  ? "Reopen it to continue working on the agent."
-                  : o.status === "reviewing"
-                    ? "The agent is paused while this is on hold."
-                    : "The agent is being set up and tested with simulated actions. This opportunity goes live when the agent is activated."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <ButtonLink href={`/agents/${agent.id}`} size="sm">
-              Open {agent.name}
-            </ButtonLink>
-            {o.status === "rejected" || o.status === "archived" || o.status === "reviewing" ? (
-              <ActionButton size="sm" variant="outline" action={setOpportunityStatusAction.bind(null, id, "building")}>
-                Reopen
-              </ActionButton>
-            ) : (
-              <>
-                <ActionButton size="sm" variant="outline" action={setOpportunityStatusAction.bind(null, id, "archived")} confirm="Mark this opportunity as done?" confirmLabel="Mark done">
-                  Mark done
-                </ActionButton>
-                <ActionButton
-                  size="sm"
-                  variant="ghost"
-                  action={setOpportunityStatusAction.bind(null, id, "reviewing")}
-                  confirm="Put this opportunity on hold? A live agent is paused."
-                  confirmLabel="Put on hold"
-                >
-                  Put on hold
-                </ActionButton>
-                <ActionButton size="sm" variant="ghost" action={setOpportunityStatusAction.bind(null, id, "rejected")} confirm="Reject this opportunity? A live agent is paused." confirmLabel="Reject">
-                  Reject
-                </ActionButton>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
-      {evidence.length ? (
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle>Why this opportunity</CardTitle>
-            <CardDescription>The facts it is based on.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {evidence.map((e, i) => (
-                <li key={i} className="flex gap-2">
-                  <Badge variant="secondary" className="shrink-0">
-                    {e.source}
-                  </Badge>
-                  <span>{e.detail}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
       {found && !agent ? (
         <Alert variant="agent" className="mb-4">
           <Sparkles />
-          <AlertDescription>
-            AutonomOS found this opportunity when {proc.title} was approved. Build and test the agent in one click: it runs a simulated test, so nothing changes in your systems.
-          </AlertDescription>
+          <AlertDescription>Found when {proc.title} was approved. Building runs a simulated test, so nothing changes in your systems.</AlertDescription>
         </Alert>
       ) : null}
       {missing.length ? (
@@ -178,16 +145,17 @@ export default async function OpportunityPage({ params, searchParams }: { params
         </Alert>
       ) : null}
 
-      <p className="mb-6 max-w-3xl text-sm">{o.description}</p>
-
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Hours saved" value={`${num(Number(o.estimated_hours_saved_monthly ?? 0))} h`} hint="per month, estimate" />
-        <StatCard label="Estimated value" value={money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)} hint="per month" />
-        <StatCard label="Autonomy" value={<LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />} hint="today → target" />
-        <Card className="px-4 py-3">
-          <div className="mb-2 text-xs font-medium text-muted-foreground">Scores</div>
-          <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} className="flex-col items-start gap-1.5" />
-        </Card>
+      <div className="mb-6 space-y-4">
+        {statusNote ? <p className="text-sm font-medium">{statusNote}</p> : null}
+        <p className="max-w-3xl text-sm text-muted-foreground">{o.description}</p>
+        <StatStrip
+          items={[
+            { label: "Saves", value: `${num(Number(o.estimated_hours_saved_monthly ?? 0))} h/mo` },
+            { label: "Worth", value: `${money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}/mo` },
+            { label: "Autonomy", value: <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} /> },
+            { label: "Scores", value: <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} className="mt-1 gap-x-2" /> },
+          ]}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -195,78 +163,81 @@ export default async function OpportunityPage({ params, searchParams }: { params
           <Card>
             <CardHeader>
               <CardTitle>What changes</CardTitle>
-              <CardDescription>{o.problem}</CardDescription>
+              {o.problem ? <CardDescription>{o.problem}</CardDescription> : null}
             </CardHeader>
             <CardContent>
               <BeforeAfter today={today} proposed={(o.future_state_steps as FutureStep[]) ?? []} />
-              <p className="mt-4 text-sm text-muted-foreground">{o.proposed_future_state}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>The proposed agent</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="font-medium">{agentSpec.name}</div>
-              <p className="text-muted-foreground">{agentSpec.objective}</p>
-              <ul className="list-inside list-disc">
-                {(agentSpec.responsibilities ?? []).map((r) => (
-                  <li key={r}>{r}</li>
-                ))}
-              </ul>
-              {o.rationale ? (
-                <div>
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">Why it is worth it</div>
-                  <p className="text-muted-foreground">{o.rationale}</p>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+          {evidence.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Why this opportunity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 text-sm">
+                  {evidence.map((e, i) => (
+                    <li key={i}>
+                      <div className="text-xs font-medium text-muted-foreground">{e.source}</div>
+                      <div>{e.detail}</div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Humans and controls</CardTitle>
+              <CardTitle>{agentSpec.name ?? "The agent"}</CardTitle>
+              {agentSpec.objective ? <CardDescription>{agentSpec.objective}</CardDescription> : null}
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Still done by people</div>
-                <ul className="list-inside list-disc">
-                  {o.human_involvement.map((h) => (
-                    <li key={h}>{h}</li>
+              {agentSpec.responsibilities?.length ? (
+                <ul className="list-inside list-disc space-y-0.5">
+                  {agentSpec.responsibilities.map((r) => (
+                    <li key={r}>{r}</li>
                   ))}
                 </ul>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Needs approval</div>
-                <ul className="list-inside list-disc">
-                  {o.required_approvals.map((a) => (
-                    <li key={a}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Risks</div>
-                <ul className="list-inside list-disc">
-                  {o.major_risks.map((a) => (
-                    <li key={a}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-              <p className="text-xs text-muted-foreground">Limits and escalations are enforced by the platform, not only by the agent&apos;s instructions.</p>
+              ) : null}
+              {controls.length || o.rationale ? (
+                <Collapsible>
+                  <CollapsibleTrigger className="group inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+                    People, approvals and risks
+                    <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-3 space-y-3">
+                    {controls.map((g) => (
+                      <div key={g.title}>
+                        <div className="mb-1 text-xs text-muted-foreground">{g.title}</div>
+                        <ul className="list-inside list-disc space-y-0.5">
+                          {g.items.map((x) => (
+                            <li key={x}>{x}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                    {o.rationale ? (
+                      <div>
+                        <div className="mb-1 text-xs text-muted-foreground">Why it is worth it</div>
+                        <p>{o.rationale}</p>
+                      </div>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">Limits and escalations are enforced by the platform, not only by the agent&apos;s instructions.</p>
+                  </CollapsibleContent>
+                </Collapsible>
+              ) : null}
             </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Systems needed</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-1.5">
-              {o.required_integrations.map((s) => (
-                <Badge key={s} variant={connectedNames.includes(s.toLowerCase()) ? "success" : "warning"}>
-                  {s} {connectedNames.includes(s.toLowerCase()) ? "connected" : "not connected"}
-                </Badge>
-              ))}
-            </CardContent>
+            {o.required_integrations.length ? (
+              <CardFooter className="flex-wrap gap-1.5 border-t">
+                {o.required_integrations.map((s) => (
+                  <Badge key={s} variant={connectedNames.includes(s.toLowerCase()) ? "success" : "warning"}>
+                    {s}
+                  </Badge>
+                ))}
+              </CardFooter>
+            ) : null}
           </Card>
         </div>
       </div>

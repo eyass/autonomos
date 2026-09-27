@@ -56,9 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </header>
         {session.org.isDemo ? (
-          <div className="border-b border-info/30 bg-info-soft px-4 py-2 text-sm text-info sm:px-6">
-            Sample workspace. The company and its customers are fictional and every system is a sandbox, so nothing real changes. Agent runs, costs and approvals here are real.
-          </div>
+          <div className="border-b border-info/30 bg-info-soft px-4 py-2 text-sm text-info sm:px-6">Sample workspace. The company and its customers are fictional, and nothing real changes.</div>
         ) : null}
         {session.org.agentsPaused ? (
           <div className="border-b border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning sm:px-6">

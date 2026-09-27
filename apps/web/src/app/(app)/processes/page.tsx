@@ -83,7 +83,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
   const active = [q.department, q.status, q.autonomy, q.risk, q.value].filter(Boolean).length;
   return (
     <>
-      <PageHeader title="Processes" description="The recurring work your teams do today, and how autonomous it could become." actions={actions} />
+      <PageHeader title="Processes" description="The recurring work your teams do today." actions={actions} />
       {q.drafted ? (
         <Alert variant="agent" className="mb-4">
           <Sparkles />
