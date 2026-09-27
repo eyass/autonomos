@@ -588,13 +588,13 @@ isOneToOne: false
                   ]
                 },"integration_connections": {
                   Row: {
-                    "account_label": string | null,"connected_at": string,"connected_by": string | null,"disconnected_at": string | null,"external_account_id": string | null,"granted_permissions": NonNullable<Json>,"id": string,"integration_key": string,"last_error": string | null,"organization_id": string,"provider": Database["public"]['Enums']["integration_provider"],"status": Database["public"]['Enums']["connection_status"]
+                    "account_label": string | null,"connected_at": string,"connected_by": string | null,"disconnected_at": string | null,"external_account_id": string | null,"granted_permissions": NonNullable<Json>,"id": string,"integration_key": string,"inventoried_at": string | null,"inventory": Json | null,"inventory_error": string | null,"inventory_status": string | null,"last_error": string | null,"organization_id": string,"provider": Database["public"]['Enums']["integration_provider"],"status": Database["public"]['Enums']["connection_status"]
                   }
                   Insert: {
-                    "account_label"?: string | null,"connected_at"?: string,"connected_by"?: string | null,"disconnected_at"?: string | null,"external_account_id"?: string | null,"granted_permissions"?: NonNullable<Json>,"id"?: string,"integration_key": string,"last_error"?: string | null,"organization_id": string,"provider": Database["public"]['Enums']["integration_provider"],"status"?: Database["public"]['Enums']["connection_status"]
+                    "account_label"?: string | null,"connected_at"?: string,"connected_by"?: string | null,"disconnected_at"?: string | null,"external_account_id"?: string | null,"granted_permissions"?: NonNullable<Json>,"id"?: string,"integration_key": string,"inventoried_at"?: string | null,"inventory"?: Json | null,"inventory_error"?: string | null,"inventory_status"?: string | null,"last_error"?: string | null,"organization_id": string,"provider": Database["public"]['Enums']["integration_provider"],"status"?: Database["public"]['Enums']["connection_status"]
                   }
                   Update: {
-                    "account_label"?: string | null,"connected_at"?: string,"connected_by"?: string | null,"disconnected_at"?: string | null,"external_account_id"?: string | null,"granted_permissions"?: NonNullable<Json>,"id"?: string,"integration_key"?: string,"last_error"?: string | null,"organization_id"?: string,"provider"?: Database["public"]['Enums']["integration_provider"],"status"?: Database["public"]['Enums']["connection_status"]
+                    "account_label"?: string | null,"connected_at"?: string,"connected_by"?: string | null,"disconnected_at"?: string | null,"external_account_id"?: string | null,"granted_permissions"?: NonNullable<Json>,"id"?: string,"integration_key"?: string,"inventoried_at"?: string | null,"inventory"?: Json | null,"inventory_error"?: string | null,"inventory_status"?: string | null,"last_error"?: string | null,"organization_id"?: string,"provider"?: Database["public"]['Enums']["integration_provider"],"status"?: Database["public"]['Enums']["connection_status"]
                   }
                   Relationships: [
                     {

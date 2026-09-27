@@ -187,6 +187,10 @@ test("demo loop", async ({ page }) => {
 
   // Add systems: the popular list first, and search across the whole directory (needs a Composio key)
   await page.goto("/integrations");
+  // Each connected system was mapped once, when it was connected
+  await expect(page.getByTestId("inventory-zendesk")).toHaveText(/1 sample data \(mapped /);
+  await page.getByTestId("integration-zendesk").getByRole("button", { name: "What AutonomOS found" }).click();
+  await expect(page.getByTestId("integration-zendesk").getByText("Sample zendesk records")).toBeVisible();
   const addSystems = page.getByRole("button", { name: "Add systems" });
   if (await addSystems.count()) {
     await addSystems.click();

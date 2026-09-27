@@ -1,5 +1,6 @@
 import { ToolError } from "./errors";
-import { readOnlyTools, toolkitFor } from "./directory";
+import { readOnlyTools, toolkitFor, type ToolMeta } from "./directory";
+import type { InventoryReader, SystemInventory } from "./inventory";
 import { getComposio, type ConnectionInfo, type SandboxRecord, type SandboxStore } from "./providers";
 
 // Reads a recent sample of real data from a connected system so discovery can propose the
@@ -24,7 +25,9 @@ export type SystemScan = {
   unsupported?: string;
 };
 
-export type ScanContext = { organizationId: string; connection: ConnectionInfo; sandbox: SandboxStore; now?: Date };
+// `inventory` is what the system was found to hold when it was connected (see inventory.ts);
+// readers use it instead of looking up projects, accounts and working actions again.
+export type ScanContext = { organizationId: string; connection: ConnectionInfo; sandbox: SandboxStore; now?: Date; inventory?: SystemInventory | null };
 
 // Sandbox systems that have data to read. Live accounts: every Composio toolkit can be read,
 // with a dedicated reader for the common ones and a general reader for the rest.
@@ -277,7 +280,7 @@ async function scanSandbox(integration: string, s: SandboxStore, limit: ScanLimi
 // version the tool catalogue reports (reads only, so a newer version is safe).
 const PINNED = new Set(["zendesk", "stripe", "slack", "gmail"]);
 
-async function exec(ctx: ScanContext, slug: string, args: Record<string, unknown>, version?: string | null): Promise<Record<string, unknown>> {
+export async function exec(ctx: Pick<ScanContext, "organizationId" | "connection">, slug: string, args: Record<string, unknown>, version?: string | null): Promise<Record<string, unknown>> {
   if (!ctx.connection.externalAccountId) throw new ToolError("not_connected", "No connected account");
   const toolkit = toolkitFor(ctx.connection.integration);
   const r = (await getComposio().tools.execute(slug, {
@@ -297,8 +300,8 @@ async function exec(ctx: ScanContext, slug: string, args: Record<string, unknown
   return d;
 }
 
-const arr = (v: unknown): Array<Record<string, unknown>> => (Array.isArray(v) ? (v as Array<Record<string, unknown>>) : []);
-const iso = (v: unknown): string | null => {
+export const arr = (v: unknown): Array<Record<string, unknown>> => (Array.isArray(v) ? (v as Array<Record<string, unknown>>) : []);
+export const iso = (v: unknown): string | null => {
   if (v === null || v === undefined || v === "") return null;
   if (typeof v === "object") {
     const o = v as { dateTime?: unknown; date?: unknown };
@@ -311,7 +314,7 @@ const iso = (v: unknown): string | null => {
 };
 
 // The first non-empty array of objects in a response, however deeply Composio wraps it.
-function firstList(d: unknown, depth = 0): Array<Record<string, unknown>> {
+export function firstList(d: unknown, depth = 0): Array<Record<string, unknown>> {
   if (Array.isArray(d)) return d.length && typeof d[0] === "object" && d[0] !== null ? (d as Array<Record<string, unknown>>) : [];
   if (!d || typeof d !== "object" || depth > 3) return [];
   for (const v of Object.values(d as Record<string, unknown>)) {
@@ -332,7 +335,7 @@ const sec = (d: Date) => Math.floor(d.getTime() / 1000);
 
 // Response fields that point at the next page, and the argument names tools take them in.
 const NEXT_FIELDS = ["nextPageToken", "next_page_token", "next_cursor", "nextCursor", "cursor"];
-const TOKEN_PARAMS = ["page_token", "pageToken", "start_cursor", "cursor", "next_page_token", "after"];
+export const TOKEN_PARAMS = ["page_token", "pageToken", "start_cursor", "cursor", "next_page_token", "after"];
 function nextToken(d: Record<string, unknown>): string | null {
   for (const f of NEXT_FIELDS) if (typeof d[f] === "string" && d[f]) return d[f] as string;
   const after = (d.paging as { next?: { after?: unknown } } | undefined)?.next?.after;
@@ -440,6 +443,7 @@ async function scanComposio(integration: string, ctx: ScanContext, limit: ScanLi
     );
   }
   if (toolkit === "googlebigquery") return scanBigQuery(integration, ctx, limit, now);
+  if (toolkit === "googleads") return scanGoogleAds(integration, ctx, limit);
   if (toolkit === "notion") {
     // Pages edited most recently first, until the window or the cap runs out.
     const since = sinceMs;
@@ -485,8 +489,8 @@ async function scanComposio(integration: string, ctx: ScanContext, limit: ScanLi
 // that need no input, call them with the lookback and cap, and keep what looks like work items.
 // ---------------------------------------------------------------------------
 
-const LIMIT_PARAMS = ["limit", "max_results", "maxResults", "per_page", "perPage", "page_size", "pageSize", "count", "top", "first"];
-const SINCE_PARAMS = [
+export const LIMIT_PARAMS = ["limit", "max_results", "maxResults", "per_page", "perPage", "page_size", "pageSize", "count", "top", "first"];
+export const SINCE_PARAMS = [
   "since",
   "after",
   "start_date",
@@ -602,33 +606,20 @@ function curatedReads(toolkit: string, sinceIso: string, max: number): Read[] | 
 }
 
 // Actions about the work itself rank above actions about configuration.
-const WORK =
+export const WORK =
   /(TICKET|DEAL|CONVERSATION|ISSUE|TASK|MESSAGE|EMAIL|ORDER|INVOICE|EVENT|LEAD|OPPORTUNIT|CASE|POST|COMMENT|RECORD|FILE|CAMPAIGN|PAYMENT|TRANSACTION|BOOKING|APPOINTMENT|REQUEST|SUBMISSION|RESPONSE|NOTE|ACTIVIT)/;
-const CONFIG =
+export const CONFIG =
   /(ATTACHMENT|DOWNLOAD|FILE_CONTENT|SCHEMA|FIELD|PROPERT|SCOPE|TOKEN|WEBHOOK|SETTING|TEMPLATE|IMPORT|EXPORT|TYPE|USER|ADMIN|MEMBER|ROLE|PERMISSION|LABEL|TAG|FOLDER|WORKSPACE|TEAM|BOARD|BASE|LIST_LISTS|CATEGOR|CURRENC|LOCALE|TIMEZONE|APP)/;
 
 async function scanGeneric(integration: string, toolkit: string, ctx: ScanContext, limit: ScanLimit, now: Date): Promise<SystemScan> {
   const sinceIso = new Date(now.getTime() - limit.days * 86_400_000).toISOString();
   let reads = curatedReads(toolkit, sinceIso, limit.max);
   if (!reads && toolkit === "microsoft_teams") return scanTeams(integration, ctx, limit, now);
-  if (!reads) {
-    const tools = (await readOnlyTools(toolkit).catch(() => []))
-      .filter((t) => t.required.length === 0 && /(LIST|FETCH|SEARCH|GET_ALL|RECENT)/.test(t.slug) && WORK.test(t.slug) && !CONFIG.test(t.slug.replace(/^[A-Z]+_/, "")))
-      // An action with an optional id filter (comments of a task, say) often needs one after all,
-      // so it ranks after actions that list across the account.
-      .sort((a, b) => rank(a.slug) + idFilters(a.properties) - (rank(b.slug) + idFilters(b.properties)))
-      .slice(0, 4);
-    reads = tools.map((t) => {
-      const args: Record<string, unknown> = {};
-      const per = Math.ceil(limit.max / Math.min(2, Math.max(1, tools.length)));
-      for (const p of LIMIT_PARAMS) if (t.properties[p]) args[p] = per;
-      for (const p of SINCE_PARAMS) {
-        if (!t.properties[p]) continue;
-        args[p] = t.properties[p].type === "integer" || t.properties[p].type === "number" ? Math.floor(Date.parse(sinceIso) / 1000) : sinceIso;
-      }
-      return { slug: t.slug, args, version: t.version };
-    });
-  }
+  const perRead = (n: number) => Math.ceil(limit.max / Math.min(2, Math.max(1, n)));
+  // Read actions the inventory found working; otherwise pick candidates from the catalogue.
+  let readers: InventoryReader[] = ctx.inventory?.readers ?? [];
+  if (!reads && !readers.length) readers = genericCandidates(await readOnlyTools(toolkit).catch(() => []));
+  if (!reads) reads = readers.map((r) => ({ slug: r.slug, args: readerArgs(r, sinceIso, perRead(readers.length)), version: r.version ?? null }));
   if (!reads.length) {
     return {
       integration,
@@ -644,14 +635,12 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
   // Up to two reads that return data; later candidates only stand in for ones that fail.
   const wanted = Math.min(2, reads.length);
   const per = Math.ceil(limit.max / wanted);
-  const meta = await readOnlyTools(toolkit).catch(() => []);
   const items: ScanItem[] = [];
   const used: string[] = [];
   for (const r of reads) {
     if (used.length >= wanted) break;
     try {
-      const props = meta.find((t) => t.slug === r.slug)?.properties ?? {};
-      const tokenParam = TOKEN_PARAMS.find((p) => props[p]) ?? null;
+      const tokenParam = readers.find((t) => t.slug === r.slug)?.tokenParam ?? null;
       const rows = (await paged(ctx, r.slug, r.args, tokenParam, per * 3, (d) => firstList(d), r.version)).map(genericItem).filter((i): i is ScanItem => Boolean(i));
       const recent = rows.filter((i) => !i.date || Date.parse(i.date) >= Date.parse(sinceIso)).slice(0, per);
       if (recent.length) {
@@ -676,6 +665,38 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
   };
 }
 
+// Read-only list actions that need no input and are about the work, best first. An action with
+// an optional id filter (comments of a task, say) often needs one after all, so it ranks after
+// actions that list across the account.
+export function genericCandidates(tools: ToolMeta[], n = 4): InventoryReader[] {
+  return tools
+    .filter((t) => t.required.length === 0 && /(LIST|FETCH|SEARCH|GET_ALL|RECENT)/.test(t.slug) && WORK.test(t.slug) && !CONFIG.test(t.slug.replace(/^[A-Z]+_/, "")))
+    .sort((a, b) => rank(a.slug) + idFilters(a.properties) - (rank(b.slug) + idFilters(b.properties)))
+    .slice(0, n)
+    .map(readerFor);
+}
+
+// How to call a read action: its page-size, since and page-token parameters, if any.
+export function readerFor(t: ToolMeta): InventoryReader {
+  const sinceName = SINCE_PARAMS.find((p) => t.properties[p]);
+  const sinceType = sinceName ? t.properties[sinceName]?.type : undefined;
+  return {
+    slug: t.slug,
+    version: t.version,
+    limitParam: LIMIT_PARAMS.find((p) => t.properties[p]) ?? null,
+    since: sinceName ? { param: sinceName, unix: sinceType === "integer" || sinceType === "number" } : null,
+    tokenParam: TOKEN_PARAMS.find((p) => t.properties[p]) ?? null,
+    fields: [],
+  };
+}
+
+export function readerArgs(r: InventoryReader, sinceIso: string, per: number): Record<string, unknown> {
+  const args: Record<string, unknown> = {};
+  if (r.limitParam) args[r.limitParam] = per;
+  if (r.since) args[r.since.param] = r.since.unix ? Math.floor(Date.parse(sinceIso) / 1000) : sinceIso;
+  return args;
+}
+
 // BigQuery: the shape of the warehouse, never its rows. Table names, columns, row counts and
 // when each table last changed tell discovery what the business measures and which reports
 // or analyses an agent could run on it.
@@ -685,36 +706,49 @@ const BQ_REGIONS = [
 ];
 
 async function scanBigQuery(integration: string, ctx: ScanContext, limit: ScanLimit, now: Date): Promise<SystemScan> {
-  // Every query needs a project, so first list the projects the account can see.
-  const listed = await exec(ctx, "GOOGLEBIGQUERY_LIST_PROJECTS", { max_results: 10 }).catch((e) => {
-    console.error("bigquery projects failed", e);
-    return {} as Record<string, unknown>;
-  });
-  const projects = bqProjects(listed).slice(0, 3);
+  const known = (ctx.inventory?.resources ?? []).filter((r) => r.kind === "table");
+  // Where the tables live comes from the inventory. Without one, list the projects the account
+  // can see (every query needs a project) and try the two multi-regions.
+  let places: Array<{ project_id: string; location: string }>;
+  let projects: string[];
+  if (known.length) {
+    places = [...new Map(known.map((t) => [`${t.parent}|${t.location}`, { project_id: String(t.parent), location: String(t.location ?? "US") }])).values()];
+    projects = [...new Set(places.map((p) => p.project_id))];
+  } else {
+    const listed = await exec(ctx, "GOOGLEBIGQUERY_LIST_PROJECTS", { max_results: 10 }).catch((e) => {
+      console.error("bigquery projects failed", e);
+      return {} as Record<string, unknown>;
+    });
+    projects = bqProjects(listed).slice(0, 3);
+    places = projects.flatMap((project_id) => BQ_REGIONS.map((r) => ({ project_id, location: r.location })));
+  }
   let tables: Array<Record<string, unknown>> = [];
-  let columns: Array<Record<string, unknown>> = [];
-  for (const project_id of projects) {
-    for (const { region, location } of BQ_REGIONS) {
-      const rows = async (query: string, names: string[]) => arr((await exec(ctx, "GOOGLEBIGQUERY_QUERY", { project_id, location, query })).rows).map((r) => bqRow(r, names));
-      try {
-        const found = await rows(
-          `SELECT table_schema, table_name, total_rows, storage_last_modified_time FROM \`${project_id}\`.\`${region}\`.INFORMATION_SCHEMA.TABLE_STORAGE WHERE deleted = FALSE ORDER BY storage_last_modified_time DESC LIMIT ${limit.max}`,
-          ["table_schema", "table_name", "total_rows", "storage_last_modified_time"],
-        );
-        if (!found.length) continue;
-        tables.push(...found);
-        columns.push(
-          ...(await rows(
-            `SELECT table_schema, table_name, STRING_AGG(column_name, ', ' ORDER BY ordinal_position LIMIT 30) AS columns FROM \`${project_id}\`.\`${region}\`.INFORMATION_SCHEMA.COLUMNS GROUP BY table_schema, table_name LIMIT ${limit.max * 2}`,
-            ["table_schema", "table_name", "columns"],
-          ).catch(() => [])),
-        );
-      } catch (e) {
-        console.error("bigquery metadata failed", region, e);
-      }
+  let columns: Array<Record<string, unknown>> = known.map((t) => ({ table_schema: t.name?.split(".")[0], table_name: t.name?.split(".").slice(1).join("."), columns: (t.fields ?? []).join(", ") }));
+  for (const { project_id, location } of places) {
+    const region = bqRegion(location);
+    const rows = async (query: string, names: string[]) => arr((await exec(ctx, "GOOGLEBIGQUERY_QUERY", { project_id, location, query })).rows).map((r) => bqRow(r, names));
+    try {
+      const found = await rows(
+        `SELECT table_schema, table_name, total_rows, storage_last_modified_time FROM \`${project_id}\`.\`${region}\`.INFORMATION_SCHEMA.TABLE_STORAGE WHERE deleted = FALSE ORDER BY storage_last_modified_time DESC LIMIT ${limit.max}`,
+        ["table_schema", "table_name", "total_rows", "storage_last_modified_time"],
+      );
+      if (!found.length) continue;
+      tables.push(...found);
+      if (known.length) continue;
+      columns.push(
+        ...(await rows(
+          `SELECT table_schema, table_name, STRING_AGG(column_name, ', ' ORDER BY ordinal_position LIMIT 30) AS columns FROM \`${project_id}\`.\`${region}\`.INFORMATION_SCHEMA.COLUMNS GROUP BY table_schema, table_name LIMIT ${limit.max * 2}`,
+          ["table_schema", "table_name", "columns"],
+        ).catch(() => [])),
+      );
+    } catch (e) {
+      console.error("bigquery metadata failed", region, e);
     }
     if (tables.length >= limit.max) break;
   }
+  // If the fresh counts could not be read, the inventory still says what the warehouse holds.
+  if (!tables.length && known.length)
+    tables = known.map((t) => ({ table_schema: t.name?.split(".")[0], table_name: t.name?.split(".").slice(1).join("."), total_rows: t.count ?? 0, storage_last_modified_time: t.updatedAt ?? null }));
   tables = tables.slice(0, limit.max);
   const colsOf = new Map(columns.map((c) => [`${c.table_schema}.${c.table_name}`, String(c.columns ?? "")]));
   const items: ScanItem[] = tables.map((t) => {
@@ -747,6 +781,9 @@ async function scanBigQuery(integration: string, ctx: ScanContext, limit: ScanLi
   };
 }
 
+// The INFORMATION_SCHEMA qualifier for a dataset location: "EU" → region-eu, "europe-west1" → region-europe-west1.
+export const bqRegion = (location: string) => `region-${location.toLowerCase()}`;
+
 // Project ids from the projects list, in either the API's or a flattened shape.
 export function bqProjects(d: Record<string, unknown>): string[] {
   const list = firstList(d);
@@ -758,6 +795,83 @@ export function bqProjects(d: Record<string, unknown>): string[] {
 export function bqRow(r: Record<string, unknown>, names: string[]): Record<string, unknown> {
   if (!Array.isArray(r.f)) return r;
   return Object.fromEntries(names.map((n, i) => [n, ((r.f as Array<{ v?: unknown }>)[i] ?? {}).v]));
+}
+
+// Google Ads: spend, clicks and conversions per campaign over the last 30 days, per ad
+// account. The accounts come from the inventory (manager accounts resolved to the accounts
+// under them); without one, every account the sign-in can reach is tried.
+async function scanGoogleAds(integration: string, ctx: ScanContext, limit: ScanLimit): Promise<SystemScan> {
+  let accounts = (ctx.inventory?.resources ?? []).filter((r) => r.kind === "ad account").map((r) => ({ id: r.id, name: r.name ?? r.id, currency: r.meta?.currency }));
+  if (!accounts.length && !ctx.inventory) accounts = adsCustomerIds(await exec(ctx, "GOOGLEADS_LIST_ACCESSIBLE_CUSTOMERS", {}).catch(() => ({}))).map((id) => ({ id, name: id, currency: undefined }));
+  const items: ScanItem[] = [];
+  const read: string[] = [];
+  let spend = 0;
+  let conversions = 0;
+  let currency = "";
+  for (const a of accounts.slice(0, 5)) {
+    try {
+      const d = await exec(ctx, "GOOGLEADS_SEARCH_STREAM_GAQL", {
+        customer_id: a.id,
+        query:
+          "SELECT campaign.name, campaign.status, campaign.advertising_channel_type, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions, metrics.conversions_value FROM campaign WHERE segments.date DURING LAST_30_DAYS AND metrics.impressions > 0 ORDER BY metrics.cost_micros DESC LIMIT 50",
+      });
+      const rows = arr(d.results).length ? arr(d.results) : firstList(d);
+      if (!rows.length) continue;
+      read.push(a.name);
+      currency ||= a.currency ?? "";
+      for (const r of rows) {
+        const cost = Number(adsField(r, "metrics.cost_micros") ?? 0) / 1_000_000;
+        const conv = Number(adsField(r, "metrics.conversions") ?? 0);
+        const clicks = Number(adsField(r, "metrics.clicks") ?? 0);
+        spend += cost;
+        conversions += conv;
+        const cpa = conv ? cost / conv : null;
+        items.push({
+          title: redact(`${adsField(r, "campaign.name") ?? "Campaign"} (${String(adsField(r, "campaign.status") ?? "").toLowerCase() || "unknown status"})`, 140),
+          detail: `spend ${money(cost)}${a.currency ? ` ${a.currency}` : ""} · ${clicks.toLocaleString("en")} clicks · ${Math.round(conv * 10) / 10} conversions${cpa !== null ? ` · cost per conversion ${money(cpa)}` : ""}`,
+          amount: Math.round(cost * 100) / 100,
+          labels: [String(adsField(r, "campaign.advertising_channel_type") ?? "").toLowerCase(), a.name].filter(Boolean),
+        });
+      }
+    } catch (e) {
+      console.error("google ads report failed", a.id, e);
+    }
+  }
+  return {
+    integration,
+    provider: "composio",
+    itemKind: "ad campaigns",
+    sampled: items.length,
+    periodDays: 30,
+    stats: {
+      campaigns: items.length,
+      spend_last_30_days: `${money(spend)}${currency ? ` ${currency}` : ""}`,
+      conversions: Math.round(conversions),
+      cost_per_conversion: conversions ? money(spend / conversions) : "",
+      accounts: read.join(", "),
+    },
+    items: items.slice(0, limit.max),
+    ...(items.length ? {} : { unsupported: accounts.length ? "No campaign had impressions in the last 30 days." : "No ad account the connected sign-in can report on." }),
+  };
+}
+
+const money = (n: number) => n.toLocaleString("en", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+
+// "customers/1234567890" → "1234567890".
+export function adsCustomerIds(d: Record<string, unknown>): string[] {
+  const names = Array.isArray(d.resourceNames) ? d.resourceNames : Array.isArray(d.resource_names) ? d.resource_names : [];
+  return names.map((n) => String(n).replace(/^customers\//, "")).filter((id) => /^\d+$/.test(id));
+}
+
+// GAQL rows come back nested, in camelCase or snake_case: metrics.cost_micros or metrics.costMicros.
+export function adsField(row: Record<string, unknown>, path: string): unknown {
+  let v: unknown = row;
+  for (const part of path.split(".")) {
+    if (!v || typeof v !== "object") return undefined;
+    const o = v as Record<string, unknown>;
+    v = o[part] ?? o[part.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())];
+  }
+  return v;
 }
 
 // Microsoft Teams: the most recent chats, then the last month of messages in each.
@@ -775,9 +889,9 @@ async function scanTeams(integration: string, ctx: ScanContext, limit: ScanLimit
   return chatScan(integration, "composio", messages, limit, now);
 }
 
-const idFilters = (props: Record<string, unknown>) => (Object.keys(props).some((k) => /^[a-z]+_id$/.test(k)) ? 3 : 0);
+export const idFilters = (props: Record<string, unknown>) => (Object.keys(props).some((k) => /^[a-z]+_id$/.test(k)) ? 3 : 0);
 
-function rank(slug: string) {
+export function rank(slug: string) {
   if (/LIST/.test(slug)) return 0;
   if (/FETCH|RECENT|GET_ALL/.test(slug)) return 1;
   return 2;

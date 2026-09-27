@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/session";
 import { completeOAuthConnection } from "@/server/integrations";
 
+// The first inventory of the system runs after the redirect; give it room to finish.
+export const maxDuration = 300;
+
 // Composio OAuth return. The connected account is verified server-side before it is stored.
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;

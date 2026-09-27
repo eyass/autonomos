@@ -4,14 +4,19 @@ import { IntegrationGrid } from "./grid";
 import { AddSystems } from "./add-systems";
 import { canUseComposio } from "@/server/integrations";
 import { PageHeader } from "@/components/app/page-header";
+import { LiveRefresh } from "../activity/[runId]/live";
 
 export const metadata = { title: "Integrations" };
+// Connecting and mapping a system run their first inventory after the response.
+export const maxDuration = 300;
 
 export default async function IntegrationsPage() {
   const session = await requireSession();
   const integrations = await loadIntegrations(session);
+  const mapping = integrations.some((i) => i.inventory?.state === "running");
   return (
     <>
+      <LiveRefresh active={mapping} />
       <PageHeader
         title="Integrations"
         description="Systems AutonomOS can read from and act in. Connecting does not give any agent access; each agent gets an explicit list of allowed actions."

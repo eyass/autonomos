@@ -1,9 +1,10 @@
 import "server-only";
-import { toolsForIntegrations } from "@autonomos/integrations";
+import { isInventory, toolsForIntegrations } from "@autonomos/integrations";
 import { dateTime, relative } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { adminDb, isAdmin, type Session } from "@/lib/session";
 import { canUseComposio, SANDBOX_INTEGRATIONS } from "@/server/integrations";
+import { INVENTORY_STALE_MS } from "@/server/inventory";
 
 export type IntegrationView = {
   key: string;
@@ -27,7 +28,45 @@ export type IntegrationView = {
   sandboxAvailable: boolean;
   oauthAvailable: boolean;
   webhook: { url: string; secret: string } | null;
+  // What the system holds, mapped once when it was connected.
+  inventory: InventoryView | null;
 };
+
+export type InventoryView = {
+  state: "running" | "ready" | "failed" | "none";
+  summary: string | null;
+  takenAtLabel: string | null;
+  groups: Array<{ kind: string; items: string[]; more: number }>;
+  notes: string[];
+  error: string | null;
+};
+
+function inventoryView(c: { inventory: unknown; inventory_status: string | null; inventoried_at: string | null; inventory_error: string | null }): InventoryView {
+  const inv = isInventory(c.inventory) ? c.inventory : null;
+  const cutOff = c.inventory_status === "running" && c.inventoried_at && Date.now() - new Date(c.inventoried_at).getTime() > INVENTORY_STALE_MS;
+  const state = cutOff ? "failed" : ((c.inventory_status as InventoryView["state"] | null) ?? (inv ? "ready" : "none"));
+  const byKind = new Map<string, string[]>();
+  for (const r of inv?.resources ?? [])
+    byKind.set(r.kind, [...(byKind.get(r.kind) ?? []), `${r.name ?? r.id}${r.count !== undefined && r.kind === "table" ? ` (${r.count.toLocaleString("en")} rows)` : ""}`]);
+  if (inv?.readers.length)
+    byKind.set(
+      "readable record",
+      inv.readers.map((r) =>
+        r.slug
+          .replace(/^[A-Z0-9]+_/, "")
+          .replaceAll("_", " ")
+          .toLowerCase(),
+      ),
+    );
+  return {
+    state,
+    summary: inv?.summary ?? null,
+    takenAtLabel: inv ? dateTime(inv.takenAt) : null,
+    groups: [...byKind].map(([kind, items]) => ({ kind, items: items.slice(0, 30), more: Math.max(0, items.length - 30) })),
+    notes: inv?.notes ?? [],
+    error: cutOff ? "Mapping was interrupted." : (c.inventory_error ?? null),
+  };
+}
 
 export async function loadIntegrations(session: Session): Promise<IntegrationView[]> {
   const supabase = await createClient();
@@ -35,7 +74,7 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
     supabase.from("integrations").select("*").order("sort_order"),
     supabase
       .from("integration_connections")
-      .select("id, integration_key, status, provider, account_label, connected_at, users:connected_by(first_name, last_name, email)")
+      .select("id, integration_key, status, provider, account_label, connected_at, inventory, inventory_status, inventoried_at, inventory_error, users:connected_by(first_name, last_name, email)")
       .eq("organization_id", session.org.id),
   ]);
   // Webhook signing secrets are only loaded for admins, server-side.
@@ -84,6 +123,7 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
         sandboxAvailable: SANDBOX_INTEGRATIONS.includes(i.key),
         oauthAvailable: canUseComposio(),
         webhook: c && c.status === "connected" && secrets.get(c.id) ? { url: `${appUrl}/api/webhooks/${c.id}`, secret: secrets.get(c.id)! } : null,
+        inventory: c && c.status === "connected" ? inventoryView(c) : null,
       };
     });
 }

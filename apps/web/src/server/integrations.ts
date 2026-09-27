@@ -3,6 +3,7 @@ import { composioConfigured, directoryGroups, getComposio, getToolkit, integrati
 import { sandboxStore } from "@autonomos/db";
 import { audit, activity, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
+import { inventoryInBackground } from "./inventory";
 
 // Integrations implemented end to end in the sandbox (tools exist for them).
 export const SANDBOX_INTEGRATIONS = ["zendesk", "stripe", "slack", "gmail"];
@@ -109,6 +110,9 @@ export async function connectSandbox(session: Session, key: string) {
         connected_at: new Date().toISOString(),
         disconnected_at: null,
         last_error: null,
+        inventory: null,
+        inventory_status: "running",
+        inventory_error: null,
       },
       { onConflict: "organization_id,integration_key" },
     )
@@ -165,6 +169,9 @@ export async function completeOAuthConnection(session: Session, key: string, con
         connected_at: new Date().toISOString(),
         disconnected_at: null,
         last_error: null,
+        inventory: null,
+        inventory_status: "running",
+        inventory_error: null,
       },
       { onConflict: "organization_id,integration_key" },
     )
@@ -176,9 +183,24 @@ export async function completeOAuthConnection(session: Session, key: string, con
 }
 
 async function afterConnect(session: Session, key: string, provider: string) {
+  // Map what the system holds once, in the background, so every later read can use it.
+  inventoryInBackground(session.org.id, key);
   await audit(session, { action: "integration.connected", system: key, input: { provider } });
   await activity(session, { actionType: "integration_connected", title: `Connected ${key}${provider === "sandbox" ? " (sandbox)" : ""}`, status: "success" });
   await track(session, "integration_connected", { integration: key, provider });
+}
+
+// Maps the system again, for example after new projects or tables were added.
+export async function refreshInventory(session: Session, key: string) {
+  if (!isAdmin(session)) throw new HttpError(403, "Only admins can manage integrations");
+  const { data } = await adminDb().from("integration_connections").select("status").eq("organization_id", session.org.id).eq("integration_key", key).maybeSingle();
+  if (data?.status !== "connected") throw new HttpError(409, "Connect the system first");
+  await adminDb()
+    .from("integration_connections")
+    .update({ inventory_status: "running", inventory_error: null, inventoried_at: new Date().toISOString() })
+    .eq("organization_id", session.org.id)
+    .eq("integration_key", key);
+  inventoryInBackground(session.org.id, key);
 }
 
 export async function disconnect(session: Session, key: string) {

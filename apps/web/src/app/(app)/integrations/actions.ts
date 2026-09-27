@@ -2,7 +2,8 @@
 import { redirect } from "next/navigation";
 import { runAction } from "@/lib/actions";
 import { requireSessionOrThrow } from "@/lib/session";
-import { connectFromDirectory, connectSandbox, disconnect, directoryCategories, searchIntegrationDirectory, startOAuthConnection } from "@/server/integrations";
+import { revalidatePath } from "next/cache";
+import { connectFromDirectory, connectSandbox, disconnect, directoryCategories, refreshInventory, searchIntegrationDirectory, startOAuthConnection } from "@/server/integrations";
 import { rotateWebhookSecret } from "@/server/platform";
 
 export async function connectSandboxAction(key: string) {
@@ -17,6 +18,12 @@ export async function connectOAuthAction(key: string) {
 
 export async function disconnectAction(key: string) {
   return runAction(async () => disconnect(await requireSessionOrThrow(), key));
+}
+
+export async function refreshInventoryAction(key: string) {
+  const result = await runAction(async () => refreshInventory(await requireSessionOrThrow(), String(key)));
+  revalidatePath("/integrations");
+  return result;
 }
 
 export async function rotateWebhookSecretAction(key: string) {
