@@ -2,7 +2,7 @@ import { computeOrgMetrics } from "@autonomos/db";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { AutonomyLadder, StatusBadge } from "@/components/domain";
-import { hours, pct, usd } from "@/lib/format";
+import { hours, pct, aiMoney } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { activateAction, pauseAction } from "./actions";
@@ -75,7 +75,7 @@ export default async function AgentsPage() {
                   </TableCell>
                   <TableCell className="hidden @2xl:table-cell">{pct(s?.successRate)}</TableCell>
                   <TableCell className="hidden @4xl:table-cell">{hours((s?.hoursSaved ?? 0) * 60)}</TableCell>
-                  <TableCell className="hidden @4xl:table-cell">{usd(s?.aiCost ?? 0)}</TableCell>
+                  <TableCell className="hidden @4xl:table-cell">{aiMoney(s?.aiCost ?? 0, session.org.currency)}</TableCell>
                   <TableCell className="text-right @lg:text-left">
                     <StatusBadge status={a.status} />
                   </TableCell>

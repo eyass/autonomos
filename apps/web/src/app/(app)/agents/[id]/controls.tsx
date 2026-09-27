@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { changeAutonomyAction, runNowAction, simulateTicketAction, testRunAction, testRunSampleAction } from "../actions";
 import { FormField } from "@/components/app/form-field";
+import { checkTestInput } from "@/lib/test-input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,21 +34,20 @@ export function TestPanel({
   const [json, setJson] = useState("{}");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const empty = !ticketDriven && /^\s*\{\s*\}\s*$/.test(json);
-  const preflight = [...warnings, ...(empty ? ["The input is empty. Use the sample input, or add the facts this run should work on."] : [])];
+  const [acknowledged, setAcknowledged] = useState(false);
+  const check = ticketDriven ? null : checkTestInput(json);
+  const errors = check?.errors ?? [];
+  const preflight = [...warnings, ...(check?.warnings ?? [])];
+  // Running despite a warning is a decision, so it is asked for, not implied by a button label.
+  const needsAck = preflight.length > 0;
   const run = () =>
     start(async () => {
       setError(null);
       let r;
       if (ticketDriven) r = await testRunSampleAction(agentId, sample);
       else {
-        let input: Record<string, unknown>;
-        try {
-          input = JSON.parse(json);
-        } catch {
-          return setError("Input must be valid JSON");
-        }
-        r = await testRunAction(agentId, input);
+        if (!check?.value) return setError(errors.join(" "));
+        r = await testRunAction(agentId, check.value, acknowledged);
       }
       if (r && !r.ok) setError(r.error);
     });
@@ -70,9 +71,33 @@ export function TestPanel({
         ) : (
           <div>
             <FormField label="Input (JSON)">
-              <Textarea value={json} onChange={(e) => setJson(e.target.value)} rows={json.split("\n").length > 3 ? 6 : 3} className="font-mono text-xs" />
+              <Textarea
+                value={json}
+                onChange={(e) => {
+                  setJson(e.target.value);
+                  setAcknowledged(false);
+                }}
+                aria-invalid={errors.length > 0}
+                aria-describedby={errors.length ? "test-input-error" : undefined}
+                rows={json.split("\n").length > 3 ? 6 : 3}
+                className="font-mono text-xs"
+              />
             </FormField>
-            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => setJson(sampleInput)}>
+            {errors.length ? (
+              <p id="test-input-error" className="mt-1 text-xs text-destructive">
+                {errors.join(" ")}
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto px-0 text-xs"
+              onClick={() => {
+                setJson(sampleInput);
+                setAcknowledged(false);
+              }}
+            >
               Use sample input
             </Button>
           </div>
@@ -91,12 +116,16 @@ export function TestPanel({
                   <li key={w}>{w}</li>
                 ))}
               </ul>
+              <label className="mt-2 flex items-center gap-2 text-sm font-medium">
+                <Checkbox checked={acknowledged} onCheckedChange={(v) => setAcknowledged(v === true)} aria-label="Run the test with these warnings" />
+                Run the test with these warnings
+              </label>
             </AlertDescription>
           </Alert>
         ) : null}
         {blockedReason ? <p className="text-xs text-muted-foreground">{blockedReason}</p> : null}
-        <Button onClick={run} disabled={pending || Boolean(blockedReason)} variant={preflight.length ? "outline" : "default"}>
-          {pending ? "Starting…" : preflight.length ? "Run test anyway" : "Run test"}
+        <Button onClick={run} disabled={pending || Boolean(blockedReason) || errors.length > 0 || (needsAck && !acknowledged)} variant={needsAck ? "outline" : "default"}>
+          {pending ? "Starting…" : needsAck ? "Run test anyway" : "Run test"}
         </Button>
       </CardContent>
     </Card>

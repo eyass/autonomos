@@ -4,6 +4,7 @@ import { AgentConfigSchema } from "@autonomos/schemas";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { runAction } from "@/lib/actions";
+import { checkTestInput } from "@/lib/test-input";
 import { HttpError, requireSessionOrThrow } from "@/lib/session";
 import {
   activateAgent,
@@ -48,8 +49,15 @@ export async function updateAgentAction(agentId: string, config: unknown, note: 
   redirect(`/agents/${agentId}`);
 }
 
-export async function testRunAction(agentId: string, input: Record<string, unknown>) {
-  const result = await runAction(async () => startTestRun(await requireSessionOrThrow(), agentId, input));
+// A test with warnings on its input runs only when the person said to run it anyway.
+export async function testRunAction(agentId: string, input: Record<string, unknown>, acknowledged = false) {
+  const result = await runAction(async () => {
+    const session = await requireSessionOrThrow();
+    const check = checkTestInput(input);
+    if (check.errors.length) throw new HttpError(400, check.errors.join(" "));
+    if (check.warnings.length && !acknowledged) throw new HttpError(400, `Confirm to run with these warnings: ${check.warnings.join(" ")}`);
+    return startTestRun(session, agentId, check.value!);
+  });
   if (!result.ok) return result;
   redirect(`/activity/${result.data}`);
 }

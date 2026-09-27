@@ -1,5 +1,5 @@
 import { agentStats, autonomyScore, departmentAutonomy, type ProcessForMetrics } from "@autonomos/agents";
-import type { AutonomyLevel } from "@autonomos/schemas";
+import { fromUsd, type AutonomyLevel } from "@autonomos/schemas";
 import type { DbClient } from "./index";
 
 // ---------------------------------------------------------------------------
@@ -157,10 +157,14 @@ export async function computeOrgMetrics(db: DbClient, organizationId: string, si
     );
   }
 
+  const currency = org.data?.currency ?? "EUR";
   return {
-    currency: org.data?.currency ?? "EUR",
+    currency,
     hourlyCost: hourlyDefault,
     autonomyScore: autonomyScore(procs, activeLevels),
+    // The same score with no agents: work the mapped processes already do with software
+    // (recorded autonomy levels). The difference is what live agents add.
+    baselineAutonomy: autonomyScore(procs, new Map()),
     departmentAutonomy: departmentAutonomy(procs, activeLevels).map((d) => ({
       ...d,
       name: (departments.data ?? []).find((x) => x.id === d.departmentId)?.name ?? "Unassigned",
@@ -178,7 +182,8 @@ export async function computeOrgMetrics(db: DbClient, organizationId: string, si
     aiCostBySource,
     productionRuns: prodRuns.length,
     // Value from production work over the AI cost of that work. Null until there is both.
-    roi: tasksExecuted > 0 && aiCostBySource.production > 0 ? valueCreated / aiCostBySource.production : null,
+    // Both in the workspace currency: AI cost is priced in USD and converted at the reference rate.
+    roi: tasksExecuted > 0 && aiCostBySource.production > 0 ? valueCreated / fromUsd(aiCostBySource.production, currency) : null,
     perAgent,
   };
 }

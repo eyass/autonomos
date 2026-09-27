@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ButtonLink } from "@/components/app/button-link";
 import { cn } from "@/lib/utils";
 import { ActionButton } from "@/components/action-button";
-import { dateTime, num, usd } from "@/lib/format";
+import { dateTime, num, aiMoney, money } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, revokeApiKeyAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
@@ -209,7 +209,7 @@ export default async function SettingsPage() {
                         {m.role}
                       </Badge>
                       <Badge variant={m.can_approve ? "success" : "secondary"}>
-                        {m.can_approve ? (m.approval_limit === null ? "Approver" : `Approves up to ${usd(Number(m.approval_limit)).replace("$", "")} ${session.org.currency}`) : "No approvals"}
+                        {m.can_approve ? (m.approval_limit === null ? "Approver" : `Approves up to ${money(Number(m.approval_limit), session.org.currency)}`) : "No approvals"}
                       </Badge>
                     </div>
                     {admin ? (
@@ -344,9 +344,10 @@ export default async function SettingsPage() {
                     label: "AI spend",
                     value: (
                       <span title="Setup is discovery and drafting; tests and live runs are split by run mode">
-                        {usd(cost)}
+                        {aiMoney(cost, session.org.currency)}
                         <span className="block text-xs font-normal text-muted-foreground">
-                          setup {usd(spend.aiCostBySource.setup)} · tests {usd(spend.aiCostBySource.test)} · live {usd(spend.aiCostBySource.production)}
+                          setup {aiMoney(spend.aiCostBySource.setup, session.org.currency)} · tests {aiMoney(spend.aiCostBySource.test, session.org.currency)} · live{" "}
+                          {aiMoney(spend.aiCostBySource.production, session.org.currency)}
                         </span>
                       </span>
                     ),

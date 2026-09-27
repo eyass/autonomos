@@ -37,6 +37,8 @@ export async function takeInventory(organizationId: string, key: string, timeout
       title: `Could not map ${key}`,
       body: "AutonomOS could not list what this system holds. Check the connection, then choose Map again.",
       link: "/integrations",
+      // Once per system per day, however often the listing is retried.
+      key: `inventory_failed:${key}:${new Date().toISOString().slice(0, 10)}`,
     }).catch((err) => console.error("notification failed", err));
     return null;
   }

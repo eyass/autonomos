@@ -259,7 +259,13 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
                   <RowLink key={a.id} href={`/agents/${a.id}`} title={a.name} meta={<span>Agent · L{a.autonomy_level}</span>} aside={<StatusBadge status={a.status} />} />
                 ))}
                 {(opportunities ?? []).map((o) => (
-                  <RowLink key={o.id} href={`/opportunities/${o.id}`} title={o.title} meta={<span>Opportunity · target L{o.target_autonomy_level}</span>} aside={<StatusBadge status={o.status} />} />
+                  <RowLink
+                    key={o.id}
+                    href={`/opportunities/${o.id}`}
+                    title={o.title}
+                    meta={<span>Opportunity · target L{o.target_autonomy_level}</span>}
+                    aside={<StatusBadge status={o.status} kind="opportunity" />}
+                  />
                 ))}
               </div>
             </Card>

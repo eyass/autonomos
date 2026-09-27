@@ -726,13 +726,13 @@ isOneToOne: false
                   ]
                 },"notifications": {
                   Row: {
-                    "body": string | null,"created_at": string,"id": string,"kind": string,"link": string | null,"organization_id": string,"read_at": string | null,"title": string,"user_id": string | null
+                    "body": string | null,"created_at": string,"dedupe_key": string | null,"id": string,"kind": string,"link": string | null,"organization_id": string,"read_at": string | null,"title": string,"user_id": string | null
                   }
                   Insert: {
-                    "body"?: string | null,"created_at"?: string,"id"?: string,"kind": string,"link"?: string | null,"organization_id": string,"read_at"?: string | null,"title": string,"user_id"?: string | null
+                    "body"?: string | null,"created_at"?: string,"dedupe_key"?: string | null,"id"?: string,"kind": string,"link"?: string | null,"organization_id": string,"read_at"?: string | null,"title": string,"user_id"?: string | null
                   }
                   Update: {
-                    "body"?: string | null,"created_at"?: string,"id"?: string,"kind"?: string,"link"?: string | null,"organization_id"?: string,"read_at"?: string | null,"title"?: string,"user_id"?: string | null
+                    "body"?: string | null,"created_at"?: string,"dedupe_key"?: string | null,"id"?: string,"kind"?: string,"link"?: string | null,"organization_id"?: string,"read_at"?: string | null,"title"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {

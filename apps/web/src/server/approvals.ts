@@ -1,6 +1,7 @@
 import "server-only";
 import { applyApprovalChanges, INTERVENTION_MINUTES } from "@autonomos/agents";
 import { getTool, ToolError } from "@autonomos/integrations";
+import { sendNotification } from "@autonomos/db";
 import { ApprovalDecisionSchema, type ApprovalDecision } from "@autonomos/schemas";
 import { enqueueRun, TriggerNotConfiguredError } from "@autonomos/workflows";
 import { activity, audit, track } from "@/lib/audit";
@@ -96,6 +97,13 @@ export async function resolveApproval(session: Session, approvalId: string, raw:
       agentRunId: approval.agent_run_id,
       status: "error",
     });
+    await sendNotification(adminDb(), session.org.id, {
+      kind: "agent_failed",
+      title: "An approved run could not resume",
+      body: `The decision on "${approval.title}" was saved, but the run did not continue. Open it to start it again.`,
+      link: `/activity/${approval.agent_run_id}`,
+      key: `resume_failed:${approvalId}`,
+    }).catch((err) => console.error("notification failed", err));
     if (e instanceof TriggerNotConfiguredError) throw new HttpError(503, `${e.message} The decision was saved; the run resumes once the agent runtime is connected.`);
     throw e;
   }

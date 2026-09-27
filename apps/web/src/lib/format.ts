@@ -1,3 +1,4 @@
+import { fromUsd } from "@autonomos/schemas";
 export function money(amount: number | null | undefined, currency = "EUR", digits = 0) {
   if (amount === null || amount === undefined || !Number.isFinite(amount)) return "–";
   return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: digits, minimumFractionDigits: digits }).format(amount);
@@ -6,6 +7,14 @@ export function money(amount: number | null | undefined, currency = "EUR", digit
 export function usd(amount: number | null | undefined) {
   if (amount === null || amount === undefined) return "–";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: amount < 1 ? 4 : 2 }).format(amount);
+}
+
+// AI spend (priced in US dollars) in the workspace currency, at the reference rate, so every
+// amount on a page is in one currency. Small amounts keep enough digits to be readable.
+export function aiMoney(usdAmount: number | null | undefined, currency = "EUR") {
+  if (usdAmount === null || usdAmount === undefined || !Number.isFinite(usdAmount)) return "–";
+  const local = fromUsd(usdAmount, currency);
+  return money(local, currency, local > 0 && local < 1 ? 3 : 2);
 }
 
 export function pct(v: number | null | undefined, digits = 0) {

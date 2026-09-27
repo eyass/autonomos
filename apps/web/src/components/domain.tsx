@@ -123,8 +123,20 @@ const STATUS_LABELS: Record<string, string> = {
   event_driven: "When it happens",
 };
 
-export function StatusBadge({ status }: { status: string }) {
-  const label = STATUS_LABELS[status] ?? status.replaceAll("_", " ");
+// Opportunities share some status names with processes and agents but mean something else
+// by them, so they get their own words, matching the lifecycle help on the page.
+const OPPORTUNITY_LABELS: Record<string, string> = {
+  suggested: "Suggested",
+  reviewing: "On hold",
+  approved: "Approved",
+  building: "Building",
+  live: "Live",
+  rejected: "Rejected",
+  archived: "Done",
+};
+
+export function StatusBadge({ status, kind }: { status: string; kind?: "opportunity" }) {
+  const label = (kind === "opportunity" ? OPPORTUNITY_LABELS[status] : undefined) ?? STATUS_LABELS[status] ?? status.replaceAll("_", " ");
   return (
     <Badge variant={STATUS_TONES[status] ?? "secondary"} className="capitalize">
       {label}

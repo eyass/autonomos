@@ -181,9 +181,14 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                     {(() => {
                       const gaps = processGaps(p);
                       return gaps.length ? (
-                        <Link href={`/processes/${p.id}?edit=1#edit`} className="block text-xs text-warning hover:underline">
-                          Add: {gaps.slice(0, 2).join(", ").toLowerCase()}
-                          {gaps.length > 2 ? ` and ${gaps.length - 2} more` : ""}
+                        // One short line per row; the full list is in the tooltip and on the process.
+                        <Link
+                          href={`/processes/${p.id}?edit=1#edit`}
+                          title={`Missing: ${gaps.join("; ")}`}
+                          aria-label={`${gaps.length} gap${gaps.length === 1 ? "" : "s"}: ${gaps.join("; ")}. Review`}
+                          className="mt-0.5 inline-block text-xs text-warning hover:underline"
+                        >
+                          {gaps.length} gap{gaps.length === 1 ? "" : "s"} · Review
                         </Link>
                       ) : null;
                     })()}

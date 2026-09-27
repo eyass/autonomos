@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
 import { OutcomeBadge, StatusBadge } from "@/components/domain";
-import { dateTime, hours, time, usd } from "@/lib/format";
+import { dateTime, hours, time, aiMoney } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -125,7 +125,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
             items={[
               { label: "Time saved", value: hours(Number(run.estimated_minutes_saved ?? 0)) },
               { label: "Human time", value: `${Number(run.human_minutes)} min` },
-              { label: "AI cost", value: <span title={`${run.input_tokens + run.output_tokens} tokens`}>{usd(Number(run.model_cost))}</span> },
+              { label: "AI cost", value: <span title={`${run.input_tokens + run.output_tokens} tokens`}>{aiMoney(Number(run.model_cost), session.org.currency)}</span> },
               { label: "Duration", value: duration === null ? "–" : `${duration.toFixed(1)} s` },
             ]}
           />

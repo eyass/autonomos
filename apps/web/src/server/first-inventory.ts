@@ -96,6 +96,7 @@ async function runMapping(session: Session, p: MappingProgress) {
         title: "Your first process inventory is ready",
         body: `${ids.length} process${ids.length === 1 ? "" : "es"} drafted for you to review.`,
         link: "/processes?status=draft",
+        key: `first_inventory_ready:${p.startedAt}`,
       }).catch((e) => console.error("notification failed", e));
   } catch (e) {
     console.error("first inventory failed", e);
@@ -103,5 +104,12 @@ async function runMapping(session: Session, p: MappingProgress) {
     p.status = "failed";
     p.error = "Drafting the first inventory did not finish.";
     await save(session.org.id, p);
+    await sendNotification(adminDb(), session.org.id, {
+      kind: "discovery_failed",
+      title: "Your first process inventory did not finish",
+      body: "Nothing was lost. Open Discover to read your systems again, or add processes by interview.",
+      link: "/discover",
+      key: `first_inventory_failed:${p.startedAt}`,
+    }).catch((err) => console.error("notification failed", err));
   }
 }
