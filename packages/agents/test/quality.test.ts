@@ -22,7 +22,11 @@ describe("compliance guardrails", () => {
   const base = {
     autonomyLevel: 5,
     tools: ["zendesk.send_reply", "stripe.create_refund"],
-    policy: { approvalRequiredFor: [], amountThresholds: [{ tool: "stripe.create_refund", field: "amount", maxWithoutApproval: 200 }], hardLimits: [] },
+    policy: {
+      approvalRequiredFor: [] as string[],
+      amountThresholds: [{ tool: "stripe.create_refund", field: "amount", maxWithoutApproval: 200 }],
+      hardLimits: [] as Array<{ tool: string; field: string; max: number }>,
+    },
   };
   it("caps collections at L3 and puts every write behind approval", async () => {
     const { applyGuardrails } = await import("../src");
