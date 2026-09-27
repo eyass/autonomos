@@ -55,7 +55,12 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
         <CardDescription className={connected || review ? "line-clamp-2" : "line-clamp-1"}>{i.description}</CardDescription>
         <CardAction className="flex items-center gap-2">
           {connected ? (
-            <Badge variant="success">Connected{i.provider === "sandbox" ? " · sandbox" : ""}</Badge>
+            <Badge
+              variant={i.provider === "sandbox" ? "warning" : "success"}
+              title={i.provider === "sandbox" ? "Sample data held in AutonomOS; nothing real changes" : "A real account: agent actions change real data"}
+            >
+              Connected · {i.provider === "sandbox" ? "sandbox" : "live"}
+            </Badge>
           ) : (
             <>
               {found ? <Badge variant="info">Detected</Badge> : null}

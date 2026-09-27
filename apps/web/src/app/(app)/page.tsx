@@ -35,18 +35,46 @@ export default async function OverviewPage() {
   ]);
 
   // The path to a first live agent, shown until it is walked. Each step links to where it is done.
-  const [{ count: connections }, { count: reviewed }, { count: tests }] = await Promise.all([
+  const [{ count: connections }, { count: reviewed }, { count: tests }, { data: firstDraft }, { data: buildingAgent }] = await Promise.all([
     db.from("integration_connections").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "connected"),
     db.from("processes").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).in("status", ["reviewed", "active"]),
     db.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("mode", "test").eq("status", "completed"),
+    db.from("processes").select("id").eq("organization_id", session.org.id).eq("status", "draft").order("created_at").limit(1).maybeSingle(),
+    db.from("agents").select("id").eq("organization_id", session.org.id).in("status", ["draft", "testing"]).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
+  // Each step opens the exact thing to act on, not just the list it is in.
+  const topOpportunity = (top ?? [])[0]?.id;
   const playbook = [
     { done: (connections ?? 0) > 0, title: "Connect a system", detail: "Sandbox data is fine to start.", href: "/integrations", cta: "Connect" },
     { done: m.processesMapped > 0, title: "Map your processes", detail: "Review what AutonomOS drafted, or run a short interview.", href: "/discover", cta: "Discover" },
-    { done: (reviewed ?? 0) > 0, title: "Approve one process", detail: "Approving finds its automation opportunities.", href: "/processes?status=draft", cta: "Review drafts" },
-    { done: m.opportunities > 0 || m.activeAgents > 0, title: "Pick an opportunity", detail: "Ranked by value, difficulty and risk.", href: "/opportunities", cta: "Open" },
-    { done: (tests ?? 0) > 0, title: "Test an agent", detail: "Every action is simulated, nothing changes in your systems.", href: "/opportunities", cta: "Build and test" },
-    { done: m.activeAgents > 0, title: "Go live at L2 or L3", detail: "The agent drafts or proposes; a person approves.", href: "/agents", cta: "Activate" },
+    {
+      done: (reviewed ?? 0) > 0,
+      title: "Approve one process",
+      detail: "Approving finds its automation opportunities.",
+      href: firstDraft ? `/processes/${firstDraft.id}` : "/processes?status=draft",
+      cta: "Review a draft",
+    },
+    {
+      done: m.opportunities > 0 || m.activeAgents > 0,
+      title: "Pick an opportunity",
+      detail: "Ranked by value, difficulty and risk.",
+      href: topOpportunity ? `/opportunities/${topOpportunity}` : "/opportunities",
+      cta: "Open the top one",
+    },
+    {
+      done: (tests ?? 0) > 0,
+      title: "Test an agent",
+      detail: "Every action is simulated, nothing changes in your systems.",
+      href: buildingAgent ? `/agents/${buildingAgent.id}#test` : topOpportunity ? `/opportunities/${topOpportunity}` : "/opportunities",
+      cta: buildingAgent ? "Run a test" : "Build and test",
+    },
+    {
+      done: m.activeAgents > 0,
+      title: "Go live at L2 or L3",
+      detail: "The agent drafts or proposes; a person approves.",
+      href: buildingAgent ? `/agents/${buildingAgent.id}` : "/agents",
+      cta: "Activate",
+    },
   ];
   const next = playbook.find((p) => !p.done);
   const playbookCard = next ? (

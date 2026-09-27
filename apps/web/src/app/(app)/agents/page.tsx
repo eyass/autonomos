@@ -38,18 +38,18 @@ export default async function AgentsPage() {
   return (
     <>
       <PageHeader title="Agents" description="Only active agents act on their own." />
-      <Card className="gap-0 overflow-hidden py-0 sm:py-0">
+      <Card className="@container gap-0 overflow-hidden py-0 sm:py-0">
         <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 sm:[&_td:first-child]:pl-6 sm:[&_th:first-child]:pl-6">
           <TableHeader>
             <TableRow>
               <TableHead>Agent</TableHead>
-              <TableHead className="hidden md:table-cell">Autonomy</TableHead>
-              <TableHead className="hidden sm:table-cell">Runs</TableHead>
-              <TableHead className="hidden md:table-cell">Success</TableHead>
-              <TableHead className="hidden lg:table-cell">Hours saved</TableHead>
-              <TableHead className="hidden lg:table-cell">AI cost</TableHead>
-              <TableHead className="text-right sm:text-left">Status</TableHead>
-              <TableHead className="hidden md:table-cell" />
+              <TableHead className="hidden @2xl:table-cell">Autonomy</TableHead>
+              <TableHead className="hidden @lg:table-cell">Live runs</TableHead>
+              <TableHead className="hidden @2xl:table-cell">Success</TableHead>
+              <TableHead className="hidden @4xl:table-cell">Hours saved</TableHead>
+              <TableHead className="hidden @4xl:table-cell">AI cost</TableHead>
+              <TableHead className="text-right @lg:text-left">Status</TableHead>
+              <TableHead className="hidden @2xl:table-cell" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -58,32 +58,32 @@ export default async function AgentsPage() {
               const proc = a.processes as unknown as { id: string; title: string; departments: { name: string } | null } | null;
               return (
                 <TableRow key={a.id} className="hover:bg-muted/50">
-                  <TableCell>
-                    <Link href={`/agents/${a.id}`} className="font-medium hover:underline">
+                  <TableCell className="w-full max-w-0 whitespace-normal">
+                    <Link href={`/agents/${a.id}`} title={a.name} className="line-clamp-2 font-medium break-words hover:underline">
                       {a.name}
                     </Link>
                     <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground">
                       <span>{proc?.title}</span>
-                      <span className="md:hidden">L{a.autonomy_level}</span>
-                      <span className="sm:hidden">
+                      <span className="@2xl:hidden">L{a.autonomy_level}</span>
+                      <span className="@lg:hidden">
                         {s?.runs ?? 0} run{s?.runs === 1 ? "" : "s"}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  <TableCell className="hidden @2xl:table-cell">
                     <AutonomyLadder current={a.autonomy_level} size="sm" />
                   </TableCell>
-                  <TableCell className="hidden tabular-nums sm:table-cell">
+                  <TableCell className="hidden tabular-nums @lg:table-cell">
                     {s?.runs ?? 0}
                     {s?.testRuns ? <span className="text-xs text-muted-foreground"> +{s.testRuns} test</span> : null}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">{pct(s?.successRate)}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{hours((s?.hoursSaved ?? 0) * 60)}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{usd(s?.aiCost ?? 0)}</TableCell>
-                  <TableCell className="text-right sm:text-left">
+                  <TableCell className="hidden @2xl:table-cell">{pct(s?.successRate)}</TableCell>
+                  <TableCell className="hidden @4xl:table-cell">{hours((s?.hoursSaved ?? 0) * 60)}</TableCell>
+                  <TableCell className="hidden @4xl:table-cell">{usd(s?.aiCost ?? 0)}</TableCell>
+                  <TableCell className="text-right @lg:text-left">
                     <StatusBadge status={a.status} />
                   </TableCell>
-                  <TableCell className="hidden whitespace-nowrap text-right md:table-cell">
+                  <TableCell className="hidden whitespace-nowrap text-right @2xl:table-cell">
                     {a.status === "active" ? (
                       <ActionButton size="sm" variant="ghost" action={pauseAction.bind(null, a.id)}>
                         Pause
