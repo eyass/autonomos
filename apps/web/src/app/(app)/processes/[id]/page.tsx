@@ -9,6 +9,7 @@ import { setProcessStatusAction } from "../actions";
 import { IdeasButton } from "./ideas-button";
 import { latestJob } from "@/server/jobs";
 import { processGate } from "@/server/processes";
+import { guardrailsFor } from "@autonomos/agents";
 import { ProcessEditor } from "./editor";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
@@ -121,7 +122,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
                 label={opportunities?.length ? "Find more ideas" : "Find automation ideas"}
                 pendingLabel="Finding automation ideas…"
                 initialJob={ideasJob}
-                blockedBy={[]}
+                blockedBy={gate?.gaps ?? []}
                 sensitive={gate?.sensitive ?? []}
                 complianceOwner={gate?.complianceOwner ?? null}
               />
@@ -169,9 +170,8 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
         <Alert variant={gate.complianceOwner ? "info" : "warning"} className="mb-4">
           <AlertDescription>
             Involves {gate.sensitive.join(" and ")}.{" "}
-            {gate.complianceOwner
-              ? `Compliance sign-off: ${gate.complianceOwner}. Ideas for it keep a person approving anything that moves money, contacts debtors or touches personal data.`
-              : "Automation ideas are generated only once you name who signs off on compliance."}
+            {gate.complianceOwner ? `Compliance sign-off: ${gate.complianceOwner}.` : "Automation ideas are generated only once you name who signs off on compliance."}
+            <span className="mt-1 block text-xs">Enforced on any agent for it: {guardrailsFor(gate.sensitive).rules.join("; ").toLowerCase()}.</span>
           </AlertDescription>
         </Alert>
       ) : null}
@@ -196,20 +196,30 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
         </Alert>
       ) : null}
 
+      {/* No economics are invented for a candidate: there is no workflow to base them on yet. */}
       <StatStrip
         className="mb-6"
-        items={[
-          {
-            label: "Human time",
-            value: `${hours(monthlyMinutes)}/mo`,
-            hint: p.estimated_occurrences_per_month
-              ? `${num(Number(p.estimated_occurrences_per_month))}×${p.estimated_minutes_per_occurrence ? `, ${num(Number(p.estimated_minutes_per_occurrence))} min each` : ""}`
-              : FREQUENCY_LABEL[p.frequency],
-          },
-          { label: "Cost", value: `${money((monthlyMinutes / 60) * rate, session.org.currency)}/mo`, hint: `at ${money(rate, session.org.currency)}/h` },
-          { label: "Autonomy", value: <LevelChange from={effective} to={p.potential_autonomy_level} />, hint: activeAgent ? `with ${activeAgent.name}` : undefined },
-          { label: "Scores", value: <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} className="mt-1 gap-x-2" /> },
-        ]}
+        items={
+          p.status === "candidate"
+            ? [
+                { label: "Human time", value: "Not estimated", hint: "Once steps and numbers are added" },
+                { label: "Cost", value: "–" },
+                { label: "Autonomy", value: `L${effective} today` },
+                { label: "Scores", value: "Not scored yet" },
+              ]
+            : [
+                {
+                  label: "Human time",
+                  value: `${hours(monthlyMinutes)}/mo`,
+                  hint: p.estimated_occurrences_per_month
+                    ? `${num(Number(p.estimated_occurrences_per_month))}×${p.estimated_minutes_per_occurrence ? `, ${num(Number(p.estimated_minutes_per_occurrence))} min each` : ""}`
+                    : FREQUENCY_LABEL[p.frequency],
+                },
+                { label: "Cost", value: `${money((monthlyMinutes / 60) * rate, session.org.currency)}/mo`, hint: `at ${money(rate, session.org.currency)}/h` },
+                { label: "Autonomy", value: <LevelChange from={effective} to={p.potential_autonomy_level} />, hint: activeAgent ? `with ${activeAgent.name}` : undefined },
+                { label: "Scores", value: <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} className="mt-1 gap-x-2" /> },
+              ]
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -373,7 +383,10 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
                 <div>
                   {SOURCE_LABEL[p.discovery_source]}
                   {(p.documents as unknown as { title: string } | null)?.title ? <span className="text-muted-foreground"> · {(p.documents as unknown as { title: string }).title}</span> : null}
-                  <span className="text-muted-foreground"> · {dateTime(p.created_at)}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {p.discovery_source === "integration" ? `from the 30 days of system data read up to ${dateTime(p.created_at)}` : dateTime(p.created_at)}
+                  </span>
                   {p.source_data ? (
                     <Badge variant={p.source_data === "live" ? "success" : "warning"} className="ml-1.5">
                       {p.source_data === "live" ? "From live accounts" : p.source_data === "mixed" ? "Live and sample data" : "From sample data"}

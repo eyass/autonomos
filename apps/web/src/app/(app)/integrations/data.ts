@@ -1,5 +1,5 @@
 import "server-only";
-import { isInventory, toolsForIntegrations } from "@autonomos/integrations";
+import { getTool, isInventory, toolsForIntegrations } from "@autonomos/integrations";
 import { dateTime, relative } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { adminDb, isAdmin, type Session } from "@/lib/session";
@@ -30,6 +30,8 @@ export type IntegrationView = {
   webhook: { url: string; secret: string } | null;
   // What the system holds, mapped once when it was connected.
   inventory: InventoryView | null;
+  // Which agents use it, and what each is allowed to read and do there (their latest version).
+  agents: Array<{ id: string; name: string; status: string; reads: string[]; acts: string[] }>;
 };
 
 export type InventoryView = {
@@ -93,6 +95,31 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
       if (!lastUsed.has(key)) lastUsed.set(key, a.created_at);
     }
   }
+  // Per-agent capabilities: each agent's latest version and the tools it was given.
+  const byIntegration = new Map<string, IntegrationView["agents"]>();
+  if (connections?.length) {
+    const db = adminDb();
+    const [{ data: agents }, { data: versions }] = await Promise.all([
+      db.from("agents").select("id, name, status").eq("organization_id", session.org.id).neq("status", "archived"),
+      db.from("agent_versions").select("id, agent_id, version, agent_tools(tool_key)").eq("organization_id", session.org.id).order("version", { ascending: false }),
+    ]);
+    const latest = new Map<string, string[]>();
+    for (const v of versions ?? [])
+      if (!latest.has(v.agent_id))
+        latest.set(
+          v.agent_id,
+          ((v.agent_tools as unknown as Array<{ tool_key: string }>) ?? []).map((t) => t.tool_key),
+        );
+    for (const a of agents ?? []) {
+      const tools = (latest.get(a.id) ?? []).map((k) => getTool(k)).filter((t): t is NonNullable<ReturnType<typeof getTool>> => Boolean(t));
+      for (const key of new Set(tools.map((t) => t.integration))) {
+        const mine = tools.filter((t) => t.integration === key);
+        const list = byIntegration.get(key) ?? [];
+        list.push({ id: a.id, name: a.name, status: a.status, reads: mine.filter((t) => t.access === "read").map((t) => t.label), acts: mine.filter((t) => t.access === "write").map((t) => t.label) });
+        byIntegration.set(key, list);
+      }
+    }
+  }
   // Directory systems appear once an organisation has connected them.
   const connectedKeys = new Set((connections ?? []).map((c) => c.integration_key));
   return (catalog ?? [])
@@ -124,6 +151,7 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
         oauthAvailable: canUseComposio(),
         webhook: c && c.status === "connected" && secrets.get(c.id) ? { url: `${appUrl}/api/webhooks/${c.id}`, secret: secrets.get(c.id)! } : null,
         inventory: c && c.status === "connected" ? inventoryView(c) : null,
+        agents: byIntegration.get(i.key) ?? [],
       };
     });
 }

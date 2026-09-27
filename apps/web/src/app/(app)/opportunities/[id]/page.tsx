@@ -49,9 +49,11 @@ export default async function OpportunityPage({ params, searchParams }: { params
   // The savings formula, in the open: today's time, what the agent takes over, what stays with people.
   const perMonth = Number(proc.estimated_occurrences_per_month ?? 0);
   const perItem = Number(proc.estimated_minutes_per_occurrence ?? 0);
-  const todayHours = (perMonth * perItem) / 60;
-  const savedHours = Math.min(Number(o.estimated_hours_saved_monthly ?? 0), todayHours || Infinity);
-  const keptHours = Math.max(0, todayHours - savedHours);
+  // One rounding for every number on the page (to a tenth of an hour), so saved + kept = today.
+  const tenth = (h: number) => Math.round(h * 10) / 10;
+  const todayHours = tenth((perMonth * perItem) / 60);
+  const savedHours = tenth(Math.min(Number(o.estimated_hours_saved_monthly ?? 0), todayHours || Infinity));
+  const keptHours = tenth(Math.max(0, todayHours - savedHours));
   const rate = Number(proc.departments?.hourly_labour_cost ?? session.org.defaultHourlyCost);
   // Where each piece of evidence came from: sample (sandbox) data or a live account.
   const providerByName = new Map((connections ?? []).map((c) => [((c.integrations as unknown as { name: string } | null)?.name ?? c.integration_key).toLowerCase(), c.provider]));
@@ -181,8 +183,8 @@ export default async function OpportunityPage({ params, searchParams }: { params
         <p className="max-w-3xl text-sm text-muted-foreground">{o.description}</p>
         <StatStrip
           items={[
-            { label: "Saves", value: `${num(Number(o.estimated_hours_saved_monthly ?? 0))} h/mo` },
-            { label: "Worth", value: `${money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}/mo` },
+            { label: "Saves", value: `${num(savedHours)} h/mo` },
+            { label: "Worth", value: `${money(todayHours ? savedHours * rate : Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}/mo` },
             { label: "Autonomy", value: <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} /> },
             { label: "Scores", value: <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} className="mt-1 gap-x-2" /> },
           ]}
@@ -210,21 +212,21 @@ export default async function OpportunityPage({ params, searchParams }: { params
                 <dl className="grid gap-2 sm:grid-cols-3">
                   <div>
                     <dt className="text-xs text-muted-foreground">Today</dt>
-                    <dd className="font-medium tabular-nums">{num(Math.round(todayHours))} h/mo</dd>
+                    <dd className="font-medium tabular-nums">{num(todayHours)} h/mo</dd>
                     <dd className="text-xs text-muted-foreground">
                       {num(perMonth)} a month × {num(perItem)} min
                     </dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">The agent takes over</dt>
-                    <dd className="font-medium tabular-nums">{num(Math.round(savedHours))} h/mo</dd>
+                    <dd className="font-medium tabular-nums">{num(savedHours)} h/mo</dd>
                     <dd className="text-xs text-muted-foreground">
                       ≈ {money(savedHours * rate, session.org.currency)} at {money(rate, session.org.currency)}/h
                     </dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Stays with people</dt>
-                    <dd className="font-medium tabular-nums">{num(Math.round(keptHours))} h/mo</dd>
+                    <dd className="font-medium tabular-nums">{num(keptHours)} h/mo</dd>
                     <dd className="text-xs text-muted-foreground">Approvals, reviews and exceptions</dd>
                   </div>
                 </dl>

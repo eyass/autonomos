@@ -51,6 +51,8 @@ export async function generateOpportunitiesForProcess(session: Session, processI
   if (row.status === "draft") throw new HttpError(409, "Review the process before generating opportunities");
   // Regulated work gets ideas only once someone owns the compliance sign-off.
   const gate = await processGate(session, processId);
+  // No ideas (and so no agents) from work that is not described well enough to trust.
+  if (gate.gaps.length) throw new HttpError(409, `Fill in the process before looking for automation ideas: ${gate.gaps.join("; ")}.`);
   if (gate.sensitive.length && !gate.complianceOwner) {
     throw new HttpError(409, `This process involves ${gate.sensitive.join(" and ")}. Name who signs off on compliance before automation ideas are generated.`);
   }

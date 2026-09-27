@@ -228,8 +228,14 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                       {p.title}
                     </Link>
                     <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground @2xl:hidden">
-                      <span>{hours(monthly(p))} / month</span>
-                      <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
+                      {p.status === "candidate" ? (
+                        <span>Not estimated yet</span>
+                      ) : (
+                        <>
+                          <span>{hours(monthly(p))} / month</span>
+                          <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
+                        </>
+                      )}
                     </div>
                     <div className="hidden text-xs text-muted-foreground @2xl:block @4xl:hidden">{dept}</div>
                     {(() => {
@@ -249,14 +255,18 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground @4xl:table-cell">{dept ?? "–"}</TableCell>
                   <TableCell className="hidden tabular-nums @2xl:table-cell">
-                    {hours(monthly(p))}
+                    {p.status === "candidate" ? "–" : hours(monthly(p))}
                     <div className="text-xs text-muted-foreground">{FREQUENCY_LABEL[p.frequency]}</div>
                   </TableCell>
                   <TableCell className="hidden @2xl:table-cell">
                     <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
                   </TableCell>
                   <TableCell className="hidden @4xl:table-cell">
-                    <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />
+                    {p.status === "candidate" ? (
+                      <span className="text-xs text-muted-foreground">Not scored yet</span>
+                    ) : (
+                      <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />
+                    )}
                   </TableCell>
                   <TableCell className="text-right @lg:text-left">
                     <StatusBadge status={p.status} />
