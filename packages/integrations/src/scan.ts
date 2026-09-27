@@ -614,11 +614,13 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
   if (!reads) {
     const tools = (await readOnlyTools(toolkit).catch(() => []))
       .filter((t) => t.required.length === 0 && /(LIST|FETCH|SEARCH|GET_ALL|RECENT)/.test(t.slug) && WORK.test(t.slug) && !CONFIG.test(t.slug.replace(/^[A-Z]+_/, "")))
-      .sort((a, b) => rank(a.slug) - rank(b.slug))
-      .slice(0, 2);
+      // An action with an optional id filter (comments of a task, say) often needs one after all,
+      // so it ranks after actions that list across the account.
+      .sort((a, b) => rank(a.slug) + idFilters(a.properties) - (rank(b.slug) + idFilters(b.properties)))
+      .slice(0, 4);
     reads = tools.map((t) => {
       const args: Record<string, unknown> = {};
-      const per = Math.ceil(limit.max / Math.max(1, tools.length));
+      const per = Math.ceil(limit.max / Math.min(2, Math.max(1, tools.length)));
       for (const p of LIMIT_PARAMS) if (t.properties[p]) args[p] = per;
       for (const p of SINCE_PARAMS) {
         if (!t.properties[p]) continue;
@@ -639,11 +641,14 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
       unsupported: "Its data cannot be read yet. AutonomOS proposes work for it from what the system is used for.",
     };
   }
-  const per = Math.ceil(limit.max / reads.length);
+  // Up to two reads that return data; later candidates only stand in for ones that fail.
+  const wanted = Math.min(2, reads.length);
+  const per = Math.ceil(limit.max / wanted);
   const meta = await readOnlyTools(toolkit).catch(() => []);
   const items: ScanItem[] = [];
   const used: string[] = [];
   for (const r of reads) {
+    if (used.length >= wanted) break;
     try {
       const props = meta.find((t) => t.slug === r.slug)?.properties ?? {};
       const tokenParam = TOKEN_PARAMS.find((p) => props[p]) ?? null;
@@ -674,28 +679,43 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
 // BigQuery: the shape of the warehouse, never its rows. Table names, columns, row counts and
 // when each table last changed tell discovery what the business measures and which reports
 // or analyses an agent could run on it.
-const BQ_REGIONS = ["region-eu", "region-us"];
+const BQ_REGIONS = [
+  { region: "region-eu", location: "EU" },
+  { region: "region-us", location: "US" },
+];
 
 async function scanBigQuery(integration: string, ctx: ScanContext, limit: ScanLimit, now: Date): Promise<SystemScan> {
-  const rows = async (query: string, names: string[]) => arr((await exec(ctx, "GOOGLEBIGQUERY_QUERY", { query })).rows).map((r) => bqRow(r, names));
+  // Every query needs a project, so first list the projects the account can see.
+  const listed = await exec(ctx, "GOOGLEBIGQUERY_LIST_PROJECTS", { max_results: 10 }).catch((e) => {
+    console.error("bigquery projects failed", e);
+    return {} as Record<string, unknown>;
+  });
+  const projects = bqProjects(listed).slice(0, 3);
   let tables: Array<Record<string, unknown>> = [];
   let columns: Array<Record<string, unknown>> = [];
-  for (const region of BQ_REGIONS) {
-    try {
-      tables = await rows(
-        `SELECT table_schema, table_name, total_rows, storage_last_modified_time FROM \`${region}\`.INFORMATION_SCHEMA.TABLE_STORAGE WHERE deleted = FALSE ORDER BY storage_last_modified_time DESC LIMIT ${limit.max}`,
-        ["table_schema", "table_name", "total_rows", "storage_last_modified_time"],
-      );
-      if (!tables.length) continue;
-      columns = await rows(
-        `SELECT table_schema, table_name, STRING_AGG(column_name, ', ' ORDER BY ordinal_position LIMIT 30) AS columns FROM \`${region}\`.INFORMATION_SCHEMA.COLUMNS GROUP BY table_schema, table_name LIMIT ${limit.max * 2}`,
-        ["table_schema", "table_name", "columns"],
-      ).catch(() => []);
-      break;
-    } catch (e) {
-      console.error("bigquery metadata failed", region, e);
+  for (const project_id of projects) {
+    for (const { region, location } of BQ_REGIONS) {
+      const rows = async (query: string, names: string[]) => arr((await exec(ctx, "GOOGLEBIGQUERY_QUERY", { project_id, location, query })).rows).map((r) => bqRow(r, names));
+      try {
+        const found = await rows(
+          `SELECT table_schema, table_name, total_rows, storage_last_modified_time FROM \`${project_id}\`.\`${region}\`.INFORMATION_SCHEMA.TABLE_STORAGE WHERE deleted = FALSE ORDER BY storage_last_modified_time DESC LIMIT ${limit.max}`,
+          ["table_schema", "table_name", "total_rows", "storage_last_modified_time"],
+        );
+        if (!found.length) continue;
+        tables.push(...found);
+        columns.push(
+          ...(await rows(
+            `SELECT table_schema, table_name, STRING_AGG(column_name, ', ' ORDER BY ordinal_position LIMIT 30) AS columns FROM \`${project_id}\`.\`${region}\`.INFORMATION_SCHEMA.COLUMNS GROUP BY table_schema, table_name LIMIT ${limit.max * 2}`,
+            ["table_schema", "table_name", "columns"],
+          ).catch(() => [])),
+        );
+      } catch (e) {
+        console.error("bigquery metadata failed", region, e);
+      }
     }
+    if (tables.length >= limit.max) break;
   }
+  tables = tables.slice(0, limit.max);
   const colsOf = new Map(columns.map((c) => [`${c.table_schema}.${c.table_name}`, String(c.columns ?? "")]));
   const items: ScanItem[] = tables.map((t) => {
     const name = `${t.table_schema}.${t.table_name}`;
@@ -717,8 +737,21 @@ async function scanBigQuery(integration: string, ctx: ScanContext, limit: ScanLi
     periodDays: null,
     stats: { tables: items.length, datasets: datasets.join(", "), updated_in_last_30_days: fresh },
     items,
-    ...(items.length ? {} : { unsupported: "Could not read the table list. Check that the connected account can view the project's datasets." }),
+    ...(items.length
+      ? {}
+      : {
+          unsupported: projects.length
+            ? "Could not read the table list. Check that the connected account can view the project's datasets."
+            : "The connected account has no BigQuery projects it can see.",
+        }),
   };
+}
+
+// Project ids from the projects list, in either the API's or a flattened shape.
+export function bqProjects(d: Record<string, unknown>): string[] {
+  const list = firstList(d);
+  const ids = list.map((p) => (p.projectReference as { projectId?: string } | undefined)?.projectId ?? p.projectId ?? p.project_id ?? p.id);
+  return [...new Set(ids.filter((x): x is string => typeof x === "string" && /^[a-z0-9:.-]+$/i.test(x)))];
 }
 
 // BigQuery rows come either as plain objects or in the API's { f: [{ v }] } form.
@@ -741,6 +774,8 @@ async function scanTeams(integration: string, ctx: ScanContext, limit: ScanLimit
   }
   return chatScan(integration, "composio", messages, limit, now);
 }
+
+const idFilters = (props: Record<string, unknown>) => (Object.keys(props).some((k) => /^[a-z]+_id$/.test(k)) ? 3 : 0);
 
 function rank(slug: string) {
   if (/LIST/.test(slug)) return 0;

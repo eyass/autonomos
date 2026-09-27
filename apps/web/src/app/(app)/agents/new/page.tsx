@@ -6,6 +6,9 @@ import { NewAgentWizard } from "./wizard";
 import { PageHeader } from "@/components/app/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+// Test runs execute on this server after the response, so give them room to finish.
+export const maxDuration = 300;
+
 export const metadata = { title: "Create agent" };
 
 export default async function NewAgentPage({ searchParams }: { searchParams: Promise<{ opportunity?: string }> }) {

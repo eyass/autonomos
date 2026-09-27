@@ -67,7 +67,8 @@ describe("live readers cover the whole lookback window", () => {
 
 describe("BigQuery", () => {
   it("reads the shape of the warehouse, not its rows", async () => {
-    respond = (_slug, args) => {
+    respond = (slug, args) => {
+      if (slug === "GOOGLEBIGQUERY_LIST_PROJECTS") return { projects: [{ id: "shop-prod", projectReference: { projectId: "shop-prod" } }] };
       const q = String(args.query);
       if (q.includes("region-eu") && q.includes("TABLE_STORAGE"))
         return {
@@ -80,7 +81,9 @@ describe("BigQuery", () => {
       return { rows: [] };
     };
     const scan = await scanSystem("googlebigquery", ctx("googlebigquery"));
-    expect(calls.every((c) => /INFORMATION_SCHEMA/.test(String(c.args.query)))).toBe(true);
+    const queries = calls.filter((c) => c.slug === "GOOGLEBIGQUERY_QUERY");
+    expect(queries.every((c) => /INFORMATION_SCHEMA/.test(String(c.args.query)) && c.args.project_id === "shop-prod")).toBe(true);
+    expect(queries.find((c) => String(c.args.query).includes("region-eu"))!.args.location).toBe("EU");
     expect(scan.itemKind).toBe("warehouse tables");
     expect(scan.items.map((i) => i.title)).toEqual(["marketplace.orders (120,000 rows)", "ads.google_ads_daily (9,000 rows)"]);
     expect(scan.items[0]!.detail).toContain("amount");

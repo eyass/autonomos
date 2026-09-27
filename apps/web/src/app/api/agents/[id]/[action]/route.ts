@@ -4,6 +4,9 @@ import { handle } from "@/lib/actions";
 import { HttpError } from "@/lib/session";
 import { activateAgent, pauseAgent, startProductionRun, startTestRun } from "@/server/agents";
 
+// Test runs execute on this server after the response, so give them room to finish.
+export const maxDuration = 300;
+
 const Input = z.object({ input: z.record(z.string(), z.unknown()).default({}) });
 
 // POST /api/agents/:id/test | activate | pause | run

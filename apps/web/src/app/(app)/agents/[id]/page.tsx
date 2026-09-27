@@ -25,6 +25,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+// Test runs execute on this server after the response, so give them room to finish.
+export const maxDuration = 300;
+
 function snapshot(v: { autonomy_level: number; instructions: unknown; trigger_config: unknown; policy_config: unknown; agent_tools: unknown }): VersionSnapshot {
   return {
     autonomy_level: v.autonomy_level,
