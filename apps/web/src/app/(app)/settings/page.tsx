@@ -16,7 +16,7 @@ import { ReadinessChecklist } from "@/components/app/readiness-checklist";
 import { SettingsSection } from "@/components/app/settings-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { executionReadiness } from "@/server/readiness";
+import { agentStates, executionReadiness } from "@/server/readiness";
 import { listApiKeys, planUsage } from "@/server/platform";
 import { PLANS } from "@autonomos/schemas";
 import { CONTACT_EMAIL } from "@/components/marketing/config";
@@ -45,7 +45,9 @@ export default async function SettingsPage() {
     supabase.from("model_usage").select("input_tokens, output_tokens, estimated_cost").eq("organization_id", session.org.id).gte("created_at", monthStart),
   ]);
   const { data: org } = await adminDb().from("organizations").select("plan, subscription_status").eq("id", session.org.id).single();
-  const readiness = await executionReadiness(session);
+  const [readiness, agents] = await Promise.all([executionReadiness(session), agentStates(session)]);
+  const eligible = agents.filter((a) => a.state.canActivate).length;
+  const live = agents.filter((a) => a.status === "active").length;
   const [{ data: connections }, { data: catalog }] = await Promise.all([
     supabase.from("integration_connections").select("integration_key, provider, account_label").eq("organization_id", session.org.id).eq("status", "connected"),
     supabase.from("integrations").select("key, name"),
@@ -119,13 +121,33 @@ export default async function SettingsPage() {
             title="Execution"
             description={
               readiness.ready
-                ? "The workspace is set up: agents can be tested. Each agent goes live only once its own checks pass, a passed test on real input and the tools to read its work, shown on the agent."
+                ? agents.length
+                  ? `The workspace is set up, so agents can be tested. ${live} live, ${eligible} ready to go live, ${agents.length - live - eligible} blocked; each agent's own checks are below.`
+                  : "The workspace is set up, so agents can be tested. Each agent goes live only once its own checks pass."
                 : "Not ready yet. Fix the items below before agents can run."
             }
             action={<Badge variant={readiness.ready ? "success" : "warning"}>{readiness.ready ? "Ready to test" : "Not ready"}</Badge>}
             defaultOpen={!readiness.ready}
           >
             <ReadinessChecklist checks={readiness.checks} />
+            {agents.length ? (
+              <div className="mt-4 border-t border-border pt-4" data-testid="agent-readiness">
+                <h3 className="text-sm font-medium">Each agent</h3>
+                <ul className="mt-2 divide-y divide-border text-sm">
+                  {agents.map((a) => (
+                    <li key={a.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <Link href={`/agents/${a.id}${a.firstBlocker ? "#readiness" : ""}`} className="font-medium hover:underline">
+                          {a.name}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">{a.firstBlocker ? `${a.firstBlocker.label}: ${a.firstBlocker.detail}` : a.state.description}</p>
+                      </div>
+                      <Badge variant={a.status === "active" ? (a.firstBlocker ? "warning" : "success") : a.state.canActivate ? "success" : "secondary"}>{a.state.title}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </SettingsSection>
 
           <SettingsSection

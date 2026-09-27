@@ -1,6 +1,6 @@
 import { OG_IMAGES } from "@/components/marketing/config";
 import type { Metadata } from "next";
-import { PageIntro, Prose, SECURITY_EMAIL, SubprocessorTable } from "@/components/marketing/site";
+import { PageIntro, Prose, RetentionList, SECURITY_EMAIL, SubprocessorTable } from "@/components/marketing/site";
 
 const description = "How AutonomOS isolates tenants, constrains agents, records every action and handles your data.";
 
@@ -96,13 +96,7 @@ export default function SecurityPage() {
         </ul>
 
         <h2 id="retention">Retention</h2>
-        <ul>
-          <li>Run history, tool inputs and outputs, and audit events are kept for the life of the workspace.</li>
-          <li>
-            Deleting a workspace deletes its data. There is no self-serve deletion yet: <a href="mailto:hello@autonomos.ai?subject=Delete%20workspace">contact us to delete a workspace</a>.
-          </li>
-          <li>During onboarding, AutonomOS reads at most six public pages of your website, once, to draft your company profile.</li>
-        </ul>
+        <RetentionList />
 
         <h2 id="subprocessors">Subprocessors</h2>
         <SubprocessorTable />

@@ -2,6 +2,7 @@ import { JobButton } from "@/components/app/job";
 import { latestJob } from "@/server/jobs";
 import { snapshotMetrics } from "@autonomos/db";
 import { reconcileStuckRuns } from "@/server/run-health";
+import { agentStates } from "@/server/readiness";
 import { CircleCheck } from "lucide-react";
 import Link from "next/link";
 import { hours, money, num, pct, aiMoney } from "@/lib/format";
@@ -45,16 +46,20 @@ export default async function OverviewPage() {
   ]);
 
   // The path to a first live agent, shown until it is walked. Each step links to where it is done.
-  const [{ count: connections }, { count: reviewed }, { count: tests }, { data: firstDraft }, { data: buildingAgent }, { data: testedRuns }] = await Promise.all([
+  const [{ count: connections }, { count: reviewed }, { data: firstDraft }, { data: buildingAgent }, agents] = await Promise.all([
     db.from("integration_connections").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "connected"),
     db.from("processes").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).in("status", ["reviewed", "active"]),
-    db.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("mode", "test").eq("status", "completed"),
     db.from("processes").select("id").eq("organization_id", session.org.id).eq("status", "draft").order("created_at").limit(1).maybeSingle(),
     db.from("agents").select("id").eq("organization_id", session.org.id).in("status", ["draft", "testing"]).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    // The agent that can go live: one not yet active with a finished test.
-    db.from("agent_runs").select("agent_id, agents(status)").eq("organization_id", session.org.id).eq("mode", "test").eq("status", "completed").order("finished_at", { ascending: false }).limit(20),
+    // The same agent states as the agent list, the agent page and Settings.
+    agentStates(session),
   ]);
-  const readyAgent = (testedRuns ?? []).find((r) => ["draft", "testing", "paused"].includes((r.agents as unknown as { status: string } | null)?.status ?? ""))?.agent_id;
+  // "Test an agent" is done by a passed test on real input, not by any finished run; "Activate it"
+  // appears only for an agent that is actually eligible, otherwise the step leads to its blockers.
+  const waiting = agents.filter((a) => a.status !== "active");
+  const passedTest = agents.some((a) => a.state.readiness.checks.some((c) => c.key === "test" && c.ok));
+  const eligible = waiting.find((a) => a.state.canActivate);
+  const blocked = waiting.find((a) => a.firstBlocker);
   // Each step opens the exact thing to act on, not just the list it is in.
   const topOpportunity = (top ?? [])[0]?.id;
   const playbook = [
@@ -75,7 +80,7 @@ export default async function OverviewPage() {
       cta: "Open the top one",
     },
     {
-      done: (tests ?? 0) > 0,
+      done: passedTest || m.activeAgents > 0,
       title: "Test an agent",
       detail: "Every action is simulated, nothing changes in your systems.",
       href: buildingAgent ? `/agents/${buildingAgent.id}#test` : topOpportunity ? `/opportunities/${topOpportunity}` : "/opportunities",
@@ -84,9 +89,13 @@ export default async function OverviewPage() {
     {
       done: m.activeAgents > 0,
       title: "Go live at L2 or L3",
-      detail: "The agent drafts or proposes; a person approves.",
-      href: readyAgent ? `/agents/${readyAgent}` : buildingAgent ? `/agents/${buildingAgent.id}` : "/agents",
-      cta: readyAgent ? "Activate it" : "Activate",
+      detail: eligible
+        ? `${eligible.name} passed every check. It drafts or proposes; a person approves.`
+        : blocked?.firstBlocker
+          ? `${blocked.name}: ${blocked.firstBlocker.label.toLowerCase()}. ${blocked.firstBlocker.detail}`
+          : "Unlocks once an agent passes a test on real input and every check.",
+      href: eligible ? `/agents/${eligible.id}` : blocked ? `/agents/${blocked.id}#readiness` : "/agents",
+      cta: eligible ? "Activate it" : "View blockers",
     },
   ];
   const next = playbook.find((p) => !p.done);
@@ -231,9 +240,11 @@ export default async function OverviewPage() {
           {
             label: "Hours saved",
             value: hours(m.minutesSaved),
+            // Measured: counted from finished live runs. Each run is credited with its process's
+            // estimated minutes, so the number is only as good as that estimate.
             hint: m.productionRuns
-              ? `${money(m.valueCreated, m.currency)} this month${m.roi !== null ? `, ${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}× AI cost` : ""}`
-              : "From production runs",
+              ? `Measured over ${num(m.productionRuns)} live run${m.productionRuns === 1 ? "" : "s"}, at each process's estimated minutes; ${money(m.valueCreated, m.currency)} this month${m.roi !== null ? `, ${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}× AI cost` : ""}`
+              : "Measured from live runs only; none yet",
           },
           { label: "Tasks done", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
           {
@@ -283,7 +294,7 @@ export default async function OverviewPage() {
                   meta={
                     <>
                       <span>{(o.processes as unknown as { title: string } | null)?.title}</span>
-                      <span>~{num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month</span>
+                      <span>Estimated ~{num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month</span>
                       <span>L{o.target_autonomy_level} target</span>
                     </>
                   }

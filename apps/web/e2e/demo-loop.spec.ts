@@ -162,8 +162,18 @@ test("demo loop", async ({ page }) => {
   await page.getByRole("link", { name: "Refund request handling" }).click();
   await expect(page).toHaveURL(/\/processes\/[0-9a-f-]+/);
   const processUrl = page.url();
-  // Refunds are a regulated area: approving asks who signs off on compliance.
+  // Refunds are a regulated area: the company's refund policy is set before any agent exists,
+  // and approving asks who signs off on compliance.
+  await expect(page.getByText("Your policy")).toBeVisible();
+  await page.getByLabel("A person approves refunds or payments above").fill("40");
+  await page.getByLabel("Never refund or pay more than, in one action").fill("300");
+  await page.getByLabel("Refund window after purchase").fill("30");
+  await page.getByRole("button", { name: "Save policy" }).click();
+  await expect(page.locator("#policy").getByText("Saved")).toBeVisible();
   await page.getByLabel("Compliance sign-off by").fill("Finance (Jo Park)");
+  // A website draft nothing in the data backs is approved only once a person confirms it.
+  await expect(page.getByRole("button", { name: "Approve process" })).toBeDisabled();
+  await page.getByLabel(/I checked the steps and numbers/).check();
   await page.getByRole("button", { name: "Approve process" }).click();
   await expect(page).toHaveURL(/\/opportunities\/[0-9a-f-]+/);
   await expect(page.getByText("Proposed", { exact: true })).toBeVisible();
@@ -178,6 +188,31 @@ test("demo loop", async ({ page }) => {
   // Test run: simulated, lists the approvals production would need
   await expect(page.getByText("Test passed")).toBeVisible();
   await expect(page.getByText("Approvals needed in production")).toBeVisible();
+
+  // One eligibility state everywhere: with the refund window removed from the policy, the agent is
+  // blocked, and no page offers Activate. Home, the agent list, the agent page and Settings agree.
+  await page.goto(processUrl);
+  await page.getByLabel("Refund window after purchase").fill("");
+  await page.getByRole("button", { name: "Save policy" }).click();
+  await expect(page.locator("#policy").getByText("Saved")).toBeVisible();
+  await page.goto("/agents");
+  await expect(page.getByRole("link", { name: "View blockers" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Activate/ })).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "View blockers" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Activate it" })).toHaveCount(0);
+  await page.goto(agentUrl);
+  await expect(page.getByRole("button", { name: "Activate agent" })).toBeDisabled();
+  await expect(page.getByTestId("agent-state")).toContainText("refund window after purchase");
+  await page.goto("/settings");
+  await expect(page.getByTestId("agent-readiness")).toContainText("Its process is described well enough");
+  // With the policy complete again, every page offers it.
+  await page.goto(processUrl);
+  await page.getByLabel("Refund window after purchase").fill("30");
+  await page.getByRole("button", { name: "Save policy" }).click();
+  await expect(page.locator("#policy").getByText("Saved")).toBeVisible();
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Activate it" })).toBeVisible();
 
   // Activate and send a live sandbox ticket
   await page.goto(agentUrl);

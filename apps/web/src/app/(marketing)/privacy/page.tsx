@@ -1,6 +1,6 @@
 import { OG_IMAGES } from "@/components/marketing/config";
 import type { Metadata } from "next";
-import { CONTACT_EMAIL, DraftNotice, PageIntro, Prose, SubprocessorTable } from "@/components/marketing/site";
+import { CONTACT_EMAIL, DraftNotice, PageIntro, Prose, RetentionList, SubprocessorTable } from "@/components/marketing/site";
 
 const description = "What data AutonomOS processes, why, who helps us process it, and your choices.";
 
@@ -68,11 +68,7 @@ export default function PrivacyPage() {
         </p>
 
         <h2>How long we keep it</h2>
-        <p>
-          Run history, tool inputs and outputs, and audit events are kept for the life of the workspace. An owner can delete a workspace in Settings, under Danger zone; that deletes its processes,
-          agents, runs, connections and audit history. Copies in our database provider&apos;s backups are removed when those backups expire. To delete your own account, or for anything this does not
-          cover, <a href={`mailto:${CONTACT_EMAIL}?subject=Delete%20my%20data`}>contact us</a>.
-        </p>
+        <RetentionList />
 
         <h2>Your rights</h2>
         <p>

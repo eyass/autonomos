@@ -220,7 +220,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-start-3 lg:row-start-1">
           {state.phase !== "live" || !readiness.ready ? (
-            <Card data-testid="agent-state" data-phase={state.phase}>
+            <Card id="readiness" className="scroll-mt-20" data-testid="agent-state" data-phase={state.phase}>
               <CardHeader>
                 <CardTitle>{state.title}</CardTitle>
                 <CardDescription>{state.description}</CardDescription>

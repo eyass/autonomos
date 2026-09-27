@@ -13,7 +13,7 @@ import { WorkTabs } from "@/components/app/work-tabs";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { processGaps } from "@/lib/process-gaps";
+import { embeddedCount, estimateHeld, processGaps } from "@/lib/process-gaps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const metadata = { title: "Processes" };
@@ -37,7 +37,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     supabase
       .from("processes")
       .select(
-        "id, title, status, frequency, department_id, estimated_occurrences_per_month, estimated_minutes_per_occurrence, missing_information, current_autonomy_level, potential_autonomy_level, business_value, automation_difficulty, risk_level, confidence, departments(name)",
+        "id, title, status, frequency, department_id, estimated_occurrences_per_month, estimated_minutes_per_occurrence, missing_information, current_autonomy_level, potential_autonomy_level, business_value, automation_difficulty, risk_level, confidence, process_steps(count), departments(name)",
       )
       .eq("organization_id", session.org.id),
     supabase.from("agents").select("process_id, autonomy_level").eq("organization_id", session.org.id).eq("status", "active"),
@@ -216,6 +216,8 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
           <TableBody>
             {list.map((p) => {
               const dept = (p.departments as unknown as { name: string } | null)?.name;
+              // No hours or scores for a process not yet described well enough to base them on.
+              const held = estimateHeld({ ...p, stepsCount: embeddedCount(p.process_steps) });
               return (
                 // The title link covers the whole row, so the row opens on a tap, click or Enter.
                 <TableRow key={p.id} className="relative hover:bg-muted/50 focus-within:bg-muted/50">
@@ -228,8 +230,8 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                       {p.title}
                     </Link>
                     <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground @2xl:hidden">
-                      {p.status === "candidate" ? (
-                        <span>Not estimated yet</span>
+                      {held ? (
+                        <span title={held}>Not estimated yet</span>
                       ) : (
                         <>
                           <span>{hours(monthly(p))} / month</span>
@@ -255,18 +257,20 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground @4xl:table-cell">{dept ?? "–"}</TableCell>
                   <TableCell className="hidden tabular-nums @2xl:table-cell">
-                    {p.status === "candidate" ? "–" : hours(monthly(p))}
+                    {held ? (
+                      <span className="text-xs text-muted-foreground" title={held}>
+                        Not estimated yet
+                      </span>
+                    ) : (
+                      hours(monthly(p))
+                    )}
                     <div className="text-xs text-muted-foreground">{FREQUENCY_LABEL[p.frequency]}</div>
                   </TableCell>
                   <TableCell className="hidden @2xl:table-cell">
                     <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
                   </TableCell>
                   <TableCell className="hidden @4xl:table-cell">
-                    {p.status === "candidate" ? (
-                      <span className="text-xs text-muted-foreground">Not scored yet</span>
-                    ) : (
-                      <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />
-                    )}
+                    {held ? <span className="text-xs text-muted-foreground">Not scored yet</span> : <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />}
                   </TableCell>
                   <TableCell className="text-right @lg:text-left">
                     <StatusBadge status={p.status} />
