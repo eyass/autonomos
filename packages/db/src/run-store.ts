@@ -309,7 +309,8 @@ export class SupabaseRunStore implements RunStore {
   }
 
   async notify(ctx: RunContext, n: Parameters<RunStore["notify"]>[1]) {
-    await sendNotification(this.db, ctx.run.organizationId, n);
+    // The link names the event (the approval, or the run), so a retried step notifies once.
+    await sendNotification(this.db, ctx.run.organizationId, { ...n, key: `${n.kind}:${n.link}` });
   }
 
   async isOrganizationPaused(ctx: RunContext) {

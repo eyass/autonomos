@@ -2,7 +2,7 @@ import { snapshotMetrics } from "@autonomos/db";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { CircleCheck } from "lucide-react";
 import Link from "next/link";
-import { hours, money, num, pct, usd } from "@/lib/format";
+import { hours, money, num, pct, aiMoney } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { AutonomyTrend } from "./trend";
@@ -23,8 +23,16 @@ export default async function OverviewPage() {
   // Recompute and store today's snapshot so the trend always includes today.
   const m = await snapshotMetrics(db, session.org.id);
   const supabase = await createClient();
-  const [{ data: trend }, { data: top }] = await Promise.all([
+  const [{ data: trend }, { data: movers }, { data: top }] = await Promise.all([
     supabase.from("metrics").select("period, value").eq("organization_id", session.org.id).eq("metric", "autonomy_score").eq("dimension", "").order("period").limit(365),
+    // What moves the score: agents going live, changing level or pausing, and newly mapped work.
+    supabase
+      .from("activity_events")
+      .select("id, title, occurred_at")
+      .eq("organization_id", session.org.id)
+      .in("action_type", ["agent_activated", "autonomy_changed", "agent_paused", "processes_mapped"])
+      .order("occurred_at", { ascending: false })
+      .limit(3),
     supabase
       .from("automation_opportunities")
       .select("id, title, estimated_hours_saved_monthly, automation_difficulty_score, target_autonomy_level, processes(title)")
@@ -151,7 +159,13 @@ export default async function OverviewPage() {
                 {pct(m.autonomyScore)}
               </div>
             </div>
-            <p className="max-w-48 text-right text-xs text-muted-foreground">of mapped human work, weighted by time, is done by agents</p>
+            <p className="max-w-56 text-right text-xs text-muted-foreground" data-testid="autonomy-explainer">
+              {m.autonomyScore === null
+                ? "Map processes with time estimates to measure how much work runs without people."
+                : m.activeAgents === 0
+                  ? "of mapped work, weighted by time, already runs on software your team uses. No agents are live yet, so none of it is from AutonomOS."
+                  : `of mapped work, weighted by time, runs without people: ${pct(m.baselineAutonomy)} from your existing software, ${pct(Math.max(0, m.autonomyScore - (m.baselineAutonomy ?? 0)))} added by live agents.`}
+            </p>
           </CardContent>
         </Card>
         {chart.length > 1 ? (
@@ -161,6 +175,20 @@ export default async function OverviewPage() {
             </CardHeader>
             <CardContent>
               <AutonomyTrend data={chart} />
+              <div className="mt-3 text-xs text-muted-foreground">
+                <div className="font-medium text-foreground">Why it moved</div>
+                {(movers ?? []).length ? (
+                  <ul className="mt-1 space-y-0.5">
+                    {(movers ?? []).map((e) => (
+                      <li key={e.id}>
+                        <span className="tabular-nums">{new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(e.occurred_at))}</span> · {e.title}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1">It changes when agents go live or change level, and when processes are added or re-estimated. Nothing like that has happened yet.</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         ) : null}
@@ -178,7 +206,12 @@ export default async function OverviewPage() {
               : "From production runs",
           },
           { label: "Tasks done", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
-          { label: "AI spend", value: usd(m.aiCost), hint: `this month · tests ${usd(m.aiCostBySource.test)} · live ${usd(m.aiCostBySource.production)}` },
+          {
+            label: "AI spend this month",
+            value: <span title="Models are priced in US dollars; shown in your currency at a fixed reference rate">{aiMoney(m.aiCost, m.currency)}</span>,
+            // Every bucket is shown, so the parts add up to the total.
+            hint: `setup ${aiMoney(m.aiCostBySource.setup, m.currency)} · tests ${aiMoney(m.aiCostBySource.test, m.currency)} · live ${aiMoney(m.aiCostBySource.production, m.currency)}`,
+          },
         ]}
       />
 

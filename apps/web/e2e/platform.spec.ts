@@ -38,7 +38,7 @@ test("sample workspace, approval limits and API keys", async ({ page, request })
   const me = page.locator("li", { hasText: email });
   await me.getByLabel(/Approval limit/).fill("10");
   await me.getByRole("button", { name: "Set limit" }).click();
-  await expect(me.getByText(/Approves up to 10/)).toBeVisible();
+  await expect(me.getByText(/Approves up to €10/)).toBeVisible();
   await page.goto("/approvals");
   const card = page.getByTestId("approval-card").first();
   await card.getByRole("button", { name: "Approve", exact: true }).click();

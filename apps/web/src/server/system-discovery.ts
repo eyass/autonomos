@@ -220,6 +220,7 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
         title: `Discovery found ${result.processes.length} process${result.processes.length === 1 ? "" : "es"}`,
         body: "Review them one by one: add the ones you do, reject the rest.",
         link: "/discover",
+        key: `discovery_ready:${runId}`,
       }).catch((e) => console.error("notification failed", e));
     return toView(data!, existing);
   } catch (e) {
@@ -227,6 +228,13 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
       .from("discovery_runs")
       .update({ status: "failed", samples: null, error: e instanceof Error ? e.message.slice(0, 300) : "failed", updated_at: new Date().toISOString() })
       .eq("id", runId);
+    await sendNotification(db, session.org.id, {
+      kind: "discovery_failed",
+      title: "Reading your systems did not finish",
+      body: "Nothing was changed. Open Discover and read again, or add processes by interview or document.",
+      link: "/discover",
+      key: `discovery_failed:${runId}`,
+    }).catch((err) => console.error("notification failed", err));
     throw e;
   }
 }

@@ -67,7 +67,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
         title={o.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={o.status} />
+            <StatusBadge status={o.status} kind="opportunity" />
             <Link href={`/processes/${proc.id}`} className="hover:underline">
               {proc.title}
             </Link>

@@ -45,18 +45,20 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   }
 
   const rejected = q.status === "rejected";
+  const done = q.status === "archived";
   return (
     <>
       <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." />
       <WorkTabs active="ideas" />
       <LinkTabs
         items={[
-          { href: "/opportunities", label: "Open ideas", active: !rejected },
+          { href: "/opportunities", label: "Open ideas", active: !rejected && !done },
+          { href: "/opportunities?status=archived", label: "Done", active: done },
           { href: "/opportunities?status=rejected", label: "Rejected", active: rejected },
         ]}
       />
       {!list.length ? (
-        <EmptyState title={rejected ? "No rejected ideas." : "No open ideas."} />
+        <EmptyState title={rejected ? "No rejected ideas." : done ? "No ideas marked done." : "No open ideas."} />
       ) : (
         <>
           <Card className="@container mb-6 gap-0 overflow-hidden py-0 sm:py-0">
@@ -98,7 +100,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                         <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />
                       </TableCell>
                       <TableCell className="hidden @2xl:table-cell">
-                        <StatusBadge status={o.status} />
+                        <StatusBadge status={o.status} kind="opportunity" />
                       </TableCell>
                     </TableRow>
                   );

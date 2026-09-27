@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { AutonomyLadder, OutcomeBadge, StatusBadge } from "@/components/domain";
-import { dateTime, hours, money, pct, relative, usd } from "@/lib/format";
+import { dateTime, hours, money, pct, relative, aiMoney } from "@/lib/format";
 import { adminDb, HttpError, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { loadAgentConfig } from "@/server/agents";
@@ -161,7 +161,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
           { label: "Runs", value: stats?.runs ?? 0, hint: stats?.testRuns ? `+ ${stats.testRuns} test` : undefined },
           { label: "Success", value: pct(stats?.successRate), hint: `${pct(stats?.humanInterventionRate)} needed a human` },
           { label: "Saved", value: hours((stats?.hoursSaved ?? 0) * 60), hint: money(stats?.estimatedValue ?? 0, session.org.currency) },
-          { label: "AI cost", value: usd(stats?.aiCost ?? 0) },
+          { label: "AI cost", value: aiMoney(stats?.aiCost ?? 0, session.org.currency) },
         ]}
       />
 
@@ -222,7 +222,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                         <span>{relative(r.queued_at)}</span>
                         <span>v{(r.agent_versions as unknown as { version: number } | null)?.version}</span>
                         {Number(r.estimated_minutes_saved ?? 0) > 0 ? <span>{hours(Number(r.estimated_minutes_saved))} saved</span> : null}
-                        <span>{usd(Number(r.model_cost))}</span>
+                        <span>{aiMoney(Number(r.model_cost), session.org.currency)}</span>
                       </>
                     }
                   />

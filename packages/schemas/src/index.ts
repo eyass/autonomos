@@ -56,6 +56,22 @@ export const INDUSTRIES = [
 ] as const;
 
 export const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "DKK", "NOK", "PLN", "CAD", "AUD"] as const;
+// AI models are priced in US dollars. To show AI spend next to value in the workspace's own
+// currency, it is converted at these fixed reference rates (units per 1 USD, approximate). They
+// are for comparison on screen, never for billing.
+export const USD_REFERENCE_RATES: Record<(typeof CURRENCIES)[number], number> = {
+  USD: 1,
+  EUR: 0.86,
+  GBP: 0.74,
+  CHF: 0.8,
+  SEK: 9.5,
+  DKK: 6.4,
+  NOK: 10.1,
+  PLN: 3.65,
+  CAD: 1.37,
+  AUD: 1.52,
+};
+export const fromUsd = (amount: number, currency: string) => amount * (USD_REFERENCE_RATES[currency as (typeof CURRENCIES)[number]] ?? 1);
 
 // ---------------------------------------------------------------------------
 // Company profile, drafted from the company website during onboarding
