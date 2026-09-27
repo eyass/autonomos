@@ -10,13 +10,13 @@ import { createClient } from "@/lib/supabase/server";
 
 // ---- API keys ----
 
-export async function createApiKey(session: Session, name: string) {
+export async function createApiKey(session: Session, name: string, scope: "read" | "read_write" = "read_write") {
   requireRole(session, ["owner", "admin"]);
   const label = z.string().trim().min(1, "Name the key, for example after the system that uses it").max(60).parse(name);
   const { key, prefix, hash } = generateApiKey();
-  const { error } = await adminDb().from("api_keys").insert({ organization_id: session.org.id, name: label, prefix, key_hash: hash, created_by: session.user.id });
+  const { error } = await adminDb().from("api_keys").insert({ organization_id: session.org.id, name: label, prefix, key_hash: hash, created_by: session.user.id, scope });
   if (error) throw new Error(error.message);
-  await audit(session, { action: "api_key.created", input: { name: label, prefix } });
+  await audit(session, { action: "api_key.created", input: { name: label, prefix, scope } });
   await activity(session, { actionType: "api_key_created", title: `API key "${label}" created` });
   return { key, prefix };
 }
@@ -37,7 +37,11 @@ export async function revokeApiKey(session: Session, id: string) {
 }
 
 export async function listApiKeys(session: Session) {
-  const { data } = await adminDb().from("api_keys").select("id, name, prefix, created_at, last_used_at, revoked_at").eq("organization_id", session.org.id).order("created_at", { ascending: false });
+  const { data } = await adminDb()
+    .from("api_keys")
+    .select("id, name, prefix, scope, created_at, last_used_at, revoked_at")
+    .eq("organization_id", session.org.id)
+    .order("created_at", { ascending: false });
   return data ?? [];
 }
 

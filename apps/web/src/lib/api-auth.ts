@@ -23,8 +23,10 @@ export async function requireApiSession(request: Request): Promise<Session> {
   const key = header.slice("Bearer ".length).trim();
   if (!key.startsWith(KEY_PREFIX)) throw new HttpError(401, "Invalid API key");
   const db = adminDb();
-  const { data: row } = await db.from("api_keys").select("id, organization_id, created_by, revoked_at").eq("key_hash", hashApiKey(key)).maybeSingle();
+  const { data: row } = await db.from("api_keys").select("id, organization_id, created_by, revoked_at, scope").eq("key_hash", hashApiKey(key)).maybeSingle();
   if (!row || row.revoked_at) throw new HttpError(401, "Invalid or revoked API key");
+  // A read-only key can list and fetch, never change anything.
+  if (row.scope === "read" && !["GET", "HEAD"].includes(request.method)) throw new HttpError(403, "This API key is read-only");
   const session = await sessionFor(row.created_by, row.organization_id);
   if (!session) throw new HttpError(401, "The member who created this API key is no longer in the organisation");
   await db.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", row.id);

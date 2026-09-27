@@ -217,6 +217,10 @@ export function ApiKeyForm() {
     <form action={action} className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input name="name" placeholder="Key name, for example Zapier" aria-label="Key name" className="sm:w-64" required />
+        <NativeSelect name="scope" defaultValue="read" aria-label="What the key may do" className="sm:w-48">
+          <NativeSelectOption value="read">Read only</NativeSelectOption>
+          <NativeSelectOption value="read_write">Read and change</NativeSelectOption>
+        </NativeSelect>
         <Button type="submit" variant="outline" disabled={pending}>
           {pending ? "Creating…" : "Create API key"}
         </Button>
@@ -224,7 +228,7 @@ export function ApiKeyForm() {
       {created ? (
         <Alert variant="success">
           <AlertDescription className="space-y-1">
-            <span className="block">Copy this key now. It is not shown again.</span>
+            <span className="block font-medium">Copy this key now. It is shown only once and stored only as a hash.</span>
             <code className="block break-all rounded bg-background px-2 py-1 text-xs">{created}</code>
           </AlertDescription>
         </Alert>

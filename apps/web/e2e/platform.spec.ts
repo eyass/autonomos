@@ -44,14 +44,16 @@ test("sample workspace, approval limits and API keys", async ({ page, request })
   await card.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText(/above your approval limit/)).toBeVisible();
 
-  // API keys: shown once, work as a bearer token, stop working when revoked.
+  // API keys: shown once, read-only by default, work as a bearer token, stop working when revoked.
   await page.goto("/settings#developers");
   await page.getByLabel("Key name").fill("Integration key");
   await page.getByRole("button", { name: "Create API key" }).click();
-  const key = (await page.getByRole("alert").filter({ hasText: "not shown again" }).locator("code").textContent())!.trim();
+  const key = (await page.getByRole("alert").filter({ hasText: "shown only once" }).locator("code").textContent())!.trim();
   const ok = await request.get("/api/agents", { headers: { Authorization: `Bearer ${key}` } });
   expect(ok.status()).toBe(200);
   expect(JSON.stringify(await ok.json())).toContain(`"status":"active"`);
+  const write = await request.post("/api/processes", { headers: { Authorization: `Bearer ${key}` }, data: { title: "Should not be created" } });
+  expect(write.status()).toBe(403);
   const bad = await request.get("/api/agents", { headers: { Authorization: "Bearer aos_live_nope" } });
   expect(bad.status()).toBe(401);
   await page.reload();

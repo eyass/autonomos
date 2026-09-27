@@ -5,6 +5,7 @@ import { dateTime, time } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/app/empty-state";
+import { LinkTabs } from "@/components/app/link-tabs";
 import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -12,6 +13,21 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 export const metadata = { title: "Activity" };
+
+const ATTENTION = ["warning", "error", "waiting"];
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+type Row = { id: string; occurred_at: string; actor_type: string; action_type: string; status: string; title: string; agent_run_id: string | null };
+// Runs of the same kind of event in a row (twelve "Mapped a process") collapse into one line.
+function grouped<T extends Row>(list: T[]): Array<{ first: T; rest: T[] }> {
+  const out: Array<{ first: T; rest: T[] }> = [];
+  for (const e of list) {
+    const last = out.at(-1);
+    if (last && !e.agent_run_id && !last.first.agent_run_id && last.first.action_type === e.action_type && last.first.status === e.status && last.first.actor_type === e.actor_type) last.rest.push(e);
+    else out.push({ first: e, rest: [] });
+  }
+  return out;
+}
 
 const TONES: Record<string, "success" | "warning" | "danger" | "secondary"> = { success: "success", warning: "warning", error: "danger", waiting: "warning", info: "secondary" };
 
@@ -32,6 +48,15 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   if (f.type === "test") q = q.eq("detail->>mode", "test");
   else if (f.type) q = q.ilike("action_type", `%${f.type}%`);
   if (f.date) q = q.gte("occurred_at", `${f.date}T00:00:00Z`).lte("occurred_at", `${f.date}T23:59:59Z`);
+  // "Needs attention" is the default whenever something does; "Everything" shows the rest.
+  const { count: attention } = await supabase
+    .from("activity_events")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", session.org.id)
+    .in("status", ATTENTION)
+    .gte("occurred_at", daysAgo(14));
+  const view = f.view ?? (attention && !f.status ? "attention" : "all");
+  if (view === "attention" && !f.status) q = q.in("status", ATTENTION);
   const [{ data: events }, { data: agents }, { data: departments }] = await Promise.all([
     q,
     supabase.from("agents").select("id, name").eq("organization_id", session.org.id),
@@ -47,6 +72,12 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader title="Activity" description="Everything agents and people did, across the company." />
+      <LinkTabs
+        items={[
+          { href: `/activity?view=attention`, label: `Needs attention${attention ? ` (${attention})` : ""}`, active: view === "attention" },
+          { href: `/activity?view=all`, label: "Everything", active: view === "all" },
+        ]}
+      />
       <FilterBar
         className="mb-4"
         activeCount={[f.department, f.agent, f.type, f.status, f.date].filter(Boolean).length}
@@ -90,14 +121,18 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         }
       />
       {!events?.length ? (
-        <EmptyState title="No activity yet." description="Agent runs, approvals and changes appear here as they happen." />
+        view === "attention" ? (
+          <EmptyState title="Nothing needs attention." description="Warnings, errors and runs waiting on a person show here." />
+        ) : (
+          <EmptyState title="No activity yet." description="Agent runs, approvals and changes appear here as they happen." />
+        )
       ) : (
         <div className="space-y-4">
           {[...byDay.entries()].map(([day, list]) => (
             <Card key={day}>
               <div className="border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
               <ul>
-                {list.map((e) => {
+                {grouped(list).map(({ first: e, rest }) => {
                   const who =
                     e.actor_type === "agent"
                       ? (e.agents as unknown as { name: string } | null)?.name
@@ -116,6 +151,18 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                           {who}
                         </div>
                         <div>{e.title}</div>
+                        {rest.length ? (
+                          <details className="mt-1 text-xs text-muted-foreground">
+                            <summary className="cursor-pointer select-none hover:text-foreground">and {rest.length} more like it</summary>
+                            <ul className="mt-1 space-y-0.5">
+                              {rest.map((r) => (
+                                <li key={r.id}>
+                                  <span className="tabular-nums">{time(r.occurred_at)}</span> {r.title}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        ) : null}
                       </div>
                       {(e.detail as { mode?: string } | null)?.mode === "test" ? (
                         <Badge variant="secondary" className="shrink-0">

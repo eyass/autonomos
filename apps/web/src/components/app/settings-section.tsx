@@ -22,7 +22,7 @@ export function SettingsSection({
   action?: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
-  tone?: "warning";
+  tone?: "warning" | "danger";
 }) {
   const [open, setOpen] = useState(defaultOpen);
   // Jump-list links and deep links (/settings#members) open the section they point at.
@@ -39,7 +39,7 @@ export function SettingsSection({
   }, [id]);
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
-      <Card id={id} className={cn("scroll-mt-20", tone === "warning" && "border-warning")}>
+      <Card id={id} className={cn("scroll-mt-20", tone === "warning" && "border-warning", tone === "danger" && "border-destructive/50")}>
         <CardHeader>
           {/* On phones the action sits under the description so long labels never push the card wider than the screen. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">

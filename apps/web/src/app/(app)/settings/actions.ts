@@ -115,7 +115,7 @@ export async function refreshProfileAction() {
 
 export async function createApiKeyAction(_: unknown, form: FormData) {
   return runAction(async () => {
-    const created = await createApiKey(await requireSessionOrThrow(), String(form.get("name") ?? ""));
+    const created = await createApiKey(await requireSessionOrThrow(), String(form.get("name") ?? ""), form.get("scope") === "read" ? "read" : "read_write");
     revalidatePath("/settings");
     return created;
   });

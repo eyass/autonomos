@@ -173,13 +173,13 @@ isOneToOne: false
                   ]
                 },"agent_runs": {
                   Row: {
-                    "agent_id": string,"agent_version_id": string,"baseline_minutes": number | null,"error": string | null,"error_retryable": boolean | null,"estimated_minutes_saved": number | null,"execution_cost": number,"external_job_id": string | null,"finished_at": string | null,"human_minutes": number,"id": string,"input": NonNullable<Json>,"input_tokens": number,"mode": Database["public"]['Enums']["run_mode"],"model": string | null,"model_cost": number,"organization_id": string,"outcome": string | null,"output": Json | null,"output_tokens": number,"process_id": string,"queued_at": string,"started_at": string | null,"started_by": string | null,"state": NonNullable<Json>,"status": Database["public"]['Enums']["run_status"],"success": boolean | null,"summary": string | null,"trigger": NonNullable<Json>
+                    "agent_id": string,"agent_version_id": string,"baseline_minutes": number | null,"error": string | null,"error_retryable": boolean | null,"estimated_minutes_saved": number | null,"execution_cost": number,"external_job_id": string | null,"finished_at": string | null,"handled_at": string | null,"handled_by": string | null,"human_minutes": number,"id": string,"input": NonNullable<Json>,"input_tokens": number,"mode": Database["public"]['Enums']["run_mode"],"model": string | null,"model_cost": number,"organization_id": string,"outcome": string | null,"output": Json | null,"output_tokens": number,"process_id": string,"queued_at": string,"started_at": string | null,"started_by": string | null,"state": NonNullable<Json>,"status": Database["public"]['Enums']["run_status"],"success": boolean | null,"summary": string | null,"trigger": NonNullable<Json>
                   }
                   Insert: {
-                    "agent_id": string,"agent_version_id": string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"finished_at"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode": Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id": string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id": string,"queued_at"?: string,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger": NonNullable<Json>
+                    "agent_id": string,"agent_version_id": string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"finished_at"?: string | null,"handled_at"?: string | null,"handled_by"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode": Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id": string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id": string,"queued_at"?: string,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger": NonNullable<Json>
                   }
                   Update: {
-                    "agent_id"?: string,"agent_version_id"?: string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"finished_at"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode"?: Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id"?: string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id"?: string,"queued_at"?: string,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger"?: NonNullable<Json>
+                    "agent_id"?: string,"agent_version_id"?: string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"finished_at"?: string | null,"handled_at"?: string | null,"handled_by"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode"?: Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id"?: string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id"?: string,"queued_at"?: string,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger"?: NonNullable<Json>
                   }
                   Relationships: [
                     {
@@ -193,6 +193,12 @@ isOneToOne: false
       columns: ["agent_version_id"]
 isOneToOne: false
       referencedRelation: "agent_versions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agent_runs_handled_by_fkey"
+      columns: ["handled_by"]
+isOneToOne: false
+      referencedRelation: "users"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "agent_runs_organization_id_fkey"
@@ -315,13 +321,13 @@ isOneToOne: false
                   ]
                 },"api_keys": {
                   Row: {
-                    "created_at": string,"created_by": string,"id": string,"key_hash": string,"last_used_at": string | null,"name": string,"organization_id": string,"prefix": string,"revoked_at": string | null
+                    "created_at": string,"created_by": string,"id": string,"key_hash": string,"last_used_at": string | null,"name": string,"organization_id": string,"prefix": string,"revoked_at": string | null,"scope": string
                   }
                   Insert: {
-                    "created_at"?: string,"created_by": string,"id"?: string,"key_hash": string,"last_used_at"?: string | null,"name": string,"organization_id": string,"prefix": string,"revoked_at"?: string | null
+                    "created_at"?: string,"created_by": string,"id"?: string,"key_hash": string,"last_used_at"?: string | null,"name": string,"organization_id": string,"prefix": string,"revoked_at"?: string | null,"scope"?: string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string,"id"?: string,"key_hash"?: string,"last_used_at"?: string | null,"name"?: string,"organization_id"?: string,"prefix"?: string,"revoked_at"?: string | null
+                    "created_at"?: string,"created_by"?: string,"id"?: string,"key_hash"?: string,"last_used_at"?: string | null,"name"?: string,"organization_id"?: string,"prefix"?: string,"revoked_at"?: string | null,"scope"?: string
                   }
                   Relationships: [
                     {

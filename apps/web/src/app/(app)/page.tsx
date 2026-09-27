@@ -178,7 +178,7 @@ export default async function OverviewPage() {
               : "From production runs",
           },
           { label: "Tasks done", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
-          { label: "AI spend", value: usd(m.aiCost), hint: "this month" },
+          { label: "AI spend", value: usd(m.aiCost), hint: `this month · tests ${usd(m.aiCostBySource.test)} · live ${usd(m.aiCostBySource.production)}` },
         ]}
       />
 

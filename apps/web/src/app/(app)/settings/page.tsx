@@ -1,4 +1,6 @@
+import { computeOrgMetrics } from "@autonomos/db";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { ActionButton } from "@/components/action-button";
 import { dateTime, num, usd } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
@@ -60,7 +62,9 @@ export default async function SettingsPage() {
   const meUser = me?.users as unknown as { first_name: string; last_name: string } | null;
   const prefs = { approvals: true, failures: true, weekly_summary: false, ...((me?.notification_preferences as Record<string, boolean> | null) ?? {}) };
   const tokens = (usage ?? []).reduce((s, u) => s + u.input_tokens + u.output_tokens, 0);
-  const cost = (usage ?? []).reduce((s, u) => s + Number(u.estimated_cost), 0);
+  // AI spend comes from the same ledger and code as the Overview, so the two always agree.
+  const spend = await computeOrgMetrics(adminDb(), session.org.id);
+  const cost = spend.aiCost;
 
   const sections = [
     ["stop", "Emergency stop"],
@@ -73,348 +77,365 @@ export default async function SettingsPage() {
     ...(admin ? ([["developers", "Developers"]] as const) : []),
     ["billing", "Billing"],
     ["audit", "Audit log"],
+    ["danger", "Danger zone"],
   ] as const;
 
   return (
     <>
       <PageHeader title="Settings" />
-      <nav aria-label="Settings sections" className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <ul className="flex gap-2 pb-1">
-          {sections.map(([id, label]) => (
-            <li key={id} className="shrink-0">
-              <Button asChild size="sm" variant="outline" className="rounded-full">
-                <Link href={`#${id}`}>{label}</Link>
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <div className="space-y-4 md:space-y-6">
-        <SettingsSection
-          id="stop"
-          title="Emergency stop"
-          description="Stops all agents from taking new actions. Runs in progress stop before their next external action."
-          tone={session.org.agentsPaused ? "warning" : undefined}
-          defaultOpen={session.org.agentsPaused}
-        >
-          {admin ? <PauseControl paused={session.org.agentsPaused} until={session.org.agentsPausedUntil} /> : <p className="text-sm text-muted-foreground">Only admins can pause all agents.</p>}
-        </SettingsSection>
+      <div className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-8">
+        {/* A sticky list of sections beside the page on wide screens; a scrollable row on small ones. */}
+        <nav aria-label="Settings sections" className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 lg:sticky lg:top-4 lg:mb-0 lg:self-start lg:overflow-visible">
+          <ul className="flex gap-2 pb-1 lg:flex-col lg:gap-0.5">
+            {sections.map(([id, label]) => (
+              <li key={id} className="shrink-0">
+                <Button asChild size="sm" variant="outline" className={cn("rounded-full lg:w-full lg:justify-start lg:rounded-md lg:border-0 lg:shadow-none", id === "danger" && "text-destructive")}>
+                  <Link href={`#${id}`}>{label}</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="min-w-0 space-y-4 md:space-y-6">
+          <SettingsSection
+            id="stop"
+            title="Emergency stop"
+            description="Stops all agents from taking new actions. Runs in progress stop before their next external action."
+            tone={session.org.agentsPaused ? "warning" : undefined}
+            defaultOpen={session.org.agentsPaused}
+          >
+            {admin ? <PauseControl paused={session.org.agentsPaused} until={session.org.agentsPausedUntil} /> : <p className="text-sm text-muted-foreground">Only admins can pause all agents.</p>}
+          </SettingsSection>
 
-        <SettingsSection
-          id="execution"
-          title="Execution"
-          description={readiness.ready ? "Ready. Agents can be tested and go live." : "Not ready yet. Fix the items below before agents can run."}
-          action={<Badge variant={readiness.ready ? "success" : "warning"}>{readiness.ready ? "Ready" : "Not ready"}</Badge>}
-          defaultOpen={!readiness.ready}
-        >
-          <ReadinessChecklist checks={readiness.checks} />
-        </SettingsSection>
+          <SettingsSection
+            id="execution"
+            title="Execution"
+            description={readiness.ready ? "Ready. Agents can be tested and go live." : "Not ready yet. Fix the items below before agents can run."}
+            action={<Badge variant={readiness.ready ? "success" : "warning"}>{readiness.ready ? "Ready" : "Not ready"}</Badge>}
+            defaultOpen={!readiness.ready}
+          >
+            <ReadinessChecklist checks={readiness.checks} />
+          </SettingsSection>
 
-        <SettingsSection
-          id="environment"
-          title="Environment"
-          description="Where agents act. Sandbox systems hold sample data inside AutonomOS, so nothing real changes. Live systems are your real accounts."
-        >
-          {connections?.length ? (
-            <ul className="-mx-6 border-t border-border text-sm">
-              {connections.map((c) => (
-                <li key={c.integration_key} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
-                  <span className="min-w-0 flex-1 truncate font-medium">{systemName(c.integration_key)}</span>
-                  {c.account_label ? <span className="truncate text-xs text-muted-foreground">{c.account_label}</span> : null}
-                  <Badge variant={c.provider === "sandbox" ? "warning" : "success"}>{c.provider === "sandbox" ? "Sandbox" : "Live"}</Badge>
+          <SettingsSection
+            id="environment"
+            title="Environment"
+            description="Where agents act. Sandbox systems hold sample data inside AutonomOS, so nothing real changes. Live systems are your real accounts."
+          >
+            {connections?.length ? (
+              <ul className="-mx-6 border-t border-border text-sm">
+                {connections.map((c) => (
+                  <li key={c.integration_key} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
+                    <span className="min-w-0 flex-1 truncate font-medium">{systemName(c.integration_key)}</span>
+                    {c.account_label ? <span className="truncate text-xs text-muted-foreground">{c.account_label}</span> : null}
+                    <Badge variant={c.provider === "sandbox" ? "warning" : "success"}>{c.provider === "sandbox" ? "Sandbox" : "Live"}</Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No systems connected yet.</p>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              To move a system from sandbox to live, disconnect it and connect your real account in{" "}
+              <Link href="/integrations" className="underline">
+                Integrations
+              </Link>
+              . Test runs are always simulated, whichever mode a system is in.
+            </p>
+          </SettingsSection>
+
+          <SettingsSection id="profile" title="Your profile" description="Your name and which emails you get.">
+            <ProfileForm firstName={meUser?.first_name ?? ""} lastName={meUser?.last_name ?? ""} prefs={prefs} />
+          </SettingsSection>
+
+          <SettingsSection
+            id="company"
+            title="Workspace and company"
+            description={
+              session.org.websiteProfile
+                ? `Profile drafted from ${session.org.website ?? "your website"}${session.org.detectedTools.length ? `. Tools found: ${session.org.detectedTools.join(", ")}` : ""}.`
+                : "Add your website to let AutonomOS keep this profile up to date."
+            }
+            action={
+              admin && session.org.website ? (
+                <ActionButton size="sm" variant="outline" action={refreshProfileAction} pendingLabel="Reading website…">
+                  Refresh from website
+                </ActionButton>
+              ) : null
+            }
+          >
+            <CompanyForm org={session.org} disabled={!admin} />
+          </SettingsSection>
+
+          <SettingsSection id="departments" title="Departments" description="Hourly cost per department overrides the company default for estimated value.">
+            <div className="space-y-3">
+              {(departments ?? []).map((d) => (
+                <DepartmentForm
+                  key={d.id}
+                  dept={{ ...d, hourly_labour_cost: d.hourly_labour_cost === null ? null : Number(d.hourly_labour_cost) }}
+                  disabled={!admin}
+                  extra={
+                    admin ? (
+                      <ActionButton size="sm" variant="ghost" confirm={`Archive ${d.name}?`} confirmLabel="Archive" action={archiveDepartmentAction.bind(null, d.id)}>
+                        Archive
+                      </ActionButton>
+                    ) : null
+                  }
+                />
+              ))}
+              <div className="border-t border-border pt-3">
+                <DepartmentForm disabled={!admin} />
+              </div>
+            </div>
+          </SettingsSection>
+
+          <SettingsSection id="members" title="Members" description="Who can use AutonomOS, their role, and who can approve agent actions.">
+            <ul className="-mx-6 border-t border-border">
+              {(members ?? []).map((m) => {
+                const u = m.users as unknown as { first_name: string; last_name: string; email: string } | null;
+                const editable = admin && m.role !== "owner" && m.user_id !== session.user.id;
+                return (
+                  <li key={m.user_id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-3 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">
+                        {u ? `${u.first_name} ${u.last_name}` : "–"}
+                        {m.user_id === session.user.id ? <span className="font-normal text-muted-foreground"> (you)</span> : null}
+                      </div>
+                      <div className="truncate text-xs text-muted-foreground">{u?.email}</div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge variant="outline" className="capitalize">
+                        {m.role}
+                      </Badge>
+                      <Badge variant={m.can_approve ? "success" : "secondary"}>
+                        {m.can_approve ? (m.approval_limit === null ? "Approver" : `Approves up to ${usd(Number(m.approval_limit)).replace("$", "")} ${session.org.currency}`) : "No approvals"}
+                      </Badge>
+                    </div>
+                    {admin ? (
+                      <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
+                        <ActionButton size="sm" variant="ghost" action={setApprovalAction.bind(null, m.user_id, !m.can_approve)}>
+                          {m.can_approve ? "Remove approval" : "Allow approvals"}
+                        </ActionButton>
+                        {m.can_approve ? <ApprovalLimitForm userId={m.user_id} limit={m.approval_limit === null ? null : Number(m.approval_limit)} currency={session.org.currency} /> : null}
+                        {editable ? (
+                          <ActionButton size="sm" variant="ghost" action={setMemberRoleAction.bind(null, m.user_id, m.role === "admin" ? "member" : "admin")}>
+                            {m.role === "admin" ? "Make member" : "Make admin"}
+                          </ActionButton>
+                        ) : null}
+                        {editable ? (
+                          <ActionButton size="sm" variant="ghost" confirm="Remove this member?" confirmLabel="Remove" action={removeMemberAction.bind(null, m.user_id)}>
+                            Remove
+                          </ActionButton>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+              {(invites ?? []).map((i) => (
+                <li key={i.email} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate">{i.email}</div>
+                    <div className="text-xs text-muted-foreground">Invited {dateTime(i.created_at)}, not joined yet</div>
+                  </div>
+                  <Badge variant="outline" className="capitalize">
+                    {i.role}
+                  </Badge>
+                  <Badge variant="warning">Pending</Badge>
+                  {admin ? (
+                    <ActionButton size="sm" variant="ghost" confirm={`Revoke the invite for ${i.email}?`} confirmLabel="Revoke" action={revokeInviteAction.bind(null, i.email)}>
+                      Revoke
+                    </ActionButton>
+                  ) : null}
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">No systems connected yet.</p>
-          )}
-          <p className="mt-3 text-xs text-muted-foreground">
-            To move a system from sandbox to live, disconnect it and connect your real account in{" "}
-            <Link href="/integrations" className="underline">
-              Integrations
-            </Link>
-            . Test runs are always simulated, whichever mode a system is in.
-          </p>
-        </SettingsSection>
-
-        <SettingsSection id="profile" title="Your profile" description="Your name and which emails you get.">
-          <ProfileForm firstName={meUser?.first_name ?? ""} lastName={meUser?.last_name ?? ""} prefs={prefs} />
-        </SettingsSection>
-
-        <SettingsSection
-          id="company"
-          title="Workspace and company"
-          description={
-            session.org.websiteProfile
-              ? `Profile drafted from ${session.org.website ?? "your website"}${session.org.detectedTools.length ? `. Tools found: ${session.org.detectedTools.join(", ")}` : ""}.`
-              : "Add your website to let AutonomOS keep this profile up to date."
-          }
-          action={
-            admin && session.org.website ? (
-              <ActionButton size="sm" variant="outline" action={refreshProfileAction} pendingLabel="Reading website…">
-                Refresh from website
-              </ActionButton>
-            ) : null
-          }
-        >
-          <CompanyForm org={session.org} disabled={!admin} />
-        </SettingsSection>
-
-        <SettingsSection id="departments" title="Departments" description="Hourly cost per department overrides the company default for estimated value.">
-          <div className="space-y-3">
-            {(departments ?? []).map((d) => (
-              <DepartmentForm
-                key={d.id}
-                dept={{ ...d, hourly_labour_cost: d.hourly_labour_cost === null ? null : Number(d.hourly_labour_cost) }}
-                disabled={!admin}
-                extra={
-                  admin ? (
-                    <ActionButton size="sm" variant="ghost" confirm={`Archive ${d.name}?`} confirmLabel="Archive" action={archiveDepartmentAction.bind(null, d.id)}>
-                      Archive
-                    </ActionButton>
-                  ) : null
-                }
-              />
-            ))}
-            <div className="border-t border-border pt-3">
-              <DepartmentForm disabled={!admin} />
-            </div>
-          </div>
-        </SettingsSection>
-
-        <SettingsSection id="members" title="Members" description="Who can use AutonomOS, their role, and who can approve agent actions.">
-          <ul className="-mx-6 border-t border-border">
-            {(members ?? []).map((m) => {
-              const u = m.users as unknown as { first_name: string; last_name: string; email: string } | null;
-              const editable = admin && m.role !== "owner" && m.user_id !== session.user.id;
-              return (
-                <li key={m.user_id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-3 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">
-                      {u ? `${u.first_name} ${u.last_name}` : "–"}
-                      {m.user_id === session.user.id ? <span className="font-normal text-muted-foreground"> (you)</span> : null}
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">{u?.email}</div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1">
-                    <Badge variant="outline" className="capitalize">
-                      {m.role}
-                    </Badge>
-                    <Badge variant={m.can_approve ? "success" : "secondary"}>
-                      {m.can_approve ? (m.approval_limit === null ? "Approver" : `Approves up to ${usd(Number(m.approval_limit)).replace("$", "")} ${session.org.currency}`) : "No approvals"}
-                    </Badge>
-                  </div>
-                  {admin ? (
-                    <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
-                      <ActionButton size="sm" variant="ghost" action={setApprovalAction.bind(null, m.user_id, !m.can_approve)}>
-                        {m.can_approve ? "Remove approval" : "Allow approvals"}
-                      </ActionButton>
-                      {m.can_approve ? <ApprovalLimitForm userId={m.user_id} limit={m.approval_limit === null ? null : Number(m.approval_limit)} currency={session.org.currency} /> : null}
-                      {editable ? (
-                        <ActionButton size="sm" variant="ghost" action={setMemberRoleAction.bind(null, m.user_id, m.role === "admin" ? "member" : "admin")}>
-                          {m.role === "admin" ? "Make member" : "Make admin"}
-                        </ActionButton>
-                      ) : null}
-                      {editable ? (
-                        <ActionButton size="sm" variant="ghost" confirm="Remove this member?" confirmLabel="Remove" action={removeMemberAction.bind(null, m.user_id)}>
-                          Remove
-                        </ActionButton>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-            {(invites ?? []).map((i) => (
-              <li key={i.email} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-3 text-sm">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate">{i.email}</div>
-                  <div className="text-xs text-muted-foreground">Invited {dateTime(i.created_at)}, not joined yet</div>
-                </div>
-                <Badge variant="outline" className="capitalize">
-                  {i.role}
-                </Badge>
-                <Badge variant="warning">Pending</Badge>
-                {admin ? (
-                  <ActionButton size="sm" variant="ghost" confirm={`Revoke the invite for ${i.email}?`} confirmLabel="Revoke" action={revokeInviteAction.bind(null, i.email)}>
-                    Revoke
-                  </ActionButton>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-          <div className="pt-4">
-            <InviteForm disabled={!admin} />
-          </div>
-        </SettingsSection>
-
-        {admin ? (
-          <SettingsSection id="developers" title="Developers" description="API keys let other systems use the AutonomOS API. A key acts with the role of the admin who created it.">
-            <div className="space-y-4">
-              <ApiKeyForm />
-              {apiKeys.length ? (
-                <ul className="-mx-6 border-t border-border text-sm">
-                  {apiKeys.map((k) => (
-                    <li key={k.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{k.name}</div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          <code>{k.prefix}…</code> · created {dateTime(k.created_at)} · {k.last_used_at ? `last used ${dateTime(k.last_used_at)}` : "never used"}
-                        </div>
-                      </div>
-                      {k.revoked_at ? (
-                        <Badge variant="secondary">Revoked</Badge>
-                      ) : (
-                        <ActionButton
-                          size="sm"
-                          variant="ghost"
-                          confirm={`Revoke "${k.name}"? Anything using it stops working immediately.`}
-                          confirmLabel="Revoke"
-                          action={revokeApiKeyAction.bind(null, k.id)}
-                        >
-                          Revoke
-                        </ActionButton>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <p className="text-xs text-muted-foreground">
-                Send the key as <code>Authorization: Bearer aos_live_…</code>. See the{" "}
-                <Link href="/docs/api" className="underline">
-                  API reference
-                </Link>
-                . Webhook signing secrets belong to each connection; view or rotate them in{" "}
-                <Link href="/integrations" className="underline">
-                  Integrations
-                </Link>
-                .
-              </p>
+            <div className="pt-4">
+              <InviteForm disabled={!admin} />
             </div>
           </SettingsSection>
-        ) : null}
 
-        <SettingsSection
-          id="billing"
-          title="Billing and usage"
-          description={`${plan.name} plan${plan.price ? `, ${plan.price} ${session.org.currency} a month` : ", invoiced manually"}. Usage this month:`}
-        >
-          <div className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-sm">
-                  <span>Live agents</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {usageVsPlan.activeAgents} of {plan.activeAgents}
-                  </span>
-                </div>
-                <Progress value={Math.min(100, (usageVsPlan.activeAgents / plan.activeAgents) * 100)} />
+          {admin ? (
+            <SettingsSection id="developers" title="Developers" description="API keys let other systems use the AutonomOS API. A key acts with the role of the admin who created it.">
+              <div className="space-y-4">
+                <ApiKeyForm />
+                {apiKeys.length ? (
+                  <ul className="-mx-6 border-t border-border text-sm">
+                    {apiKeys.map((k) => (
+                      <li key={k.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{k.name}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            <code>{k.prefix}…</code> · {k.scope === "read" ? "read only" : "read and change"} · created {dateTime(k.created_at)} ·{" "}
+                            {k.last_used_at ? `last used ${dateTime(k.last_used_at)}` : "never used"}
+                          </div>
+                        </div>
+                        {k.revoked_at ? (
+                          <Badge variant="secondary">Revoked</Badge>
+                        ) : (
+                          <ActionButton
+                            size="sm"
+                            variant="ghost"
+                            confirm={`Revoke "${k.name}"? Anything using it stops working immediately.`}
+                            confirmLabel="Revoke"
+                            action={revokeApiKeyAction.bind(null, k.id)}
+                          >
+                            Revoke
+                          </ActionButton>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  Send the key as <code>Authorization: Bearer aos_live_…</code>. See the{" "}
+                  <Link href="/docs/api" className="underline">
+                    API reference
+                  </Link>
+                  . Webhook signing secrets belong to each connection; view or rotate them in{" "}
+                  <Link href="/integrations" className="underline">
+                    Integrations
+                  </Link>
+                  .
+                </p>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-sm">
-                  <span>Production runs</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {num(usageVsPlan.runs)} of {num(plan.runsPerMonth)}
-                  </span>
-                </div>
-                <Progress value={Math.min(100, (usageVsPlan.runs / plan.runsPerMonth) * 100)} />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {usageVsPlan.overageRuns
-                ? `${num(usageVsPlan.overageRuns)} runs over the allowance, billed at ${plan.overagePerRun} ${session.org.currency} each (${usageVsPlan.overageCost.toFixed(2)} ${session.org.currency} so far).`
-                : `Runs above the allowance keep working and are billed at ${plan.overagePerRun} ${session.org.currency} each. Test runs are free. A new agent cannot go live once the live-agent limit is reached.`}
-            </p>
-            <DefinitionList
-              className="lg:grid-cols-4"
-              items={[
-                { label: "All runs incl. tests", value: num(runs ?? 0) },
-                { label: "Tool actions", value: num(toolActions ?? 0) },
-                { label: "Model tokens", value: num(tokens) },
-                { label: "AI spend", value: usd(cost) },
-              ]}
-            />
-            <div>
-              <div className="mb-2 text-sm font-medium">Plans</div>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {Object.entries(PLANS).map(([key, p]) => (
-                  <div key={key} className={`rounded-md border p-3 text-xs ${key === (org?.plan ?? "design_partner") ? "border-primary" : "border-border"}`}>
-                    <div className="flex items-center justify-between text-sm font-medium">
-                      {p.name}
-                      {key === (org?.plan ?? "design_partner") ? <Badge variant="success">Current</Badge> : null}
-                    </div>
-                    <div className="mt-1 text-muted-foreground">{p.price ? `${p.price} ${session.org.currency} / month` : "By agreement"}</div>
-                    <div className="mt-1 text-muted-foreground">
-                      {p.activeAgents} live agents · {num(p.runsPerMonth)} runs · then {p.overagePerRun} per run
-                    </div>
+            </SettingsSection>
+          ) : null}
+
+          <SettingsSection
+            id="billing"
+            title="Billing and usage"
+            description={`${plan.name} plan${plan.price ? `, ${plan.price} ${session.org.currency} a month` : ", invoiced manually"}. Usage this month:`}
+          >
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span>Live agents</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {usageVsPlan.activeAgents} of {plan.activeAgents}
+                    </span>
                   </div>
-                ))}
+                  <Progress value={Math.min(100, (usageVsPlan.activeAgents / plan.activeAgents) * 100)} />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span>Production runs</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {num(usageVsPlan.runs)} of {num(plan.runsPerMonth)}
+                    </span>
+                  </div>
+                  <Progress value={Math.min(100, (usageVsPlan.runs / plan.runsPerMonth) * 100)} />
+                </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                To change plan, email{" "}
-                <a className="underline" href={`mailto:${CONTACT_EMAIL}?subject=Change%20plan`}>
-                  {CONTACT_EMAIL}
-                </a>
-                .
+              <p className="text-xs text-muted-foreground">
+                {usageVsPlan.overageRuns
+                  ? `${num(usageVsPlan.overageRuns)} runs over the allowance, billed at ${plan.overagePerRun} ${session.org.currency} each (${usageVsPlan.overageCost.toFixed(2)} ${session.org.currency} so far).`
+                  : `Runs above the allowance keep working and are billed at ${plan.overagePerRun} ${session.org.currency} each. Test runs are free. A new agent cannot go live once the live-agent limit is reached.`}
               </p>
-            </div>
-            <div>
-              <div className="mb-2 text-sm font-medium">Invoices</div>
-              {invoices?.length ? (
-                <ul className="-mx-6 border-t border-border text-sm">
-                  {invoices.map((inv) => (
-                    <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
-                      <span className="min-w-0 flex-1 truncate font-medium">{inv.number}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {inv.period_start} to {inv.period_end}
+              <DefinitionList
+                className="lg:grid-cols-4"
+                items={[
+                  { label: "All runs incl. tests", value: num(runs ?? 0) },
+                  { label: "Tool actions", value: num(toolActions ?? 0) },
+                  { label: "Model tokens", value: num(tokens) },
+                  {
+                    label: "AI spend",
+                    value: (
+                      <span title="Setup is discovery and drafting; tests and live runs are split by run mode">
+                        {usd(cost)}
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          setup {usd(spend.aiCostBySource.setup)} · tests {usd(spend.aiCostBySource.test)} · live {usd(spend.aiCostBySource.production)}
+                        </span>
                       </span>
-                      <span className="tabular-nums">
-                        {Number(inv.amount).toFixed(2)} {inv.currency}
-                      </span>
-                      <Badge variant={inv.status === "paid" ? "success" : inv.status === "open" ? "warning" : "secondary"} className="capitalize">
-                        {inv.status}
-                      </Badge>
-                      {inv.url ? (
-                        <a href={inv.url} className="text-xs underline" target="_blank" rel="noreferrer">
-                          PDF
-                        </a>
-                      ) : null}
-                    </li>
+                    ),
+                  },
+                ]}
+              />
+              <div>
+                <div className="mb-2 text-sm font-medium">Plans</div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {Object.entries(PLANS).map(([key, p]) => (
+                    <div key={key} className={`rounded-md border p-3 text-xs ${key === (org?.plan ?? "design_partner") ? "border-primary" : "border-border"}`}>
+                      <div className="flex items-center justify-between text-sm font-medium">
+                        {p.name}
+                        {key === (org?.plan ?? "design_partner") ? <Badge variant="success">Current</Badge> : null}
+                      </div>
+                      <div className="mt-1 text-muted-foreground">{p.price ? `${p.price} ${session.org.currency} / month` : "By agreement"}</div>
+                      <div className="mt-1 text-muted-foreground">
+                        {p.activeAgents} live agents · {num(p.runsPerMonth)} runs · then {p.overagePerRun} per run
+                      </div>
+                    </div>
                   ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground">No invoices yet.</p>
-              )}
-            </div>
-          </div>
-        </SettingsSection>
-
-        <SettingsSection id="audit" title="Audit log" description="Append-only record of material actions by people and agents. Latest 50.">
-          <ul className="-mx-6 border-t border-border text-sm">
-            {(auditRows ?? []).map((a) => (
-              <li key={a.id} className="flex items-start gap-3 border-b border-border px-6 py-2.5 last:border-0">
-                <div className="min-w-0 flex-1">
-                  <div className="break-words font-mono text-xs">
-                    {a.action}
-                    {a.tool ? <span className="text-muted-foreground"> · {a.tool}</span> : null}
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {dateTime(a.occurred_at)} · {a.actor_type === "user" ? ((a.users as unknown as { email: string } | null)?.email ?? "user") : a.actor_type}
-                  </div>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">{a.result}</span>
-              </li>
-            ))}
-          </ul>
-        </SettingsSection>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  To change plan, email{" "}
+                  <a className="underline" href={`mailto:${CONTACT_EMAIL}?subject=Change%20plan`}>
+                    {CONTACT_EMAIL}
+                  </a>
+                  .
+                </p>
+              </div>
+              <div>
+                <div className="mb-2 text-sm font-medium">Invoices</div>
+                {invoices?.length ? (
+                  <ul className="-mx-6 border-t border-border text-sm">
+                    {invoices.map((inv) => (
+                      <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-2.5 last:border-0">
+                        <span className="min-w-0 flex-1 truncate font-medium">{inv.number}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {inv.period_start} to {inv.period_end}
+                        </span>
+                        <span className="tabular-nums">
+                          {Number(inv.amount).toFixed(2)} {inv.currency}
+                        </span>
+                        <Badge variant={inv.status === "paid" ? "success" : inv.status === "open" ? "warning" : "secondary"} className="capitalize">
+                          {inv.status}
+                        </Badge>
+                        {inv.url ? (
+                          <a href={inv.url} className="text-xs underline" target="_blank" rel="noreferrer">
+                            PDF
+                          </a>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No invoices yet.</p>
+                )}
+              </div>
+            </div>
+          </SettingsSection>
 
-        <SettingsSection
-          id="delete"
-          title="Delete workspace"
-          description={session.role === "owner" ? "Permanently delete this workspace and everything in it." : "Only the workspace owner can delete it."}
-        >
-          {session.role === "owner" ? <DeleteWorkspace name={session.org.name} /> : null}
-        </SettingsSection>
+          <SettingsSection id="audit" title="Audit log" description="Append-only record of material actions by people and agents. Latest 50.">
+            <ul className="-mx-6 border-t border-border text-sm">
+              {(auditRows ?? []).map((a) => (
+                <li key={a.id} className="flex items-start gap-3 border-b border-border px-6 py-2.5 last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="break-words font-mono text-xs">
+                      {a.action}
+                      {a.tool ? <span className="text-muted-foreground"> · {a.tool}</span> : null}
+                    </div>
+                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {dateTime(a.occurred_at)} · {a.actor_type === "user" ? ((a.users as unknown as { email: string } | null)?.email ?? "user") : a.actor_type}
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">{a.result}</span>
+                </li>
+              ))}
+            </ul>
+          </SettingsSection>
+
+          <SettingsSection id="danger" title="Danger zone" tone="danger" description="Actions here cannot be undone.">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm">
+                <div className="font-medium">Delete this workspace</div>
+                <div className="text-muted-foreground">{session.role === "owner" ? "Removes everything in it, for every member." : "Only the workspace owner can delete it."}</div>
+              </div>
+              {session.role === "owner" ? <DeleteWorkspace name={session.org.name} /> : null}
+            </div>
+          </SettingsSection>
+        </div>
       </div>
     </>
   );
