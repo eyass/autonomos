@@ -52,5 +52,14 @@ export async function saveAboutAction(_: unknown, form: FormData) {
 export async function finishOnboardingAction() {
   const result = await runAction(async () => completeOnboarding(await requireSessionOrThrow()));
   if (!result.ok) return result;
-  redirect(result.data > 0 ? `/processes?status=draft&drafted=${result.data}` : "/discover?welcome=1");
+  redirect("/onboarding/mapping");
+}
+
+export async function retryMappingAction() {
+  const result = await runAction(async () => {
+    const { startMapping } = await import("@/server/first-inventory");
+    await startMapping(await requireSessionOrThrow());
+  });
+  if (!result.ok) return result;
+  redirect("/onboarding/mapping");
 }

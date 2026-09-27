@@ -12,6 +12,8 @@ import { Steps } from "../steps";
 import { finishOnboardingAction } from "../actions";
 
 export const metadata = { title: "Connect systems" };
+// Continue starts the first process inventory, which runs after the response.
+export const maxDuration = 300;
 
 export default async function ConnectPage() {
   const session = await getSession();
@@ -37,7 +39,7 @@ export default async function ConnectPage() {
               Back to company info
             </Link>
           </Button>
-          <ActionButton action={finishOnboardingAction} pendingLabel="Mapping your processes…">
+          <ActionButton action={finishOnboardingAction} pendingLabel="Starting…">
             Continue
           </ActionButton>
         </div>
