@@ -30,7 +30,10 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
   const live = connected.filter((i) => i.provider !== "sandbox");
   // With many systems, filter the connected ones instead of scrolling past all of them.
   const [filter, setFilter] = useState<"all" | "live" | "sample" | "used">("all");
-  const shown = connected.filter((i) => (filter === "live" ? i.provider !== "sandbox" : filter === "sample" ? i.provider === "sandbox" : filter === "used" ? i.agents.length > 0 : true));
+  const [query, setQuery] = useState("");
+  const shown = connected
+    .filter((i) => (filter === "live" ? i.provider !== "sandbox" : filter === "sample" ? i.provider === "sandbox" : filter === "used" ? i.agents.length > 0 : true))
+    .filter((i) => !query.trim() || i.name.toLowerCase().includes(query.trim().toLowerCase()));
   const filters = [
     ["all", `All (${connected.length})`],
     ["live", `Live (${live.length})`],
@@ -78,6 +81,16 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
               {label}
             </button>
           ))}
+          {connected.length > 8 ? (
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find a system"
+              aria-label="Find a connected system"
+              className="h-8 min-w-0 flex-1 rounded-full border bg-background px-3 text-sm sm:max-w-56"
+            />
+          ) : null}
         </div>
       ) : null}
       {connected.length ? section("Connected", compact ? connected : shown) : null}
@@ -95,8 +108,13 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
 
 function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView; canManage: boolean; compact?: boolean; found?: boolean }) {
   const [review, setReview] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const connected = i.status === "connected";
   const available = i.sandboxAvailable || i.oauthAvailable;
+  // On a phone a connected system is one short card: name, status and who uses it. The rest
+  // (what was found, which agents do what, the buttons) opens on request.
+  const folds = connected && !compact && !review;
+  const folded = folds && !expanded ? "max-sm:hidden" : "";
   return (
     <Card data-testid={`integration-${i.key}`} className="min-w-0 gap-3 sm:gap-4">
       <CardHeader>
@@ -104,7 +122,15 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
           <SystemLogo src={i.logo} name={i.name} className="size-6" />
           {i.name}
         </CardTitle>
-        <CardDescription className={connected || review ? "line-clamp-2" : "line-clamp-1"}>{i.description}</CardDescription>
+        <CardDescription className={connected || review ? "line-clamp-1 sm:line-clamp-2" : "line-clamp-1"}>{i.description}</CardDescription>
+        {folds ? (
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground sm:hidden">
+            <span>{i.agents.length ? `Used by ${i.agents.length} agent${i.agents.length === 1 ? "" : "s"}` : "No agent uses it"}</span>
+            <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+              {expanded ? "Less" : "Details"}
+            </button>
+          </div>
+        ) : null}
         <CardAction className="flex items-center gap-2">
           {connected ? (
             <Badge
@@ -127,7 +153,7 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
           )}
         </CardAction>
       </CardHeader>
-      <CardContent className="space-y-2 empty:hidden">
+      <CardContent className={`space-y-2 empty:hidden ${folded}`}>
         {connected && !compact ? (
           <>
             {i.inventory ? (
@@ -188,7 +214,7 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
         ) : null}
       </CardContent>
       {canManage && (connected || review) ? (
-        <CardFooter className="flex-wrap gap-2">
+        <CardFooter className={`flex-wrap gap-2 ${folded}`}>
           {connected ? (
             <>
               {i.oauthAvailable && i.provider === "composio" ? (

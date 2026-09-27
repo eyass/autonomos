@@ -169,3 +169,23 @@ export function SubprocessorTable() {
     </div>
   );
 }
+
+// One retention statement for the Security and Privacy pages, so the two can never disagree.
+export function RetentionList() {
+  return (
+    <ul>
+      <li>Run history, tool inputs and outputs, and audit events are kept for the life of the workspace.</li>
+      <li>
+        Samples read from connected systems to discover processes are redacted, and deleted as soon as the suggestions are drafted. The discovery run keeps only per-system counts and the suggestions.
+      </li>
+      <li>AutonomOS reads at most six public pages of your website each time it drafts or refreshes your company profile, and keeps the profile it drafted, not the pages.</li>
+      <li>
+        An owner can delete a workspace in Settings, under Danger zone. That deletes its processes, agents, runs, connections and audit history. Copies in our database provider&apos;s backups are
+        removed when those backups expire.
+      </li>
+      <li>
+        To delete your own account, or for anything this does not cover, <a href={`mailto:${CONTACT_EMAIL}?subject=Delete%20my%20data`}>contact us</a>.
+      </li>
+    </ul>
+  );
+}

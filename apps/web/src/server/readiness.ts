@@ -101,13 +101,13 @@ export async function agentReadiness(session: Session, agent: AgentForReadiness,
     const { data: row } = await db.from("agents").select("process_id").eq("organization_id", session.org.id).eq("id", agent.id).maybeSingle();
     const work = row ? await processGate(session, row.process_id) : null;
     if (work) {
-      const problems = [...work.gaps, ...(work.sensitive.length && !work.complianceOwner ? [`name a compliance owner (${work.sensitive.join(", ")})`] : [])];
+      const problems = [...work.gaps, ...(work.sensitive.length && !work.complianceOwner ? [`name a compliance owner (${work.sensitive.join(", ")})`] : []), ...work.policyGaps];
       checks.push({
         key: "process",
         label: "Its process is described well enough",
         ok: problems.length === 0,
-        detail: problems.length ? `On the process: ${problems.join("; ")}.` : "Workflow, numbers and sign-off are in place.",
-        href: `/processes/${row!.process_id}?edit=1#edit`,
+        detail: problems.length ? `On the process: ${problems.join("; ")}.` : "Workflow, numbers, sign-off and policy thresholds are in place.",
+        href: work.gaps.length ? `/processes/${row!.process_id}?edit=1#edit` : `/processes/${row!.process_id}#policy`,
         blocking: true,
       });
     }
@@ -150,6 +150,25 @@ export async function agentState(session: Session, agent: AgentForReadiness & { 
   };
   const [title, description] = words[phase];
   return { phase, title, description, canActivate: agent.status !== "active" && failing.length === 0, testBlockedReason, readiness };
+}
+
+// Every agent in the workspace with its state, from agentState: the one source Home, the agent
+// list, the agent page and Settings all read, so none of them can offer Activate while another
+// says it is blocked. The first failing blocking check is what "View blockers" leads to.
+export type AgentSummary = { id: string; name: string; status: string; autonomyLevel: number; state: AgentState; firstBlocker: ReadinessCheck | null };
+
+export async function agentStates(session: Session): Promise<AgentSummary[]> {
+  const { loadAgentConfig } = await import("@/server/agents");
+  const { data: agents } = await adminDb().from("agents").select("id, name, status, autonomy_level").eq("organization_id", session.org.id).neq("status", "archived").order("created_at");
+  return Promise.all(
+    (agents ?? []).map(async (a) => {
+      const { version, config } = await loadAgentConfig(session, a.id);
+      const state = await agentState(session, { id: a.id, status: a.status, versionId: version.id }, config);
+      // A live agent has already gone live: only what it depends on now can block it.
+      const firstBlocker = state.readiness.checks.find((c) => c.blocking && !c.ok && (a.status !== "active" || c.key !== "test")) ?? null;
+      return { id: a.id, name: a.name, status: a.status, autonomyLevel: a.autonomy_level, state, firstBlocker };
+    }),
+  );
 }
 
 // Enqueues a run; if it cannot start, the run is marked failed (with the reason) and shows

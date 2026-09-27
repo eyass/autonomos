@@ -12,7 +12,10 @@ const Body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("website_profile"), input: z.object({ website: z.string().trim().min(1).max(300) }) }),
   z.object({ kind: z.literal("profile_refresh"), input: z.object({}).default({}) }),
   z.object({ kind: z.literal("document_import"), input: DocumentImportSchema }),
-  z.object({ kind: z.literal("opportunities"), input: z.object({ processId: z.string().uuid(), approve: z.boolean().default(false), complianceOwner: z.string().trim().max(120).optional() }) }),
+  z.object({
+    kind: z.literal("opportunities"),
+    input: z.object({ processId: z.string().uuid(), approve: z.boolean().default(false), complianceOwner: z.string().trim().max(120).optional(), confirmed: z.boolean().optional() }),
+  }),
   z.object({ kind: z.literal("build_agent"), input: z.object({ opportunityId: z.string().uuid() }) }),
   z.object({ kind: z.literal("sample_workspace"), input: z.object({}).default({}) }),
 ]);
@@ -48,6 +51,9 @@ export async function POST(request: Request) {
         // Say what is missing now, before a background job is started for nothing.
         const gate = await processGate(session, body.input.processId);
         if (body.input.approve && gate.gaps.length) throw new HttpError(409, `Fill in the details before approving: ${gate.gaps.join("; ")}.`);
+        if (body.input.approve && gate.unconfirmed && !body.input.confirmed) {
+          throw new HttpError(409, "Nothing in your data backs this process yet. Confirm the steps and numbers match how the work is done before approving.");
+        }
         if (gate.sensitive.length && !gate.complianceOwner && !body.input.complianceOwner) {
           throw new HttpError(409, `This process involves ${gate.sensitive.join(" and ")}. Name who signs off on compliance first.`);
         }

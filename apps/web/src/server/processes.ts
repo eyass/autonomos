@@ -9,11 +9,25 @@ import {
   type CompanyContext,
   type InterviewMessage,
 } from "@autonomos/ai";
-import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk, isThin, qualityGaps, rankByValue, sensitiveAreas, tempered } from "@autonomos/agents";
+import {
+  blendScore,
+  deterministicBusinessValue,
+  deterministicDifficulty,
+  deterministicRisk,
+  isThin,
+  needsConfirmation,
+  policyFieldsFor,
+  policyGaps,
+  qualityGaps,
+  rankByValue,
+  sensitiveAreas,
+  tempered,
+  type PolicyValues,
+} from "@autonomos/agents";
 import { DEPARTMENTS, DiscoveredProcessSchema, tidyTitle, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
-import { adminDb, HttpError, type Session } from "@/lib/session";
+import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
 
 export async function companyContext(session: Session): Promise<CompanyContext> {
   const { data } = await adminDb().from("integration_connections").select("integration_key, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected");
@@ -169,6 +183,13 @@ export async function saveDiscoveredProcesses(
   return ids;
 }
 
+// Evidence counts only for sources that infer work rather than hear about it: the website and
+// connected systems. An interview or a document is a person or the company saying so.
+function evidenceCountFor(source: string, evidence: unknown): number | undefined {
+  if (source !== "website" && source !== "integration") return undefined;
+  return Array.isArray(evidence) ? evidence.length : 0;
+}
+
 export const ManualProcessSchema = z.object({
   title: z.string().trim().min(2, "Give the process a name"),
   description: z.string().trim().min(5, "Describe the process in a sentence or two"),
@@ -285,7 +306,9 @@ export async function processGate(session: Session, id: string) {
   const db = adminDb();
   const { data: p } = await db
     .from("processes")
-    .select("title, description, status, confidence, estimated_occurrences_per_month, estimated_minutes_per_occurrence, compliance_owner, process_steps(title)")
+    .select(
+      "title, description, status, confidence, discovery_source, evidence, estimated_occurrences_per_month, estimated_minutes_per_occurrence, compliance_owner, policy_thresholds, process_steps(title)",
+    )
     .eq("organization_id", session.org.id)
     .eq("id", id)
     .maybeSingle();
@@ -297,8 +320,63 @@ export async function processGate(session: Session, id: string) {
     estimatedOccurrencesPerMonth: p.estimated_occurrences_per_month === null ? null : Number(p.estimated_occurrences_per_month),
     estimatedMinutesPerOccurrence: p.estimated_minutes_per_occurrence === null ? null : Number(p.estimated_minutes_per_occurrence),
   });
+  // An AI guess with nothing in the data behind it waits for a person to confirm it.
+  const unconfirmed = needsConfirmation({
+    confidence: p.confidence === null ? null : Number(p.confidence),
+    stepsCount: steps.length,
+    estimatedOccurrencesPerMonth: null,
+    estimatedMinutesPerOccurrence: null,
+    evidenceCount: evidenceCountFor(p.discovery_source ?? "", p.evidence),
+  });
   const sensitive = sensitiveAreas(`${p.title} ${p.description} ${steps.map((s) => s.title).join(" ")}`);
-  return { gaps, sensitive, complianceOwner: p.compliance_owner, status: p.status };
+  const policy = ((p.policy_thresholds ?? {}) as PolicyValues) ?? {};
+  return {
+    gaps,
+    unconfirmed,
+    confidence: p.confidence === null ? null : Number(p.confidence),
+    sensitive,
+    complianceOwner: p.compliance_owner,
+    status: p.status,
+    policy,
+    policyGaps: policyGaps(sensitive, policy),
+  };
+}
+
+// A person confirms an AI-drafted process matches how the work is really done. The AI's
+// confidence no longer applies once someone has checked it (the same as editing it).
+export async function confirmProcess(session: Session, id: string) {
+  const { error } = await adminDb().from("processes").update({ confidence: null }).eq("organization_id", session.org.id).eq("id", id);
+  if (error) throw new Error(error.message);
+  await audit(session, { action: "process.confirmed", processId: id });
+}
+
+// Saves the company's policy numbers for a process in a regulated area. Only the fields its
+// areas ask for are kept; numbers must be zero or more.
+export async function setPolicyThresholds(session: Session, id: string, raw: Record<string, string>) {
+  if (!isAdmin(session)) throw new HttpError(403, "Only admins can set policy thresholds");
+  const gate = await processGate(session, id);
+  const values: PolicyValues = { ...gate.policy };
+  for (const f of policyFieldsFor(gate.sensitive)) {
+    const v = (raw[f.key] ?? "").trim();
+    if (!v) {
+      delete values[f.key];
+      continue;
+    }
+    if (f.unit === "text") values[f.key] = v.slice(0, 200);
+    else {
+      const n = Number(v.replace(",", "."));
+      if (!Number.isFinite(n) || n < 0) throw new HttpError(400, `${f.label}: enter a number of zero or more`);
+      values[f.key] = f.unit === "money" ? Math.round(n * 100) / 100 : Math.round(n);
+    }
+  }
+  const { error } = await adminDb()
+    .from("processes")
+    .update({ policy_thresholds: values as never })
+    .eq("organization_id", session.org.id)
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  await audit(session, { action: "process.policy_thresholds_set", processId: id, input: values });
+  return values;
 }
 
 // Records who signs off on compliance for a process in a sensitive area.
@@ -320,6 +398,7 @@ export async function setProcessStatus(session: Session, id: string, status: "re
   if (status === "reviewed") {
     const gate = await processGate(session, id);
     if (gate.gaps.length) throw new HttpError(409, `Fill in the details before approving: ${gate.gaps.join("; ")}.`);
+    if (gate.unconfirmed) throw new HttpError(409, "Nothing in your data backs this process yet. Confirm the steps and numbers match how the work is done before approving.");
   }
   const { data, error } = await db
     .from("processes")

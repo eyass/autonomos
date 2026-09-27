@@ -3,18 +3,19 @@ import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { LevelChange, Scores, StatusBadge } from "@/components/domain";
 import { dateTime, FREQUENCY_LABEL, hours, money, num, pct } from "@/lib/format";
-import { requireSession } from "@/lib/session";
+import { isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { setProcessStatusAction } from "../actions";
 import { IdeasButton } from "./ideas-button";
 import { latestJob } from "@/server/jobs";
 import { processGate } from "@/server/processes";
-import { guardrailsFor } from "@autonomos/agents";
+import { guardrailsFor, policyFieldsFor } from "@autonomos/agents";
+import { PolicyForm } from "./policy-form";
 import { ProcessEditor } from "./editor";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
 import { StatStrip } from "@/components/app/stat-card";
-import { processGaps } from "@/lib/process-gaps";
+import { estimateHeld, processGaps } from "@/lib/process-gaps";
 import { LifecycleHelp } from "@/components/app/lifecycle-help";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,8 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
   const systems = ((p.process_systems as unknown as Array<{ system: string }>) ?? []).map((s) => s.system);
   const roles = ((p.process_people as unknown as Array<{ role: string }>) ?? []).map((r) => r.role);
   const gaps = processGaps({ ...p, stepsCount: steps.length, systemsCount: systems.length });
+  // Hours, cost and scores wait until the process is described well enough to base them on.
+  const held = estimateHeld({ ...p, stepsCount: steps.length });
   // Structured picks for the editor: connected systems first, then what other processes use.
   const connectedKeys = new Set((connected ?? []).map((c) => c.integration_key));
   const systemOptions = uniqueOptions([
@@ -113,6 +116,8 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
                 blockedBy={gate?.gaps ?? []}
                 sensitive={gate?.sensitive ?? []}
                 complianceOwner={gate?.complianceOwner ?? null}
+                unconfirmed={gate?.unconfirmed ?? false}
+                confidence={gate?.confidence ?? null}
               />
             ) : null}
             {p.status !== "draft" && p.status !== "candidate" && p.status !== "archived" ? (
@@ -171,9 +176,24 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
           <AlertDescription>
             Involves {gate.sensitive.join(" and ")}.{" "}
             {gate.complianceOwner ? `Compliance sign-off: ${gate.complianceOwner}.` : "Automation ideas are generated only once you name who signs off on compliance."}
-            <span className="mt-1 block text-xs">Enforced on any agent for it: {guardrailsFor(gate.sensitive).rules.join("; ").toLowerCase()}.</span>
+            <span className="mt-1 block text-xs">Enforced on any agent for it: {guardrailsFor(gate.sensitive, gate.policy).rules.join("; ").toLowerCase()}.</span>
           </AlertDescription>
         </Alert>
+      ) : null}
+      {gate && policyFieldsFor(gate.sensitive).length ? (
+        <Card id="policy" className="mb-4 scroll-mt-20">
+          <CardHeader>
+            <CardTitle>Your policy</CardTitle>
+            <CardDescription>
+              {gate.policyGaps.length
+                ? "Needed before an agent is built or goes live. Money limits are enforced on every action and can only be stricter than the platform limits; the rest become the agent's rules and escalations, and every change it makes still needs approval."
+                : "Set. Money limits are enforced on every action; the rest are the agent's rules and escalations."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PolicyForm processId={id} fields={policyFieldsFor(gate.sensitive)} values={gate.policy} currency={session.org.currency} canEdit={isAdmin(session)} />
+          </CardContent>
+        </Card>
       ) : null}
       {gaps.length ? (
         <Alert variant="warning" className="mb-4">
@@ -196,13 +216,13 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
         </Alert>
       ) : null}
 
-      {/* No economics are invented for a candidate: there is no workflow to base them on yet. */}
+      {/* No economics are invented for a thin process: there is no workflow or evidence to base them on yet. */}
       <StatStrip
         className="mb-6"
         items={
-          p.status === "candidate"
+          held
             ? [
-                { label: "Human time", value: "Not estimated", hint: "Once steps and numbers are added" },
+                { label: "Human time", value: "Not estimated", hint: held },
                 { label: "Cost", value: "–" },
                 { label: "Autonomy", value: `L${effective} today` },
                 { label: "Scores", value: "Not scored yet" },

@@ -6,8 +6,7 @@ import { hours, pct, aiMoney } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { activateAction, pauseAction } from "./actions";
-import { loadAgentConfig } from "@/server/agents";
-import { agentState } from "@/server/readiness";
+import { agentStates } from "@/server/readiness";
 import { ButtonLink } from "@/components/app/button-link";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
@@ -33,17 +32,9 @@ export default async function AgentsPage() {
     );
   }
   const metrics = await computeOrgMetrics(adminDb(), session.org.id, new Date(0));
-  // The same checks as the agent page and activation: the list offers Activate only when they pass.
-  const states = new Map(
-    await Promise.all(
-      agents
-        .filter((a) => a.status !== "active")
-        .map(async (a) => {
-          const { version, config } = await loadAgentConfig(session, a.id);
-          return [a.id, await agentState(session, { id: a.id, status: a.status, versionId: version.id }, config)] as const;
-        }),
-    ),
-  );
+  // The same state as the agent page, Home and Settings: the list offers Activate only when every
+  // blocking check passes, and otherwise leads to the blockers.
+  const states = new Map((await agentStates(session)).map((a) => [a.id, a] as const));
   return (
     <>
       <PageHeader title="Agents" description="Only active agents act on their own." />
@@ -117,7 +108,7 @@ export default async function AgentsPage() {
                       <ActionButton size="sm" variant="ghost" action={pauseAction.bind(null, a.id)}>
                         Pause
                       </ActionButton>
-                    ) : states.get(a.id)?.canActivate ? (
+                    ) : states.get(a.id)?.state.canActivate ? (
                       <ActionButton
                         size="sm"
                         variant="ghost"
@@ -129,9 +120,14 @@ export default async function AgentsPage() {
                         Activate
                       </ActionButton>
                     ) : (
-                      <Link href={`/agents/${a.id}#test`} className="text-xs text-muted-foreground hover:text-foreground hover:underline" title={states.get(a.id)?.description}>
-                        {states.get(a.id)?.title ?? "Not ready"}
-                      </Link>
+                      <ButtonLink
+                        href={`/agents/${a.id}#readiness`}
+                        size="sm"
+                        variant="outline"
+                        title={states.get(a.id)?.firstBlocker ? `${states.get(a.id)!.firstBlocker!.label}: ${states.get(a.id)!.firstBlocker!.detail}` : undefined}
+                      >
+                        View blockers
+                      </ButtonLink>
                     )}
                   </TableCell>
                 </TableRow>

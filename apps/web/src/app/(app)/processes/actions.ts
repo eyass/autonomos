@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { runAction } from "@/lib/actions";
 import { requireSessionOrThrow } from "@/lib/session";
-import { createManualProcess, ManualProcessSchema, ProcessUpdateSchema, setProcessStatus, updateProcess } from "@/server/processes";
+import { createManualProcess, ManualProcessSchema, ProcessUpdateSchema, setPolicyThresholds, setProcessStatus, updateProcess } from "@/server/processes";
 
 export async function createProcessAction(_: unknown, form: FormData) {
   const result = await runAction(async () =>
@@ -21,4 +21,10 @@ export async function updateProcessAction(id: string, input: unknown) {
 
 export async function setProcessStatusAction(id: string, status: "reviewed" | "active" | "archived" | "draft") {
   return runAction(async () => setProcessStatus(await requireSessionOrThrow(), id, status));
+}
+
+export async function setPolicyThresholdsAction(id: string, _: unknown, form: FormData) {
+  const raw: Record<string, string> = {};
+  for (const [k, v] of form.entries()) if (typeof v === "string") raw[k] = v;
+  return runAction(async () => setPolicyThresholds(await requireSessionOrThrow(), id, raw));
 }

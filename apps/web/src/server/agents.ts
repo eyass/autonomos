@@ -57,13 +57,16 @@ async function insertVersion(session: Session, agentId: string, version: number,
 async function guardedConfig(session: Session, processId: string, config: AgentConfig, mode: "create" | "update") {
   const gate = await processGate(session, processId);
   if (gate.gaps.length) throw new HttpError(409, `The process is not described well enough for an agent yet: ${gate.gaps.join("; ")}. Fill it in first.`);
+  if (gate.unconfirmed) throw new HttpError(409, "Nothing in your data backs this process yet. Confirm it on the process first.");
   if (gate.sensitive.length && !gate.complianceOwner) throw new HttpError(409, `The process involves ${gate.sensitive.join(" and ")}. Name who signs off on compliance on the process first.`);
-  const caps = guardrailsFor(gate.sensitive);
+  // The company's own thresholds come before any agent: without them there is nothing to enforce.
+  if (gate.policyGaps.length) throw new HttpError(409, `On the process, ${gate.policyGaps.join("; ")}. The agent enforces these, so they are needed first.`);
+  const caps = guardrailsFor(gate.sensitive, gate.policy);
   if (mode === "update" && config.autonomyLevel > caps.maxLevel) {
     throw new HttpError(409, `Work involving ${gate.sensitive.join(" and ")} runs at L${caps.maxLevel} at most.`);
   }
   const writes = config.tools.filter((t) => getTool(t)?.access === "write");
-  return AgentConfigSchema.parse(applyGuardrails(config, gate.sensitive, writes));
+  return AgentConfigSchema.parse(applyGuardrails(config, gate.sensitive, writes, gate.policy));
 }
 
 export async function createAgent(session: Session, input: { processId: string; opportunityId: string | null; config: AgentConfig }) {

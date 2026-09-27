@@ -227,6 +227,10 @@ export async function seedDemoOrganization(db: DbClient, userId: string, options
         // Sample processes in regulated areas come with a named (fictional) compliance owner.
         compliance_owner: sensitiveAreas(`${p.title} ${p.description} ${p.steps.map((x) => x.title).join(" ")}`).length ? "Finance and compliance team (sample)" : null,
         compliance_confirmed_at: new Date().toISOString(),
+        // And sample policy numbers, so their agents have thresholds to enforce.
+        policy_thresholds: (sensitiveAreas(`${p.title} ${p.description} ${p.steps.map((x) => x.title).join(" ")}`).length
+          ? { approvalAbove: 50, maxPerAction: 500, windowDays: 30, minBalance: 20, escalateAbove: 1000, graceDays: 7, maxRemindersPerMonth: 3, lawfulBasis: "Contract (sample)", responseDays: 30 }
+          : {}) as never,
         reviewed_by: userId,
         reviewed_at: new Date().toISOString(),
         created_by: userId,
