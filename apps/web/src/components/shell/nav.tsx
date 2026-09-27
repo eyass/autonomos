@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Bot, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Pencil, Plug, Plus, Settings, Workflow } from "lucide-react";
+import { Activity, Bot, Building2, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Plug, Settings, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
@@ -172,15 +172,9 @@ export function AppSidebar({
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem asChild>
-                  <Link href="/onboarding/company?new=1" onClick={() => setOpenMobile(false)}>
-                    <Plus />
-                    New workspace
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings#company" onClick={() => setOpenMobile(false)}>
-                    <Pencil />
-                    Rename or delete workspace
+                  <Link href="/workspaces" onClick={() => setOpenMobile(false)}>
+                    <Building2 />
+                    Manage workspaces
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

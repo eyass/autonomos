@@ -1,12 +1,13 @@
 import { computeOrgMetrics } from "@autonomos/db";
 import Link from "next/link";
+import { ButtonLink } from "@/components/app/button-link";
 import { cn } from "@/lib/utils";
 import { ActionButton } from "@/components/action-button";
 import { dateTime, num, usd } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, revokeApiKeyAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
-import { ApiKeyForm, ApprovalLimitForm, CompanyForm, DeleteWorkspace, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
+import { ApiKeyForm, ApprovalLimitForm, CompanyForm, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
 import { DefinitionList } from "@/components/app/definition-list";
 import { PageHeader } from "@/components/app/page-header";
 import { ReadinessChecklist } from "@/components/app/readiness-checklist";
@@ -430,9 +431,11 @@ export default async function SettingsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm">
                 <div className="font-medium">Delete this workspace</div>
-                <div className="text-muted-foreground">{session.role === "owner" ? "Removes everything in it, for every member." : "Only the workspace owner can delete it."}</div>
+                <div className="text-muted-foreground">Rename, delete and add workspaces in one place.</div>
               </div>
-              {session.role === "owner" ? <DeleteWorkspace name={session.org.name} /> : null}
+              <ButtonLink href="/workspaces" variant="outline">
+                Manage workspaces
+              </ButtonLink>
             </div>
           </SettingsSection>
         </div>
