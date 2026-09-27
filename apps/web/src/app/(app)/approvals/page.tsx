@@ -39,10 +39,14 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       .order("finished_at", { ascending: false })
       .limit(30),
   ]);
+  // Production hand-offs need someone; test ones only show what a test ran into.
+  const liveHandoffs = (handoffs ?? []).filter((r) => r.mode !== "test");
+  const testHandoffs = (handoffs ?? []).filter((r) => r.mode === "test");
+  const needs = (data?.length ?? 0) + liveHandoffs.length;
   const tabs = (
     <LinkTabs
       items={[
-        { href: "/approvals", label: `Needs a person${(data?.length ?? 0) + (handoffs?.length ?? 0) && !resolved ? ` (${(data?.length ?? 0) + (handoffs?.length ?? 0)})` : ""}`, active: !resolved },
+        { href: "/approvals", label: `Needs a person${needs && !resolved ? ` (${needs})` : ""}`, active: !resolved },
         { href: "/approvals?view=resolved", label: "Resolved", active: resolved },
       ]}
     />
@@ -110,33 +114,47 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
             <ApprovalCard key={a.id} a={a} canApprove={session.canApprove} />
           ))}
         </div>
-      ) : !handoffs?.length ? (
+      ) : !liveHandoffs.length ? (
         <EmptyState
           title="Nothing needs a person right now."
           description="Actions an agent prepares for approval, and work it hands to a person, appear here and you get notified. Run a test from an agent to see one."
         />
       ) : null}
-      {handoffs?.length ? (
+      {liveHandoffs.length ? (
         <section className={views.length ? "mt-6" : ""}>
           <h2 className="mb-2 text-sm font-semibold">Handed to a person</h2>
-          <Card className="gap-0 py-0">
-            {handoffs.map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0 sm:px-5">
-                <Link href={`/activity/${r.id}`} className="min-w-0 flex-1 hover:underline">
-                  <div className="text-sm font-medium">{r.summary ?? "Needs a person"}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {(r.agents as unknown as { name: string } | null)?.name} · {dateTime(r.finished_at)}
-                  </div>
-                </Link>
-                {r.mode === "test" ? <Badge variant="secondary">Test</Badge> : null}
-                <ActionButton size="sm" variant="outline" action={markHandledAction.bind(null, r.id)}>
-                  Mark handled
-                </ActionButton>
-              </div>
-            ))}
-          </Card>
+          <HandoffList rows={liveHandoffs} />
         </section>
       ) : null}
+      {testHandoffs.length ? (
+        <details className="mt-6 group" open={!needs}>
+          <summary className="mb-2 cursor-pointer text-sm font-semibold text-muted-foreground">
+            From tests ({testHandoffs.length}) <span className="font-normal">· nothing real is waiting on these</span>
+          </summary>
+          <HandoffList rows={testHandoffs} />
+        </details>
+      ) : null}
     </>
+  );
+}
+
+function HandoffList({ rows }: { rows: Array<{ id: string; mode: string; summary: string | null; finished_at: string | null; agents: unknown }> }) {
+  return (
+    <Card className="gap-0 py-0">
+      {rows.map((r) => (
+        <div key={r.id} className="flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0 sm:px-5">
+          <Link href={`/activity/${r.id}`} className="min-w-0 flex-1 hover:underline">
+            <div className="text-sm font-medium">{r.summary ?? "Needs a person"}</div>
+            <div className="text-xs text-muted-foreground">
+              {(r.agents as { name: string } | null)?.name} · {dateTime(r.finished_at)}
+            </div>
+          </Link>
+          {r.mode === "test" ? <Badge variant="secondary">Test</Badge> : <Badge variant="warning">Live</Badge>}
+          <ActionButton size="sm" variant="outline" action={markHandledAction.bind(null, r.id)}>
+            Mark handled
+          </ActionButton>
+        </div>
+      ))}
+    </Card>
   );
 }

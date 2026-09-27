@@ -10,7 +10,7 @@ import {
   type InterviewMessage,
 } from "@autonomos/ai";
 import { blendScore, deterministicBusinessValue, deterministicDifficulty, deterministicRisk } from "@autonomos/agents";
-import { DEPARTMENTS, DiscoveredProcessSchema, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
+import { DEPARTMENTS, DiscoveredProcessSchema, tidyTitle, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
@@ -98,7 +98,8 @@ export async function saveDiscoveredProcesses(
   const { data: existing } = await db.from("processes").select("title").eq("organization_id", session.org.id).neq("status", "archived");
   const known = new Set((existing ?? []).map((e) => e.title.trim().toLowerCase()));
   for (const raw of processes) {
-    const p = DiscoveredProcessSchema.parse(raw);
+    const parsed = DiscoveredProcessSchema.parse(raw);
+    const p = { ...parsed, title: tidyTitle(parsed.title) };
     const key = p.title.trim().toLowerCase();
     if (known.has(key)) continue;
     known.add(key);

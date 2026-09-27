@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { JobKind, JobView } from "@/server/jobs";
@@ -126,9 +127,14 @@ export function JobButton({
   disabled?: boolean;
 }) {
   const done = useJobDone();
-  const { running, elapsed, follow, job } = useJob(initialJob, done);
+  // A failure stays on screen (with the reason) until the next attempt, instead of only a toast.
+  const { running, elapsed, follow, job } = useJob(initialJob, (j) => {
+    if (j.status !== "failed") done(j);
+  });
   const [starting, start] = useTransition();
+  const [startError, setStartError] = useState<string | null>(null);
   const busy = running || starting;
+  const failed = !busy && (startError ?? (job?.status === "failed" ? (job.error ?? "It did not finish.") : null));
   return (
     <span className="inline-flex flex-col items-start gap-1">
       <Button
@@ -139,16 +145,23 @@ export function JobButton({
         disabled={busy || disabled}
         onClick={() =>
           start(async () => {
+            setStartError(null);
             const r = await requestJob(kind, input);
-            if (!r.ok) return void toast.error(r.error);
+            if (!r.ok) return setStartError(r.error);
             follow(r.data);
           })
         }
       >
-        {busy ? <Spinner /> : null}
-        {busy ? (pendingLabel ?? children) : children}
+        {busy ? <Spinner /> : failed ? <RotateCcw /> : null}
+        {busy ? (pendingLabel ?? children) : failed ? "Try again" : children}
       </Button>
       {running && job ? <JobProgress label={job.label} elapsed={elapsed} className="max-w-72 text-xs text-muted-foreground" /> : null}
+      {failed ? (
+        <p className="max-w-72 text-xs text-destructive" role="alert">
+          {job?.label ? `${job.label} did not finish: ` : ""}
+          {failed}
+        </p>
+      ) : null}
     </span>
   );
 }

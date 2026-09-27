@@ -506,6 +506,8 @@ async function escalate(ctx: RunContext, store: RunStore, state: RunState, step:
     title: ctx.run.mode === "production" ? `${ctx.agent.name} needs a human` : `Test of ${ctx.agent.name} handed to a human`,
     body: reason,
     link: `/activity/${ctx.run.id}`,
+    // A test hand-off is for whoever ran the test: it shows in the app, it is not emailed.
+    inAppOnly: ctx.run.mode === "test",
   });
   await step({ type: "escalated", description: reason, status: "succeeded" });
   const metrics = await finalizeMetrics(ctx, store, false);
@@ -534,7 +536,13 @@ async function fail(ctx: RunContext, store: RunStore, state: RunState, step: (r:
   await step({ type: "failed", description: error, status: "failed" });
   await store.saveRun(ctx, { state, status: "failed", outcome: "failed", summary: error, success: false, error, errorRetryable: false, finishedAt: now() });
   await store.recordActivity(ctx, { actionType: "run_failed", status: "error", title: `${ctx.agent.name} failed: ${error}` });
-  await store.notify(ctx, { kind: "agent_failed", title: `${ctx.agent.name} failed`, body: error, link: `/activity/${ctx.run.id}` });
+  await store.notify(ctx, {
+    kind: "agent_failed",
+    title: ctx.run.mode === "test" ? `Test of ${ctx.agent.name} failed` : `${ctx.agent.name} failed`,
+    body: error,
+    link: `/activity/${ctx.run.id}`,
+    inAppOnly: ctx.run.mode === "test",
+  });
   await store.recordAudit(ctx, { action: "run.failed", output: error, result: "failure" });
   return { status: "failed", error };
 }

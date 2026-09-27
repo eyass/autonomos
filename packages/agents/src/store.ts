@@ -130,10 +130,7 @@ export interface RunStore {
   ): Promise<void>;
   appendStep(ctx: RunContext, sequence: number, step: StepRecord): Promise<void>;
   // Inserts a pending action. If the idempotency key already exists, returns the existing row.
-  upsertAction(
-    ctx: RunContext,
-    action: { tool: string; access: "read" | "write"; args: Record<string, unknown>; idempotencyKey: string; policy: PolicyEvaluation },
-  ): Promise<ActionRecord>;
+  upsertAction(ctx: RunContext, action: { tool: string; access: "read" | "write"; args: Record<string, unknown>; idempotencyKey: string; policy: PolicyEvaluation }): Promise<ActionRecord>;
   getActionByKey(ctx: RunContext, idempotencyKey: string): Promise<ActionRecord | null>;
   finishAction(
     ctx: RunContext,
@@ -161,13 +158,19 @@ export interface RunStore {
   getApproval(ctx: RunContext, approvalId: string): Promise<ApprovalRecord | null>;
   recordIntervention(
     ctx: RunContext,
-    intervention: { type: "approval" | "exception" | "correction" | "manual_completion" | "override" | "information_request"; description: string; minutes: number; approvalId?: string; userId?: string | null },
+    intervention: {
+      type: "approval" | "exception" | "correction" | "manual_completion" | "override" | "information_request";
+      description: string;
+      minutes: number;
+      approvalId?: string;
+      userId?: string | null;
+    },
   ): Promise<void>;
   sumInterventionMinutes(ctx: RunContext): Promise<number>;
   recordActivity(ctx: RunContext, activity: { actionType: string; status: string; title: string; detail?: Record<string, unknown> }): Promise<void>;
   recordAudit(ctx: RunContext, audit: { action: string; system?: string; tool?: string; input?: unknown; output?: unknown; approvalStatus?: string; result: string; model?: string }): Promise<void>;
   recordModelUsage(ctx: RunContext, usage: ModelUsageRecord): Promise<void>;
-  notify(ctx: RunContext, notification: { kind: "approval_required" | "agent_failed" | "agent_escalation"; title: string; body: string; link: string }): Promise<void>;
+  notify(ctx: RunContext, notification: { kind: "approval_required" | "agent_failed" | "agent_escalation"; title: string; body: string; link: string; inAppOnly?: boolean }): Promise<void>;
   isOrganizationPaused(ctx: RunContext): Promise<boolean>;
   getAgentStatus(ctx: RunContext): Promise<string>;
   connectionFor(ctx: RunContext, integration: string): Promise<ConnectionInfo | null>;

@@ -28,7 +28,7 @@ export function CompanyForm({ suggestedWebsite, initialJob = null }: { suggested
   const finished = initialJob?.status === "done" ? ((initialJob.result?.analysis as WebsiteAnalysis | undefined) ?? null) : null;
   const [analysis, setAnalysis] = useState<WebsiteAnalysis | null>(finished);
   const [manual, setManual] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialJob?.status === "failed" ? (initialJob.error ?? "Could not read the website").replace(/\.$/, "") : null);
   const [starting, startReading] = useTransition();
   const { running, follow } = useJob(initialJob?.status === "done" ? null : initialJob, (j) => {
     if (j.status === "failed") return setError((j.error ?? "Could not read the website").replace(/\.$/, ""));

@@ -295,8 +295,8 @@ export function Interview({ departments, defaultDepartment, resumable }: { depar
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-5">
-      <Card className="flex flex-col lg:col-span-2">
+    <div className="grid gap-6 xl:grid-cols-5">
+      <Card className="flex min-w-0 flex-col xl:col-span-2">
         <CardHeader>
           <CardTitle>{`${department} interview`}</CardTitle>
           <CardAction>
@@ -305,7 +305,7 @@ export function Interview({ departments, defaultDepartment, resumable }: { depar
             </Button>
           </CardAction>
         </CardHeader>
-        <div className="max-h-[50vh] flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5 lg:max-h-[28rem]">
+        <div className="max-h-[50vh] flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5 xl:max-h-[28rem]">
           {messages.map((m, i) => (
             <div key={i} className={m.role === "user" ? "ml-6 rounded-lg bg-primary/10 px-3 py-2 text-sm sm:ml-8" : "mr-6 rounded-lg bg-muted px-3 py-2 text-sm sm:mr-8"}>
               {m.content}
@@ -384,7 +384,7 @@ export function Interview({ departments, defaultDepartment, resumable }: { depar
           ) : null}
         </div>
       </Card>
-      <div className="space-y-3 lg:col-span-3">
+      <div className="min-w-0 space-y-3 xl:col-span-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Processes found ({processes.length})</h2>
           <Button size="sm" onClick={save} disabled={pending || Boolean(busy) || selected.size === 0}>

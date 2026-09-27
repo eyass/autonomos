@@ -8,6 +8,7 @@ import { hours, money, num, pct, aiMoney } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { AutonomyTrend } from "./trend";
+import { InfoTip } from "@/components/app/info-tip";
 import { ButtonLink } from "@/components/app/button-link";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
@@ -44,13 +45,16 @@ export default async function OverviewPage() {
   ]);
 
   // The path to a first live agent, shown until it is walked. Each step links to where it is done.
-  const [{ count: connections }, { count: reviewed }, { count: tests }, { data: firstDraft }, { data: buildingAgent }] = await Promise.all([
+  const [{ count: connections }, { count: reviewed }, { count: tests }, { data: firstDraft }, { data: buildingAgent }, { data: testedRuns }] = await Promise.all([
     db.from("integration_connections").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "connected"),
     db.from("processes").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).in("status", ["reviewed", "active"]),
     db.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("mode", "test").eq("status", "completed"),
     db.from("processes").select("id").eq("organization_id", session.org.id).eq("status", "draft").order("created_at").limit(1).maybeSingle(),
     db.from("agents").select("id").eq("organization_id", session.org.id).in("status", ["draft", "testing"]).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    // The agent that can go live: one not yet active with a finished test.
+    db.from("agent_runs").select("agent_id, agents(status)").eq("organization_id", session.org.id).eq("mode", "test").eq("status", "completed").order("finished_at", { ascending: false }).limit(20),
   ]);
+  const readyAgent = (testedRuns ?? []).find((r) => ["draft", "testing", "paused"].includes((r.agents as unknown as { status: string } | null)?.status ?? ""))?.agent_id;
   // Each step opens the exact thing to act on, not just the list it is in.
   const topOpportunity = (top ?? [])[0]?.id;
   const playbook = [
@@ -81,8 +85,8 @@ export default async function OverviewPage() {
       done: m.activeAgents > 0,
       title: "Go live at L2 or L3",
       detail: "The agent drafts or proposes; a person approves.",
-      href: buildingAgent ? `/agents/${buildingAgent.id}` : "/agents",
-      cta: "Activate",
+      href: readyAgent ? `/agents/${readyAgent}` : buildingAgent ? `/agents/${buildingAgent.id}` : "/agents",
+      cta: readyAgent ? "Activate it" : "Activate",
     },
   ];
   const next = playbook.find((p) => !p.done);
@@ -152,27 +156,44 @@ export default async function OverviewPage() {
       <PageHeader title="Home" />
       {playbookCard}
       <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-3">
+        {/* Two meters, not one: what already runs on the company's own software, and what
+            AutonomOS agents add (0% until one is live). */}
         <Card className={chart.length > 1 ? "" : "lg:col-span-3"}>
-          <CardContent className="flex items-end justify-between gap-4">
-            <div>
-              <div className="text-xs font-medium text-muted-foreground">Company autonomy</div>
-              <div className="mt-1 font-display text-5xl font-semibold tracking-tight text-brand tabular-nums" data-testid="autonomy-score">
-                {pct(m.autonomyScore)}
+          <CardContent className={`grid gap-5 ${chart.length > 1 ? "" : "sm:grid-cols-2"}`}>
+            <div data-testid="autonomy-live">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                AutonomOS live
+                <InfoTip label="What AutonomOS live means">
+                  The share of your mapped work, weighted by time, that live AutonomOS agents now do without a person. It stays at 0% until you activate an agent. Tests never count.
+                </InfoTip>
               </div>
+              <div className="mt-1 font-display text-5xl font-semibold tracking-tight text-brand tabular-nums" data-testid="autonomy-score">
+                {m.autonomyScore === null ? "–" : pct(Math.max(0, m.autonomyScore - (m.baselineAutonomy ?? 0)))}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {m.autonomyScore === null
+                  ? "Add time estimates to your processes to measure this."
+                  : m.activeAgents === 0
+                    ? "No agents are live yet. Activate one to move this."
+                    : `${m.activeAgents} live agent${m.activeAgents === 1 ? "" : "s"} across ${m.processesAutomated} process${m.processesAutomated === 1 ? "" : "es"}.`}
+              </p>
             </div>
-            <p className="max-w-56 text-right text-xs text-muted-foreground" data-testid="autonomy-explainer">
-              {m.autonomyScore === null
-                ? "Map processes with time estimates to measure how much work runs without people."
-                : m.activeAgents === 0
-                  ? "of mapped work, weighted by time, already runs on software your team uses. No agents are live yet, so none of it is from AutonomOS."
-                  : `of mapped work, weighted by time, runs without people: ${pct(m.baselineAutonomy)} from your existing software, ${pct(Math.max(0, m.autonomyScore - (m.baselineAutonomy ?? 0)))} added by live agents.`}
-            </p>
+            <div data-testid="autonomy-explainer">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                Already automated in your stack
+                <InfoTip label="What already automated means">
+                  Work your existing software already does without a person, from the autonomy level recorded on each process. AutonomOS did not do this part.
+                </InfoTip>
+              </div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums">{pct(m.baselineAutonomy)}</div>
+              <p className="mt-1 text-xs text-muted-foreground">of mapped work, weighted by time. Together: {pct(m.autonomyScore)} runs without people.</p>
+            </div>
           </CardContent>
         </Card>
         {chart.length > 1 ? (
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Autonomy over time</CardTitle>
+              <CardTitle>Work that runs without people, over time</CardTitle>
             </CardHeader>
             <CardContent>
               <AutonomyTrend data={chart} />
@@ -209,7 +230,23 @@ export default async function OverviewPage() {
           { label: "Tasks done", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
           {
             label: "AI spend this month",
-            value: <span title="Models are priced in US dollars; shown in your currency at a fixed reference rate">{aiMoney(m.aiCost, m.currency)}</span>,
+            value: (
+              <span className="inline-flex items-center gap-1">
+                {aiMoney(m.aiCost, m.currency)}
+                <InfoTip label="What AI spend covers">
+                  <p>
+                    <strong>Setup</strong>: reading your website and systems, drafting processes, ideas and agents.
+                  </p>
+                  <p className="mt-1">
+                    <strong>Tests</strong>: simulated runs, where nothing changes in your systems.
+                  </p>
+                  <p className="mt-1">
+                    <strong>Live</strong>: work done by active agents. Only this is compared with the value created.
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">Models are priced in US dollars and shown in your currency at a fixed reference rate.</p>
+                </InfoTip>
+              </span>
+            ),
             // Every bucket is shown, so the parts add up to the total.
             hint: `setup ${aiMoney(m.aiCostBySource.setup, m.currency)} · tests ${aiMoney(m.aiCostBySource.test, m.currency)} · live ${aiMoney(m.aiCostBySource.production, m.currency)}`,
           },

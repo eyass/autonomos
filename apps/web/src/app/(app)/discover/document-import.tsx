@@ -15,7 +15,8 @@ export function DocumentImport({ initialJob = null }: { initialJob?: JobView | n
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [source, setSource] = useState<"upload" | "paste">("paste");
-  const [error, setError] = useState<string | null>(null);
+  // A failed extraction from before a reload is still reported, with the button to retry.
+  const [error, setError] = useState<string | null>(initialJob?.status === "failed" ? `Extraction did not finish: ${initialJob.error ?? "try again."}` : null);
   const [starting, start] = useTransition();
   const done = useJobDone();
   const { job, running, elapsed, follow } = useJob(initialJob, (j) => {

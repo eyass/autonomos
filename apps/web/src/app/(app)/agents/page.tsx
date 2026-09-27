@@ -53,9 +53,14 @@ export default async function AgentsPage() {
               const s = metrics.perAgent.get(a.id);
               const proc = a.processes as unknown as { id: string; title: string; departments: { name: string } | null } | null;
               return (
-                <TableRow key={a.id} className="hover:bg-muted/50">
+                // The name link covers the row; the Pause/Activate button sits above it.
+                <TableRow key={a.id} className="relative hover:bg-muted/50 focus-within:bg-muted/50">
                   <TableCell className="w-full max-w-0 whitespace-normal">
-                    <Link href={`/agents/${a.id}`} title={a.name} className="line-clamp-2 font-medium break-words hover:underline">
+                    <Link
+                      href={`/agents/${a.id}`}
+                      title={a.name}
+                      className="line-clamp-2 font-medium break-words outline-none after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+                    >
                       {a.name}
                     </Link>
                     <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground">
@@ -65,6 +70,21 @@ export default async function AgentsPage() {
                         {s?.runs ?? 0} run{s?.runs === 1 ? "" : "s"}
                       </span>
                     </div>
+                    {/* On a narrow screen the numbers the columns show come along under the name. */}
+                    <dl className="mt-1 grid grid-cols-3 gap-2 text-xs @4xl:hidden">
+                      <div className="@2xl:hidden">
+                        <dt className="text-muted-foreground">Success</dt>
+                        <dd className="tabular-nums">{pct(s?.successRate)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Hours saved</dt>
+                        <dd className="tabular-nums">{hours((s?.hoursSaved ?? 0) * 60)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">AI cost</dt>
+                        <dd className="tabular-nums">{aiMoney(s?.aiCost ?? 0, session.org.currency)}</dd>
+                      </div>
+                    </dl>
                   </TableCell>
                   <TableCell className="hidden @2xl:table-cell">
                     <AutonomyLadder current={a.autonomy_level} size="sm" />
@@ -79,7 +99,7 @@ export default async function AgentsPage() {
                   <TableCell className="text-right @lg:text-left">
                     <StatusBadge status={a.status} />
                   </TableCell>
-                  <TableCell className="hidden whitespace-nowrap text-right @2xl:table-cell">
+                  <TableCell className="relative z-10 hidden whitespace-nowrap text-right @2xl:table-cell">
                     {a.status === "active" ? (
                       <ActionButton size="sm" variant="ghost" action={pauseAction.bind(null, a.id)}>
                         Pause

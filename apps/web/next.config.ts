@@ -15,8 +15,10 @@ const nextConfig: NextConfig = {
       { source: "/pricing", destination: "/#pricing", permanent: false },
       { source: "/about", destination: "/#how-it-works", permanent: false },
       { source: "/blog", destination: "/docs", permanent: false },
-      { source: "/help", destination: "/docs", permanent: false },
-      { source: "/support", destination: "/docs", permanent: false },
+      // Help lives in the docs for good: a permanent (308) redirect, answered before any page renders.
+      { source: "/help", destination: "/docs", permanent: true },
+      { source: "/help/:path*", destination: "/docs", permanent: true },
+      { source: "/support", destination: "/docs", permanent: true },
       { source: "/legal", destination: "/terms", permanent: false },
     ];
   },

@@ -73,3 +73,14 @@ test("addresses people type land on real pages", async ({ page }) => {
   await page.goto("/blog");
   await expect(page).toHaveURL(/\/docs$/);
 });
+
+test("help is a permanent redirect to the docs, never a 404", async ({ page, request }) => {
+  const res = await request.get("/help", { maxRedirects: 0 });
+  expect(res.status()).toBe(308);
+  expect(res.headers()["location"]).toMatch(/\/docs$/);
+  const statuses: number[] = [];
+  page.on("response", (r) => statuses.push(r.status()));
+  await page.goto("/help");
+  await expect(page).toHaveURL(/\/docs$/);
+  expect(statuses).not.toContain(404);
+});

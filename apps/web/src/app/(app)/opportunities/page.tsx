@@ -33,7 +33,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   if (!list.length && !q.process && !q.status) {
     return (
       <>
-        <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." />
+        <PageHeader title="Work" description="Your recurring work, and ideas to automate it." />
         <WorkTabs active="ideas" />
         <EmptyState
           title="No automation ideas yet."
@@ -48,7 +48,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   const done = q.status === "archived";
   return (
     <>
-      <PageHeader title="Work" description="The recurring work your teams do, and ideas for automating it." />
+      <PageHeader title="Work" description="Your recurring work, and ideas to automate it." />
       <WorkTabs active="ideas" />
       <LinkTabs
         items={[

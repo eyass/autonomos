@@ -123,8 +123,26 @@ export const DiscoveredStepSchema = z.object({
 });
 export type DiscoveredStep = z.infer<typeof DiscoveredStepSchema>;
 
+// Names are shown in lists and on phones: short, plain, no trailing detail.
+export const TITLE_HINT = "Short name of 2 to 5 words in plain business language, for example Refund request handling or Paid search monitoring. No explanation, no trailing period.";
+
+// Keeps a generated name readable: at most 60 characters, cut at a word, never mid-word.
+export function tidyTitle(title: string): string {
+  const t = title
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.:;,]+$/, "");
+  if (t.length <= 60) return t.charAt(0).toUpperCase() + t.slice(1);
+  const cut = t
+    .slice(0, 61)
+    .replace(/\s+\S*$/, "")
+    .replace(/[\s,;:(–-]+$/, "");
+  const short = cut || t.slice(0, 60);
+  return short.charAt(0).toUpperCase() + short.slice(1);
+}
+
 export const DiscoveredProcessSchema = z.object({
-  title: z.string().min(1),
+  title: z.string().min(1).describe(TITLE_HINT),
   description: z.string(),
   department: z.string(),
   trigger: z.string().optional(),
@@ -184,7 +202,7 @@ export const FutureStateStepSchema = z.object({
 });
 
 export const GeneratedOpportunitySchema = z.object({
-  title: z.string(),
+  title: z.string().describe(TITLE_HINT),
   description: z.string(),
   problem: z.string(),
   proposedFutureState: z.string(),

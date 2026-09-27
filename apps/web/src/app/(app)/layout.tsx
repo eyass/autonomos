@@ -18,7 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
   const [{ count: pending }, { count: handoffs }, { data: notifications }, { data: connections }] = await Promise.all([
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "pending"),
-    supabase.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("outcome", "escalated").is("handled_at", null),
+    // The badge counts what production needs from a person; test hand-offs are listed, not counted.
+    supabase.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("mode", "production").eq("outcome", "escalated").is("handled_at", null),
     supabase.from("notifications").select("id, title, body, link, created_at, read_at").eq("organization_id", session.org.id).order("created_at", { ascending: false }).limit(15),
     supabase.from("integration_connections").select("provider").eq("organization_id", session.org.id).eq("status", "connected"),
   ]);

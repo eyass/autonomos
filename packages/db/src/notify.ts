@@ -9,6 +9,8 @@ export type NotificationInput = {
   link: string;
   // Names the event, so sending it twice (a retry, a second worker) notifies once.
   key?: string;
+  // Shown in the app only, never emailed (for example, what happened in a test).
+  inAppOnly?: boolean;
 };
 
 // In-app notification for the organisation plus email for approvals, failures and
@@ -28,7 +30,7 @@ export async function sendNotification(db: SupabaseClient<Database>, organizatio
   if (error) throw new Error(`notification: ${error.message}`);
 
   // Finished discovery is in-app only; the rest need someone and are emailed too.
-  if (n.kind === "discovery_ready") return true;
+  if (n.kind === "discovery_ready" || n.inAppOnly) return true;
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) return true;
 
   let query = db.from("organization_members").select("role, can_approve, notification_preferences, users(email)").eq("organization_id", organizationId);
