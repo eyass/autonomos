@@ -418,9 +418,10 @@ export async function rejectedTitles(session: Session): Promise<string[]> {
   return (data ?? []).map((r) => r.title);
 }
 
-export async function draftInitialInventory(session: Session): Promise<string[]> {
+// `evidence` can be passed in when the systems were already read (the onboarding progress page reads them one by one).
+export async function draftInitialInventory(session: Session, evidence?: string[]): Promise<string[]> {
   const profile = session.org.websiteProfile;
-  const evidence = await connectedSystemEvidence(session);
+  evidence ??= await connectedSystemEvidence(session);
   const areas = (session.org.improvementAreas.length ? session.org.improvementAreas : ["Operations"]) as Array<(typeof DEPARTMENTS)[number]>;
   const processes = await draftProcessInventory({
     company: await companyContext(session),

@@ -3,7 +3,7 @@ import { CURRENCIES, DEPARTMENTS } from "@autonomos/schemas";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { activity, audit, track } from "@/lib/audit";
-import { draftInitialInventory } from "@/server/processes";
+import { startMapping } from "@/server/first-inventory";
 import { createClient } from "@/lib/supabase/server";
 import { adminDb, HttpError, isAdmin, ORG_COOKIE, requireRole, type Session } from "@/lib/session";
 
@@ -77,13 +77,13 @@ export async function saveAbout(session: Session, input: z.infer<typeof AboutSch
 export async function completeOnboarding(session: Session) {
   await adminDb().from("organizations").update({ onboarding_step: "done", onboarding_completed_at: new Date().toISOString() }).eq("id", session.org.id);
   await track(session, "onboarding_completed");
-  // Draft the first process inventory so the user starts by reviewing, not by typing.
-  // A failure here must not block onboarding; discovery stays available by hand.
+  // Draft the first process inventory in the background so the user starts by reviewing,
+  // not by typing; the mapping page follows it step by step. A failure here must not block
+  // onboarding; discovery stays available by hand.
   try {
-    return (await draftInitialInventory(session)).length;
+    await startMapping(session);
   } catch (e) {
-    console.error("initial inventory draft failed", e);
-    return 0;
+    console.error("initial inventory start failed", e);
   }
 }
 

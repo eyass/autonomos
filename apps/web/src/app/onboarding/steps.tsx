@@ -4,9 +4,10 @@ import Link from "next/link";
 const STEPS = [
   { label: "Your company", href: "/onboarding/about" },
   { label: "Connect systems", href: "/onboarding/connect" },
+  { label: "Map processes", href: "/onboarding/mapping" },
 ];
 
-export function Steps({ current }: { current: 0 | 1 }) {
+export function Steps({ current }: { current: 0 | 1 | 2 }) {
   return (
     <ol className="mb-6 flex gap-2 text-xs">
       {STEPS.map((s, i) => (

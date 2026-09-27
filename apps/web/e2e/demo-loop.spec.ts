@@ -65,7 +65,13 @@ test("demo loop", async ({ page }) => {
   await expect(page.getByTestId("integration-zendesk").getByText(/Connected/)).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // The first inventory is drafted without an interview
+  // The first inventory is drafted without an interview, on a page that shows each step
+  await expect(page).toHaveURL(/\/onboarding\/mapping$/);
+  const steps = page.getByTestId("mapping-steps");
+  await expect(steps.getByText("Reading your website")).toBeVisible();
+  await expect(steps.getByText("Reading Zendesk")).toBeVisible();
+  await expect(steps.getByText("Drafting your processes")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your first process inventory is ready" })).toBeVisible({ timeout: 60_000 });
   await expect(page).toHaveURL(/\/processes\?status=draft&drafted=\d+/);
   await expect(page.getByText(/AutonomOS drafted \d+ process/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Refund request handling" })).toBeVisible();

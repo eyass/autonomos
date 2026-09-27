@@ -39,7 +39,7 @@ export type DiscoveryRunView = {
   error: string | null;
 };
 
-async function connections(session: Session) {
+export async function connections(session: Session) {
   const { data } = await adminDb()
     .from("integration_connections")
     .select("integration_key, provider, external_account_id, inventory, integrations(name)")
@@ -308,13 +308,20 @@ export async function undoRejectProposal(session: Session, runId: string, title:
 
 // Evidence lines for prompts elsewhere (opportunities, first inventory). Reads systems
 // the same way, without storing anything.
-export async function readConnectedSystems(session: Session): Promise<string[]> {
+// `onSystem` hears when each system starts and how its read ended, for progress pages.
+export type SystemReadProgress = { key: string; name: string; state: "running" | "done" | "skipped" | "failed"; line?: string };
+export async function readConnectedSystems(session: Session, onSystem?: (p: SystemReadProgress) => Promise<void>): Promise<string[]> {
   const lines: string[] = [];
+  const report = async (p: SystemReadProgress) => {
+    await onSystem?.(p).catch((e) => console.error("progress update failed", e));
+  };
   for (const c of await connections(session)) {
     if (!readable(c)) {
       lines.push(`${c.name} is connected.`);
+      await report({ key: c.key, name: c.name, state: "skipped", line: "Connected, nothing to read yet" });
       continue;
     }
+    await report({ key: c.key, name: c.name, state: "running" });
     try {
       if (c.provider === "sandbox") await ensureSandboxHistory(session, c.key);
       const inventory = await inventoryFor(session.org.id, c.key, c.inventory);
@@ -326,8 +333,15 @@ export async function readConnectedSystems(session: Session): Promise<string[]> 
       });
       lines.push(describeScan(scan, c.name));
       if (inventory?.resources.length) lines.push(describeInventory(inventory, c.name, 1500));
+      await report({
+        key: c.key,
+        name: c.name,
+        state: scan.unsupported ? "skipped" : "done",
+        line: scan.unsupported ? (inventory?.summary ?? "Records could not be read") : `${scan.sampled} ${scan.itemKind}${scan.periodDays ? ` from ${scan.periodDays} days` : ""}`,
+      });
     } catch (e) {
       console.error("read connected system failed", c.key, e);
+      await report({ key: c.key, name: c.name, state: "failed", line: "Could not be read" });
       lines.push(`${c.name} is connected but could not be read.`);
     }
   }
