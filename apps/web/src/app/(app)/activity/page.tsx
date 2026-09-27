@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { reconcileStuckRuns } from "@/server/run-health";
 import { FilterBar } from "@/components/filter-bar";
 import { dateTime, time } from "@/lib/format";
 import { requireSession } from "@/lib/session";
@@ -16,6 +17,7 @@ const TONES: Record<string, "success" | "warning" | "danger" | "secondary"> = { 
 
 export default async function ActivityPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const session = await requireSession();
+  await reconcileStuckRuns(session.org.id);
   const f = await searchParams;
   const supabase = await createClient();
   let q = supabase

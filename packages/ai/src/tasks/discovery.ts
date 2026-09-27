@@ -63,6 +63,9 @@ export async function runDiscoveryTurn(input: {
     task: "Update the process inventory for this department from the interview and choose the next question.",
     mock: () => mockDiscoveryTurn(input.department, input.messages, input.existingProcesses),
     onUsage: input.onUsage,
+    // A person is waiting on this answer: fail fast and let them retry.
+    timeoutMs: 45_000,
+    maxAttempts: 2,
   });
   return object;
 }

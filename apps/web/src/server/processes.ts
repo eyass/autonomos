@@ -346,7 +346,8 @@ export async function answerInterview(session: Session, sessionId: string, answe
     .update({ messages: updated as never, extracted: turn.processes as never })
     .eq("organization_id", session.org.id)
     .eq("id", sessionId);
-  const suggestions = await interviewSuggestions(session, s.department_name ?? "Operations", updated);
+  // Suggestions are a convenience: never let them hold up the answer.
+  const suggestions = await Promise.race([interviewSuggestions(session, s.department_name ?? "Operations", updated), new Promise<string[]>((r) => setTimeout(() => r([]), 8_000))]);
   return { messages: updated, processes: turn.processes, done: turn.done, suggestions };
 }
 

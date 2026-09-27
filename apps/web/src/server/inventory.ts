@@ -1,5 +1,5 @@
 import "server-only";
-import { sandboxStore, type TablesUpdate } from "@autonomos/db";
+import { sandboxStore, sendNotification, type TablesUpdate } from "@autonomos/db";
 import { inventorySystem, isInventory, type SystemInventory } from "@autonomos/integrations";
 import { after } from "next/server";
 import { adminDb } from "@/lib/session";
@@ -32,6 +32,12 @@ export async function takeInventory(organizationId: string, key: string, timeout
   } catch (e) {
     console.error("inventory failed", key, e);
     await save({ inventory_status: "failed", inventory_error: e instanceof Error ? e.message.slice(0, 300) : "failed" });
+    await sendNotification(db, organizationId, {
+      kind: "integration_error",
+      title: `Could not map ${key}`,
+      body: "AutonomOS could not list what this system holds. Check the connection, then choose Map again.",
+      link: "/integrations",
+    }).catch((err) => console.error("notification failed", err));
     return null;
   }
 }

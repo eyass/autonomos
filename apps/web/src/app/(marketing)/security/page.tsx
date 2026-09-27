@@ -42,7 +42,7 @@ export default function SecurityPage() {
           <li>Agent runs keep going through restarts and wait for approvals without anything left open.</li>
           <li>AI models receive only the text needed for the task at hand.</li>
           <li>Sign-in tokens for live systems are held by our connection partner; AutonomOS stores only the connected account id.</li>
-          <li>Webhook signing secrets are stored in a table without row level security policies, so only the server, using the service role, can read them.</li>
+          <li>Webhook signing secrets are server-only: signed-in users and the public API cannot read them, and admins can rotate them at any time.</li>
         </ul>
 
         <h2 id="isolation">Tenant isolation</h2>

@@ -1,4 +1,5 @@
 import { getTool } from "@autonomos/integrations";
+import { reconcileStuckRuns } from "@/server/run-health";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -23,6 +24,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
   const { runId } = await params;
   const { built } = await searchParams;
   const session = await requireSession();
+  await reconcileStuckRuns(session.org.id);
   const supabase = await createClient();
   const { data: run } = await supabase
     .from("agent_runs")
@@ -209,7 +211,13 @@ export default async function RunPage({ params, searchParams }: { params: Promis
                   <Badge variant="warning">{i.type.replaceAll("_", " ")}</Badge> {i.description}
                 </div>
               ))}
-              {!interventions?.length ? <p className="text-muted-foreground">None</p> : null}
+              {!interventions?.length && run.outcome === "escalated" ? (
+                <div>
+                  <Badge variant="warning">handed to a human</Badge> {run.summary}
+                  {run.mode === "test" ? <p className="mt-1 text-xs text-muted-foreground">A test: in production this would go to a person. Not counted as human time.</p> : null}
+                </div>
+              ) : null}
+              {!interventions?.length && run.outcome !== "escalated" ? <p className="text-muted-foreground">None</p> : null}
               <Collapsible className="pt-2 text-xs">
                 <CollapsibleTrigger className="group inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
                   Run input
