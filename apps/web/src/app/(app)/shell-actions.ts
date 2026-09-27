@@ -2,7 +2,6 @@
 import { redirect } from "next/navigation";
 import { runAction } from "@/lib/actions";
 import { adminDb, requireSessionOrThrow } from "@/lib/session";
-import { createSampleWorkspace } from "@/server/demo";
 import { deleteWorkspace, switchWorkspace } from "@/server/platform";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,12 +14,6 @@ export async function markNotificationsRead() {
 
 export async function switchWorkspaceAction(organizationId: string) {
   const result = await runAction(async () => switchWorkspace(await requireSessionOrThrow(), organizationId));
-  if (result.ok) redirect("/");
-  return result;
-}
-
-export async function createSampleWorkspaceAction() {
-  const result = await runAction(async () => createSampleWorkspace(await requireSessionOrThrow()));
   if (result.ok) redirect("/");
   return result;
 }

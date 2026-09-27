@@ -36,7 +36,9 @@ test("demo loop", async ({ page }) => {
   // Your company: AutonomOS reads the website and fills everything in
   await expect(page.getByRole("heading", { name: "Your company" })).toBeVisible();
   await page.getByLabel("Company website").fill("http://127.0.0.1:3999/site");
-  await page.getByRole("button", { name: "Read my website" }).click();
+  // Reading runs on the server: reloading as soon as it starts neither stops it nor loses the result.
+  await Promise.all([page.waitForResponse((r) => r.url().endsWith("/api/jobs") && r.status() === 200), page.getByRole("button", { name: "Read my website" }).click()]);
+  await page.reload();
   await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");
   await expect(page.getByLabel("Industry")).toHaveValue("Marketplace");
   await expect(page.getByLabel("Number of employees")).toHaveValue("20–49");

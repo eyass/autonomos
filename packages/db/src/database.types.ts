@@ -449,6 +449,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"background_jobs": {
+                  Row: {
+                    "attempts": number,"created_at": string,"error": string | null,"finished_at": string | null,"heartbeat_at": string | null,"id": string,"input": NonNullable<Json>,"kind": string,"last_polled_at": string | null,"organization_id": string | null,"result": Json | null,"status": string,"subject": string | null,"updated_at": string,"user_id": string
+                  }
+                  Insert: {
+                    "attempts"?: number,"created_at"?: string,"error"?: string | null,"finished_at"?: string | null,"heartbeat_at"?: string | null,"id"?: string,"input"?: NonNullable<Json>,"kind": string,"last_polled_at"?: string | null,"organization_id"?: string | null,"result"?: Json | null,"status"?: string,"subject"?: string | null,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "attempts"?: number,"created_at"?: string,"error"?: string | null,"finished_at"?: string | null,"heartbeat_at"?: string | null,"id"?: string,"input"?: NonNullable<Json>,"kind"?: string,"last_polled_at"?: string | null,"organization_id"?: string | null,"result"?: Json | null,"status"?: string,"subject"?: string | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "background_jobs_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "background_jobs_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "users"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"departments": {
                   Row: {
                     "archived_at": string | null,"created_at": string,"hourly_labour_cost": number | null,"id": string,"name": string,"organization_id": string

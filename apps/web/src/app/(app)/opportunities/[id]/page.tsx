@@ -1,8 +1,9 @@
 import { ChevronDown, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { buildAndTestAgentAction } from "@/app/(app)/agents/actions";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
+import { JobButton } from "@/components/app/job";
+import { latestJob } from "@/server/jobs";
 import { BeforeAfter, LevelChange, Scores, StatusBadge } from "@/components/domain";
 import { money, num } from "@/lib/format";
 import { requireSession } from "@/lib/session";
@@ -31,6 +32,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
     .eq("id", id)
     .maybeSingle();
   if (!o) notFound();
+  const buildJob = await latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "build_agent", subject: id });
   const [{ data: connections }, { data: agent }] = await Promise.all([
     supabase.from("integration_connections").select("integration_key, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected"),
     supabase.from("agents").select("id, name, status, autonomy_level").eq("organization_id", session.org.id).eq("opportunity_id", id).maybeSingle(),
@@ -113,10 +115,10 @@ export default async function OpportunityPage({ params, searchParams }: { params
             </>
           ) : (
             <>
-              <ActionButton action={buildAndTestAgentAction.bind(null, id)} pendingLabel="Building and testing…">
+              <JobButton kind="build_agent" input={{ opportunityId: id }} initialJob={buildJob} pendingLabel="Building and testing…">
                 <Sparkles />
                 Build and test agent
-              </ActionButton>
+              </JobButton>
               <ButtonLink href={`/agents/new?opportunity=${id}`} variant="outline">
                 Customise first
               </ButtonLink>

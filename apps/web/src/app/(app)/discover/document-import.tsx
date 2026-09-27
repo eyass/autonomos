@@ -1,7 +1,7 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { importDocumentAction } from "./actions";
+import type { JobView } from "@/server/jobs";
+import { JobProgress, requestJob, useJob, useJobDone } from "@/components/app/job";
 import { FormField } from "@/components/app/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-export function DocumentImport() {
+// Extraction runs as a job on the server: leaving or reloading the page does not stop it,
+// and the page picks it back up.
+export function DocumentImport({ initialJob = null }: { initialJob?: JobView | null }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [source, setSource] = useState<"upload" | "paste">("paste");
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const router = useRouter();
+  const [starting, start] = useTransition();
+  const done = useJobDone();
+  const { job, running, elapsed, follow } = useJob(initialJob, (j) => {
+    if (j.status === "failed") return setError(j.error ?? "Extraction did not finish. Try again.");
+    done(j);
+  });
+  const pending = starting || running;
 
   async function onFile(file: File) {
     setError(null);
@@ -55,14 +62,15 @@ export function DocumentImport() {
           onClick={() =>
             start(async () => {
               setError(null);
-              const r = await importDocumentAction({ title, content, source });
+              const r = await requestJob("document_import", { title, content, source });
               if (!r.ok) return setError(r.error);
-              router.push("/processes?status=draft");
+              follow(r.data);
             })
           }
         >
           {pending ? "Extracting processes…" : "Extract processes"}
         </Button>
+        {running && job ? <JobProgress label={job.label} elapsed={elapsed} /> : null}
       </CardContent>
     </Card>
   );

@@ -3,10 +3,12 @@ import Link from "next/link";
 import { ButtonLink } from "@/components/app/button-link";
 import { cn } from "@/lib/utils";
 import { ActionButton } from "@/components/action-button";
+import { JobButton } from "@/components/app/job";
+import { latestJob } from "@/server/jobs";
 import { dateTime, num, aiMoney, money } from "@/lib/format";
 import { adminDb, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { archiveDepartmentAction, refreshProfileAction, removeMemberAction, revokeApiKeyAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
+import { archiveDepartmentAction, removeMemberAction, revokeApiKeyAction, revokeInviteAction, setApprovalAction, setMemberRoleAction } from "./actions";
 import { ApiKeyForm, ApprovalLimitForm, CompanyForm, DepartmentForm, InviteForm, PauseControl, ProfileForm } from "./forms";
 import { DefinitionList } from "@/components/app/definition-list";
 import { PageHeader } from "@/components/app/page-header";
@@ -24,6 +26,7 @@ export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const session = await requireSession();
+  const profileJob = await latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "profile_refresh" });
   const admin = isAdmin(session);
   const supabase = await createClient();
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
@@ -159,9 +162,9 @@ export default async function SettingsPage() {
             }
             action={
               admin && session.org.website ? (
-                <ActionButton size="sm" variant="outline" action={refreshProfileAction} pendingLabel="Reading website…">
+                <JobButton size="sm" variant="outline" kind="profile_refresh" initialJob={profileJob} pendingLabel="Reading website…">
                   Refresh from website
-                </ActionButton>
+                </JobButton>
               ) : null
             }
           >

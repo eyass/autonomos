@@ -15,30 +15,44 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { WebsiteAnalysis } from "@/server/company-profile";
-import { analyseWebsiteAction, createCompanyAction } from "../actions";
+import type { JobView } from "@/server/jobs";
+import { requestJob, useJob } from "@/components/app/job";
+import { createCompanyAction } from "../actions";
 
 const READING_STEPS = ["Reading your homepage", "Finding the about, pricing and careers pages", "Checking which tools you use", "Writing your company profile"];
 
-export function CompanyForm({ suggestedWebsite }: { suggestedWebsite: string | null }) {
+// Reading the website runs as a job on the server, so closing the tab or reloading does not
+// lose it: the page passes in the latest read and this picks it up, finished or not.
+export function CompanyForm({ suggestedWebsite, initialJob = null }: { suggestedWebsite: string | null; initialJob?: JobView | null }) {
   const [website, setWebsite] = useState(suggestedWebsite?.replace(/^https:\/\//, "") ?? "");
-  const [analysis, setAnalysis] = useState<WebsiteAnalysis | null>(null);
+  const finished = initialJob?.status === "done" ? ((initialJob.result?.analysis as WebsiteAnalysis | undefined) ?? null) : null;
+  const [analysis, setAnalysis] = useState<WebsiteAnalysis | null>(finished);
   const [manual, setManual] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reading, startReading] = useTransition();
+  const [starting, startReading] = useTransition();
+  const { running, follow } = useJob(initialJob?.status === "done" ? null : initialJob, (j) => {
+    if (j.status === "failed") return setError((j.error ?? "Could not read the website").replace(/\.$/, ""));
+    const a = j.result?.analysis as WebsiteAnalysis | undefined;
+    if (a) {
+      setAnalysis(a);
+      setManual(false);
+    }
+  });
+  const reading = starting || running;
 
   const read = (url: string) => {
     startReading(async () => {
       setError(null);
-      const r = await analyseWebsiteAction(url);
-      if (!r.ok) return setError(r.error);
-      setAnalysis(r.data);
-      setManual(false);
+      const r = await requestJob("website_profile", { website: url });
+      if (!r.ok) return setError(r.error.replace(/\.$/, ""));
+      follow(r.data);
     });
   };
 
-  // Start reading straight away when the work email already tells us the website.
+  // Start reading straight away when the work email already tells us the website, unless a
+  // read is already under way or finished.
   const autoRead = useEffectEvent(() => {
-    if (suggestedWebsite) read(suggestedWebsite);
+    if (suggestedWebsite && !initialJob) read(suggestedWebsite);
   });
   useEffect(() => autoRead(), []);
 
@@ -92,14 +106,17 @@ function ReadingProgress() {
   }, []);
   const progress = Math.min(READING_STEPS.length - 1, tick);
   return (
-    <ol className="space-y-2 text-sm" aria-live="polite">
-      {READING_STEPS.map((s, i) => (
-        <li key={s} className={cn("flex items-center gap-2", i > progress && "text-muted-foreground")}>
-          {i < progress ? <Check className="size-4 text-success" /> : i === progress ? <Spinner className="size-4" /> : <span className="size-4" />}
-          {s}
-        </li>
-      ))}
-    </ol>
+    <div className="space-y-2">
+      <ol className="space-y-2 text-sm" aria-live="polite">
+        {READING_STEPS.map((s, i) => (
+          <li key={s} className={cn("flex items-center gap-2", i > progress && "text-muted-foreground")}>
+            {i < progress ? <Check className="size-4 text-success" /> : i === progress ? <Spinner className="size-4" /> : <span className="size-4" />}
+            {s}
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-muted-foreground">This runs on our servers: you can leave or reload this page and come back to the result.</p>
+    </div>
   );
 }
 

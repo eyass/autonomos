@@ -5,7 +5,9 @@ import { LevelChange, Scores, StatusBadge } from "@/components/domain";
 import { FREQUENCY_LABEL, hours, money, num, pct } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { approveProcessAction, generateOpportunitiesAction, setProcessStatusAction } from "../actions";
+import { setProcessStatusAction } from "../actions";
+import { JobButton } from "@/components/app/job";
+import { latestJob } from "@/server/jobs";
 import { ProcessEditor } from "./editor";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
@@ -18,10 +20,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const SOURCE_LABEL = { interview: "AI interview", document: "Imported document", integration: "Connected systems", manual: "Added manually", website: "Drafted from your website" } as const;
 
-export default async function ProcessPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
+export default async function ProcessPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; ideas?: string }> }) {
   const { id } = await params;
-  const { edit } = await searchParams;
+  const { edit, ideas } = await searchParams;
   const session = await requireSession();
+  // Finding ideas runs on the server; after a reload the page follows the one under way.
+  const ideasJob = await latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "opportunities", subject: id });
   const supabase = await createClient();
   const { data: p } = await supabase
     .from("processes")
@@ -98,14 +102,14 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
         actions={
           <>
             {p.status === "draft" ? (
-              <ActionButton action={approveProcessAction.bind(null, id)} pendingLabel="Approving and finding automation ideas…">
+              <JobButton kind="opportunities" input={{ processId: id, approve: true }} initialJob={ideasJob} pendingLabel="Approving and finding automation ideas…">
                 Approve process
-              </ActionButton>
+              </JobButton>
             ) : null}
             {p.status !== "draft" && p.status !== "archived" ? (
-              <ActionButton action={generateOpportunitiesAction.bind(null, id)} pendingLabel="Analysing…">
+              <JobButton kind="opportunities" input={{ processId: id }} initialJob={ideasJob} pendingLabel="Finding automation ideas…">
                 {opportunities?.length ? "Find more ideas" : "Find automation ideas"}
-              </ActionButton>
+              </JobButton>
             ) : null}
             {p.status !== "archived" ? (
               <ActionButton
@@ -125,6 +129,15 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
         }
       />
 
+      {ideas === "failed" || ideas === "none" ? (
+        <Alert variant={ideas === "failed" ? "warning" : "info"} className="mb-4">
+          <AlertDescription>
+            {ideas === "failed"
+              ? "The process is approved, but finding automation ideas did not finish. Choose Find automation ideas to try again."
+              : "No automation ideas were found for this process yet. Adding steps and time estimates helps."}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {p.status === "draft" ? (
         <Alert variant="info" className="mb-4">
           <AlertDescription>Draft. Check the steps and numbers, then approve to find ideas for automating it.</AlertDescription>

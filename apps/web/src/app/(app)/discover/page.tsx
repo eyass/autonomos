@@ -1,5 +1,6 @@
 import { DEPARTMENTS } from "@autonomos/schemas";
 import { adminDb, requireSession } from "@/lib/session";
+import { latestJob } from "@/server/jobs";
 import { openInterviewFor } from "@/server/processes";
 import { latestDiscoveryRun } from "@/server/system-discovery";
 import { ButtonLink } from "@/components/app/button-link";
@@ -28,9 +29,10 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
   const session = await requireSession();
   const { welcome, tab } = await searchParams;
   const departments = session.org.improvementAreas.length ? session.org.improvementAreas : [...DEPARTMENTS];
-  const [latest, resumable, { count }] = await Promise.all([
+  const [latest, resumable, documentJob, { count }] = await Promise.all([
     latestDiscoveryRun(session),
     openInterviewFor(session),
+    latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "document_import" }),
     adminDb().from("integration_connections").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "connected"),
   ]);
   const connected = (count ?? 0) > 0;
@@ -58,7 +60,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Pro
         key={initial}
         initial={initial}
         panels={{
-          document: <DocumentImport />,
+          document: <DocumentImport initialJob={documentJob} />,
           interview: <Interview departments={departments} defaultDepartment={latest?.status === "ready" ? latest.proposals[0]?.department : undefined} resumable={resumable} />,
           integrations: connected ? (
             <SystemDiscovery initialRun={latest} autoStart={!fresh} />
