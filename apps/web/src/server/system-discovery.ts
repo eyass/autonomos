@@ -1,6 +1,6 @@
 import "server-only";
 import { proposeProcessesFromSystems, type SystemSample } from "@autonomos/ai";
-import { sandboxStore } from "@autonomos/db";
+import { sandboxStore, sendNotification } from "@autonomos/db";
 import { describeInventory, describeScan, sandboxHistory, scanSystem, SCANNABLE, type SystemScan } from "@autonomos/integrations";
 import { SystemProcessProposalSchema, type SystemProcessProposal } from "@autonomos/schemas";
 import { activity, recordUsage, track } from "@/lib/audit";
@@ -214,6 +214,13 @@ export async function proposeFromRun(session: Session, runId: string): Promise<D
       .select("*")
       .single();
     await activity(session, { actionType: "systems_read", title: `Read connected systems and proposed ${result.processes.length} process${result.processes.length === 1 ? "" : "es"}` });
+    if (result.processes.length)
+      await sendNotification(db, session.org.id, {
+        kind: "discovery_ready",
+        title: `Discovery found ${result.processes.length} process${result.processes.length === 1 ? "" : "es"}`,
+        body: "Review them one by one: add the ones you do, reject the rest.",
+        link: "/discover",
+      }).catch((e) => console.error("notification failed", e));
     return toView(data!, existing);
   } catch (e) {
     await db

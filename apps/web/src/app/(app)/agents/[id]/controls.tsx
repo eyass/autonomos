@@ -13,11 +13,27 @@ import { Textarea } from "@/components/ui/textarea";
 
 type Sample = { key: string; label: string };
 
-export function TestPanel({ agentId, ticketDriven, samples, blockedReason }: { agentId: string; ticketDriven: boolean; samples: Sample[]; blockedReason?: string | null }) {
+export function TestPanel({
+  agentId,
+  ticketDriven,
+  samples,
+  blockedReason,
+  warnings = [],
+  sampleInput = "{}",
+}: {
+  agentId: string;
+  ticketDriven: boolean;
+  samples: Sample[];
+  blockedReason?: string | null;
+  warnings?: string[];
+  sampleInput?: string;
+}) {
   const [sample, setSample] = useState(samples[0]?.key ?? "");
   const [json, setJson] = useState("{}");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const empty = !ticketDriven && /^\s*\{\s*\}\s*$/.test(json);
+  const preflight = [...warnings, ...(empty ? ["The input is empty. Use the sample input, or add the facts this run should work on."] : [])];
   const run = () =>
     start(async () => {
       setError(null);
@@ -52,18 +68,35 @@ export function TestPanel({ agentId, ticketDriven, samples, blockedReason }: { a
             </NativeSelect>
           </FormField>
         ) : (
-          <FormField label="Input (JSON)">
-            <Textarea value={json} onChange={(e) => setJson(e.target.value)} rows={3} className="font-mono text-xs" />
-          </FormField>
+          <div>
+            <FormField label="Input (JSON)">
+              <Textarea value={json} onChange={(e) => setJson(e.target.value)} rows={json.split("\n").length > 3 ? 6 : 3} className="font-mono text-xs" />
+            </FormField>
+            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => setJson(sampleInput)}>
+              Use sample input
+            </Button>
+          </div>
         )}
         {error ? (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
+        {preflight.length && !blockedReason ? (
+          <Alert variant="warning">
+            <AlertDescription>
+              <div className="font-medium">Before you run</div>
+              <ul className="mt-1 list-inside list-disc space-y-0.5">
+                {preflight.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {blockedReason ? <p className="text-xs text-muted-foreground">{blockedReason}</p> : null}
-        <Button onClick={run} disabled={pending || Boolean(blockedReason)}>
-          {pending ? "Starting…" : "Run test"}
+        <Button onClick={run} disabled={pending || Boolean(blockedReason)} variant={preflight.length ? "outline" : "default"}>
+          {pending ? "Starting…" : preflight.length ? "Run test anyway" : "Run test"}
         </Button>
       </CardContent>
     </Card>

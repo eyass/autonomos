@@ -1,4 +1,5 @@
 import { autonomyRecommendation } from "@autonomos/agents";
+import { reconcileStuckRuns } from "@/server/run-health";
 import { computeOrgMetrics } from "@autonomos/db";
 import { getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
 import { INTEGRATION_EVENTS } from "@autonomos/schemas";
@@ -42,6 +43,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
   const { id } = await params;
   const { created } = await searchParams;
   const session = await requireSession();
+  await reconcileStuckRuns(session.org.id);
   let loaded;
   try {
     loaded = await loadAgentConfig(session, id);
@@ -82,6 +84,19 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
       : config.trigger.type === "schedule"
         ? `On a schedule: ${config.trigger.cron} (${config.trigger.timezone})`
         : `When: ${INTEGRATION_EVENTS.find((e) => e.key === (config.trigger as { event: string }).event)?.label ?? (config.trigger as { event: string }).event}`;
+  // What a test will run into, said before it runs rather than discovered from an escalation.
+  const readTools = config.tools.map((t) => getTool(t)).filter((d) => d?.access === "read" && d.integration !== "knowledge");
+  const integrationsCheck = readiness.checks.find((c) => c.key === "integrations");
+  const testWarnings = [
+    ...(!ticketDriven && !readTools.length ? ["It has no tools that read data, so it only has what the input contains. With an empty input it hands the run to a person."] : []),
+    ...(integrationsCheck && !integrationsCheck.ok ? [integrationsCheck.detail] : []),
+  ];
+  const sampleInput =
+    config.trigger.type === "schedule"
+      ? { period: lastWeek(), note: "The run covers this period." }
+      : config.trigger.type === "integration_event"
+        ? { event: (config.trigger as { event: string }).event, data: { id: "sample-1", summary: "Describe the record the event is about" } }
+        : { request: `A typical request for ${agent.name}`, details: "Add the facts the agent needs, e.g. ids, amounts, dates" };
   const hasCompletedTest = (runs ?? []).some((r) => r.mode === "test" && r.status === "completed");
 
   return (
@@ -163,7 +178,14 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
               </CardContent>
             </Card>
           ) : null}
-          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} blockedReason={runtimeReady ? null : "Tests start once the agent runtime is connected."} />
+          <TestPanel
+            agentId={id}
+            ticketDriven={ticketDriven}
+            samples={samples}
+            blockedReason={runtimeReady ? null : "Tests start once the agent runtime is connected."}
+            warnings={testWarnings}
+            sampleInput={JSON.stringify(sampleInput, null, 2)}
+          />
           {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
           <Card id="autonomy">
             <CardHeader>
@@ -328,4 +350,11 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
       </div>
     </>
   );
+}
+
+// The last seven days as dates, for a scheduled agent's sample test input.
+function lastWeek() {
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  return { from: day(new Date(now.getTime() - 7 * 86_400_000)), to: day(now) };
 }

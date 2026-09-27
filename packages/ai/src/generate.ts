@@ -29,16 +29,25 @@ export type StructuredRequest<S extends z.ZodType> = {
   mock: () => z.infer<S>;
   onUsage?: UsageSink;
   maxAttempts?: number;
+  // Each model call is cut off after this long, so nothing waits on a stuck provider forever.
+  timeoutMs?: number;
 };
 
+const DEFAULT_TIMEOUT_MS = 120_000;
+
 export class StructuredOutputError extends Error {
-  constructor(message: string, readonly attempts: number) {
+  constructor(
+    message: string,
+    readonly attempts: number,
+  ) {
     super(message);
     this.name = "StructuredOutputError";
   }
 }
 
-export async function generateStructured<S extends z.ZodType>(req: StructuredRequest<S>): Promise<{
+export async function generateStructured<S extends z.ZodType>(
+  req: StructuredRequest<S>,
+): Promise<{
   object: z.infer<S>;
   usage: ModelUsageRecord;
 }> {
@@ -75,15 +84,17 @@ export async function generateStructured<S extends z.ZodType>(req: StructuredReq
     const prompt =
       attempt === 1
         ? basePrompt
-        : `${basePrompt}\n\n<previous_attempt_error>\nYour previous output did not match the required schema: ${String(
-            (lastError as Error)?.message ?? lastError,
-          ).slice(0, 800)}\nReturn output that matches the schema exactly.\n</previous_attempt_error>`;
+        : `${basePrompt}\n\n<previous_attempt_error>\nYour previous output did not match the required schema: ${String((lastError as Error)?.message ?? lastError).slice(
+            0,
+            800,
+          )}\nReturn output that matches the schema exactly.\n</previous_attempt_error>`;
     try {
       const result = await generateText({
         model,
         system,
         prompt,
         output: Output.object({ schema: req.schema, name: req.schemaName }),
+        abortSignal: AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
       inputTokens += result.totalUsage.inputTokens ?? 0;
       outputTokens += result.totalUsage.outputTokens ?? 0;
@@ -107,10 +118,7 @@ export async function generateStructured<S extends z.ZodType>(req: StructuredReq
   }
 
   await req.onUsage?.(buildUsage(req, modelId, inputTokens, outputTokens, cachedInputTokens, started));
-  throw new StructuredOutputError(
-    `Model output for ${req.schemaName} failed validation after ${maxAttempts} attempts: ${String((lastError as Error)?.message ?? lastError)}`,
-    maxAttempts,
-  );
+  throw new StructuredOutputError(`Model output for ${req.schemaName} failed validation after ${maxAttempts} attempts: ${String((lastError as Error)?.message ?? lastError)}`, maxAttempts);
 }
 
 function isSchemaError(error: unknown): boolean {
@@ -118,14 +126,7 @@ function isSchemaError(error: unknown): boolean {
   return name.includes("NoObjectGenerated") || name.includes("TypeValidation") || name.includes("JSONParse") || name === "ZodError";
 }
 
-function buildUsage(
-  req: { purpose: string; modelClass: ModelClass },
-  model: string,
-  inputTokens: number,
-  outputTokens: number,
-  cachedInputTokens: number,
-  started: number,
-): ModelUsageRecord {
+function buildUsage(req: { purpose: string; modelClass: ModelClass }, model: string, inputTokens: number, outputTokens: number, cachedInputTokens: number, started: number): ModelUsageRecord {
   return {
     purpose: req.purpose,
     modelClass: req.modelClass,

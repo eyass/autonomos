@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import type { Database } from "./database.types";
 
 export type NotificationInput = {
-  kind: "approval_required" | "agent_failed" | "agent_escalation";
+  kind: "approval_required" | "agent_failed" | "agent_escalation" | "integration_error" | "discovery_ready";
   title: string;
   body: string;
   link: string;
@@ -22,6 +22,8 @@ export async function sendNotification(db: SupabaseClient<Database>, organizatio
   });
   if (error) throw new Error(`notification: ${error.message}`);
 
+  // Finished discovery is in-app only; the rest need someone and are emailed too.
+  if (n.kind === "discovery_ready") return;
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) return;
 
   let query = db.from("organization_members").select("role, can_approve, notification_preferences, users(email)").eq("organization_id", organizationId);

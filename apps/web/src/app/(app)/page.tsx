@@ -1,4 +1,5 @@
 import { snapshotMetrics } from "@autonomos/db";
+import { reconcileStuckRuns } from "@/server/run-health";
 import { CircleCheck } from "lucide-react";
 import Link from "next/link";
 import { hours, money, num, pct, usd } from "@/lib/format";
@@ -17,6 +18,7 @@ export const metadata = { title: "Overview" };
 
 export default async function OverviewPage() {
   const session = await requireSession();
+  await reconcileStuckRuns(session.org.id);
   const db = adminDb();
   // Recompute and store today's snapshot so the trend always includes today.
   const m = await snapshotMetrics(db, session.org.id);

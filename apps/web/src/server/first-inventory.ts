@@ -1,4 +1,5 @@
 import "server-only";
+import { sendNotification } from "@autonomos/db";
 import { after } from "next/server";
 import { adminDb, type Session } from "@/lib/session";
 import { draftInitialInventory } from "@/server/processes";
@@ -89,6 +90,13 @@ async function runMapping(session: Session, p: MappingProgress) {
     p.drafted = ids.length;
     p.titles = (data ?? []).map((r) => r.title);
     await save(session.org.id, p);
+    if (ids.length)
+      await sendNotification(adminDb(), session.org.id, {
+        kind: "discovery_ready",
+        title: "Your first process inventory is ready",
+        body: `${ids.length} process${ids.length === 1 ? "" : "es"} drafted for you to review.`,
+        link: "/processes?status=draft",
+      }).catch((e) => console.error("notification failed", e));
   } catch (e) {
     console.error("first inventory failed", e);
     for (const s of p.steps) if (s.state === "running" || s.state === "pending") s.state = s.state === "running" ? "failed" : "skipped";

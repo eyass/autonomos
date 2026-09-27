@@ -1,7 +1,8 @@
 "use client";
 import type { DiscoveredProcess } from "@autonomos/schemas";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AutonomyLadder } from "@/components/domain";
 import { hours, pct } from "@/lib/format";
@@ -17,6 +18,15 @@ import { Textarea } from "@/components/ui/textarea";
 
 type Message = { role: "assistant" | "user"; content: string };
 
+// A person waits on each answer, so it never waits silently: this long, then it stops and offers a retry.
+const ANSWER_TIMEOUT_MS = 60_000;
+function phase(seconds: number) {
+  if (seconds < 3) return "Reading your answer";
+  if (seconds < 12) return "Updating the processes";
+  if (seconds < 30) return "Writing the next question";
+  return "Still working. The AI model is slow right now";
+}
+
 export function Interview({ departments, defaultDepartment }: { departments: string[]; defaultDepartment?: string }) {
   const [department, setDepartment] = useState(defaultDepartment && departments.includes(defaultDepartment) ? defaultDepartment : (departments[0] ?? "Customer Support"));
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -27,6 +37,17 @@ export function Interview({ departments, defaultDepartment }: { departments: str
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [busy, setBusy] = useState<{ since: number; answer: string } | null>(null);
+  const [failed, setFailed] = useState<{ answer: string; message: string } | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  // Each answer gets an id; a cancelled or superseded answer's result is ignored.
+  const request = useRef(0);
+  useEffect(() => () => void request.current++, []);
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => setElapsed(Math.round((Date.now() - busy.since) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
   const router = useRouter();
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [messages]);
@@ -42,23 +63,46 @@ export function Interview({ departments, defaultDepartment }: { departments: str
       setProcesses([]);
     });
 
+  const submit = async (answer: string) => {
+    if (!sessionId) return;
+    const id = ++request.current;
+    setError(null);
+    setFailed(null);
+    setElapsed(0);
+    setBusy({ since: Date.now(), answer });
+    const timeout = new Promise<{ ok: false; error: string }>((resolve) => setTimeout(() => resolve({ ok: false, error: "timeout" }), ANSWER_TIMEOUT_MS));
+    const r = await Promise.race([answerInterviewAction(sessionId, answer), timeout]).catch((e: unknown) => ({
+      ok: false as const,
+      error: e instanceof Error ? e.message : "The answer could not be sent.",
+    }));
+    if (id !== request.current) return;
+    setBusy(null);
+    if (!r.ok) {
+      setFailed({ answer, message: r.error === "timeout" ? "This took longer than a minute, so it was stopped." : r.error });
+      return;
+    }
+    setMessages(r.data.messages);
+    setSuggestions(r.data.suggestions);
+    setProcesses(r.data.processes);
+    setSelected(new Set(r.data.processes.map((p) => p.title)));
+  };
+
   const send = () => {
-    if (!sessionId || !draft.trim()) return;
+    if (!sessionId || !draft.trim() || busy) return;
     const answer = draft.trim();
     setDraft("");
     setSuggestions([]);
     setMessages((m) => [...m, { role: "user", content: answer }]);
-    start(async () => {
-      const r = await answerInterviewAction(sessionId, answer);
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
-      setMessages(r.data.messages);
-      setSuggestions(r.data.suggestions);
-      setProcesses(r.data.processes);
-      setSelected(new Set(r.data.processes.map((p) => p.title)));
-    });
+    void submit(answer);
+  };
+
+  // Stops waiting and puts the answer back in the box to edit or send again.
+  const cancel = () => {
+    if (!busy) return;
+    request.current++;
+    setMessages((m) => (m.at(-1)?.role === "user" ? m.slice(0, -1) : m));
+    setDraft(busy.answer);
+    setBusy(null);
   };
 
   const save = () =>
@@ -115,11 +159,41 @@ export function Interview({ departments, defaultDepartment }: { departments: str
               {m.content}
             </div>
           ))}
-          {pending ? <div className="mr-8 text-sm text-muted-foreground">Structuring…</div> : null}
+          {busy ? (
+            <div className="mr-6 flex items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground sm:mr-8" role="status">
+              <span className="flex items-center gap-2">
+                <Loader2 className="size-3.5 animate-spin" />
+                {phase(elapsed)}… <span className="tabular-nums">{elapsed}s</span>
+              </span>
+              <Button variant="ghost" size="sm" className="h-7" onClick={cancel}>
+                Cancel
+              </Button>
+            </div>
+          ) : null}
+          {failed ? (
+            <Alert variant="warning" className="mr-6 sm:mr-8">
+              <AlertDescription>
+                <p>{failed.message}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => void submit(failed.answer)}>
+                    Retry
+                  </Button>
+                  {processes.length ? (
+                    <Button size="sm" variant="outline" onClick={save}>
+                      Save what was found
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="ghost" asChild>
+                    <Link href="/processes/new">Add a process by hand</Link>
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <div ref={end} />
         </div>
         <div className="border-t border-border p-3">
-          {suggestions.length && !pending ? (
+          {suggestions.length && !busy ? (
             <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Suggested answers">
               {suggestions.map((sug) => (
                 <Button key={sug} type="button" variant="outline" size="sm" className="h-auto max-w-full whitespace-normal py-1 text-left text-xs" onClick={() => setDraft(sug)}>
@@ -144,7 +218,7 @@ export function Interview({ departments, defaultDepartment }: { departments: str
           />
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">Enter to send. Say &quot;done&quot; when you have covered the main work.</span>
-            <Button size="sm" onClick={send} disabled={pending || !draft.trim()}>
+            <Button size="sm" onClick={send} disabled={Boolean(busy) || !draft.trim()}>
               Send
             </Button>
           </div>
@@ -158,7 +232,7 @@ export function Interview({ departments, defaultDepartment }: { departments: str
       <div className="space-y-3 lg:col-span-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Processes found ({processes.length})</h2>
-          <Button size="sm" onClick={save} disabled={pending || selected.size === 0}>
+          <Button size="sm" onClick={save} disabled={pending || Boolean(busy) || selected.size === 0}>
             Save {selected.size} to inventory
           </Button>
         </div>

@@ -300,10 +300,17 @@ export async function markRunFailed(runId: string, store: RunStore, error: strin
   const ctx = await store.loadRun(runId);
   if (!ctx || TERMINAL.has(ctx.run.status)) return;
   const state = ctx.run.state?.observations ? ctx.run.state : emptyRunState();
-  await fail(ctx, store, state, async (record) => {
-    state.stepCount += 1;
-    await store.appendStep(ctx, state.stepCount, record);
-  }, error, now);
+  await fail(
+    ctx,
+    store,
+    state,
+    async (record) => {
+      state.stepCount += 1;
+      await store.appendStep(ctx, state.stepCount, record);
+    },
+    error,
+    now,
+  );
 }
 
 export function applyApprovalChanges(toolKey: string, args: Record<string, unknown>, changes: Record<string, unknown>) {
@@ -322,9 +329,7 @@ export function applyApprovalChanges(toolKey: string, args: Record<string, unkno
 async function decide(ctx: RunContext, state: RunState, store: RunStore): Promise<AgentDecision> {
   const tools = ctx.version.tools.map((key) => {
     const def = getTool(key);
-    return def
-      ? { key, description: def.description, access: def.access, input_schema: z.toJSONSchema(def.input, { io: "input" }) }
-      : { key, description: "Unavailable", access: "read" };
+    return def ? { key, description: def.description, access: def.access, input_schema: z.toJSONSchema(def.input, { io: "input" }) } : { key, description: "Unavailable", access: "read" };
   });
   const { object, usage } = await generateStructured({
     purpose: "agent_decision",
@@ -367,14 +372,7 @@ async function decide(ctx: RunContext, state: RunState, store: RunStore): Promis
   return object;
 }
 
-async function performRead(
-  ctx: RunContext,
-  store: RunStore,
-  state: RunState,
-  step: (r: StepRecord) => Promise<void>,
-  toolKey: string,
-  args: Record<string, unknown>,
-) {
+async function performRead(ctx: RunContext, store: RunStore, state: RunState, step: (r: StepRecord) => Promise<void>, toolKey: string, args: Record<string, unknown>) {
   const def = getTool(toolKey)!;
   const started = Date.now();
   try {
@@ -397,12 +395,7 @@ async function performRead(
 }
 
 // Executes state.pending. Returns a terminal result if the run must stop, otherwise null.
-async function performWrite(
-  ctx: RunContext,
-  store: RunStore,
-  state: RunState,
-  step: (r: StepRecord) => Promise<void>,
-): Promise<ExecuteResult | null> {
+async function performWrite(ctx: RunContext, store: RunStore, state: RunState, step: (r: StepRecord) => Promise<void>): Promise<ExecuteResult | null> {
   const pending = state.pending!;
   const def = getTool(pending.tool)!;
 
@@ -473,15 +466,7 @@ async function finalizeMetrics(ctx: RunContext, store: RunStore, success: boolea
   return { humanMinutes: human, baselineMinutes: baseline, estimatedMinutesSaved: saved };
 }
 
-async function complete(
-  ctx: RunContext,
-  store: RunStore,
-  state: RunState,
-  step: (r: StepRecord) => Promise<void>,
-  result: string,
-  success: boolean,
-  now: () => Date,
-): Promise<ExecuteResult> {
+async function complete(ctx: RunContext, store: RunStore, state: RunState, step: (r: StepRecord) => Promise<void>, result: string, success: boolean, now: () => Date): Promise<ExecuteResult> {
   const drafted = state.observations.filter((o) => o.kind === "draft").length;
   if (drafted && ctx.run.mode === "production") {
     await store.recordIntervention(ctx, {
@@ -513,18 +498,15 @@ async function complete(
   return { status: "completed", outcome, success };
 }
 
-async function escalate(
-  ctx: RunContext,
-  store: RunStore,
-  state: RunState,
-  step: (r: StepRecord) => Promise<void>,
-  reason: string,
-  now: () => Date,
-): Promise<ExecuteResult> {
-  if (ctx.run.mode === "production") {
-    await store.recordIntervention(ctx, { type: "exception", description: reason, minutes: ctx.process.estimatedMinutesPerOccurrence ?? 0 });
-    await store.notify(ctx, { kind: "agent_escalation", title: `${ctx.agent.name} needs a human`, body: reason, link: `/activity/${ctx.run.id}` });
-  }
+async function escalate(ctx: RunContext, store: RunStore, state: RunState, step: (r: StepRecord) => Promise<void>, reason: string, now: () => Date): Promise<ExecuteResult> {
+  // Only production hand-offs count as human time; a test says so on its run page instead.
+  if (ctx.run.mode === "production") await store.recordIntervention(ctx, { type: "exception", description: reason, minutes: ctx.process.estimatedMinutesPerOccurrence ?? 0 });
+  await store.notify(ctx, {
+    kind: "agent_escalation",
+    title: ctx.run.mode === "production" ? `${ctx.agent.name} needs a human` : `Test of ${ctx.agent.name} handed to a human`,
+    body: reason,
+    link: `/activity/${ctx.run.id}`,
+  });
   await step({ type: "escalated", description: reason, status: "succeeded" });
   const metrics = await finalizeMetrics(ctx, store, false);
   await store.saveRun(ctx, {
@@ -541,28 +523,14 @@ async function escalate(
   return { status: "completed", outcome: "escalated", success: false };
 }
 
-async function cancel(
-  ctx: RunContext,
-  store: RunStore,
-  state: RunState,
-  step: (r: StepRecord) => Promise<void>,
-  reason: string,
-  now: () => Date,
-): Promise<ExecuteResult> {
+async function cancel(ctx: RunContext, store: RunStore, state: RunState, step: (r: StepRecord) => Promise<void>, reason: string, now: () => Date): Promise<ExecuteResult> {
   await step({ type: "cancelled", description: reason, status: "skipped" });
   await store.saveRun(ctx, { state, status: "cancelled", outcome: "cancelled", summary: reason, success: false, finishedAt: now() });
   await store.recordActivity(ctx, { actionType: "run_cancelled", status: "warning", title: `${ctx.agent.name}: ${reason}` });
   return { status: "cancelled", reason };
 }
 
-async function fail(
-  ctx: RunContext,
-  store: RunStore,
-  state: RunState,
-  step: (r: StepRecord) => Promise<void>,
-  error: string,
-  now: () => Date,
-): Promise<ExecuteResult> {
+async function fail(ctx: RunContext, store: RunStore, state: RunState, step: (r: StepRecord) => Promise<void>, error: string, now: () => Date): Promise<ExecuteResult> {
   await step({ type: "failed", description: error, status: "failed" });
   await store.saveRun(ctx, { state, status: "failed", outcome: "failed", summary: error, success: false, error, errorRetryable: false, finishedAt: now() });
   await store.recordActivity(ctx, { actionType: "run_failed", status: "error", title: `${ctx.agent.name} failed: ${error}` });
