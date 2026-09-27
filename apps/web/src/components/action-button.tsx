@@ -16,6 +16,7 @@ export function ActionButton({
   size,
   confirm,
   confirmLabel = "Confirm",
+  confirmDetail,
   pendingLabel,
   onDone,
   className,
@@ -27,6 +28,8 @@ export function ActionButton({
   size?: React.ComponentProps<typeof Button>["size"];
   confirm?: string;
   confirmLabel?: string;
+  // What the person should know before confirming; replaces the default audit-log line.
+  confirmDetail?: ReactNode;
   pendingLabel?: string;
   onDone?: (data: unknown) => void;
   className?: string;
@@ -56,7 +59,13 @@ export function ActionButton({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{confirm}</AlertDialogTitle>
-              <AlertDialogDescription>This is recorded in the audit log.</AlertDialogDescription>
+              {confirmDetail ? (
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2 text-sm">{confirmDetail}</div>
+                </AlertDialogDescription>
+              ) : (
+                <AlertDialogDescription>This is recorded in the audit log.</AlertDialogDescription>
+              )}
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>

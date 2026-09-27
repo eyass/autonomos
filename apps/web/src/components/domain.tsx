@@ -149,7 +149,10 @@ export function OutcomeBadge({ outcome, mode }: { outcome: string | null; mode?:
   const map: Record<string, { label: string; tone: "success" | "warning" | "danger" | "secondary" | "info" }> = {
     completed: { label: "Done", tone: "success" },
     drafted: { label: "Drafted for a human", tone: "info" },
+    // test_completed is the older name, from before passed and unsuccessful tests were told apart.
     test_completed: { label: "Test finished", tone: "info" },
+    test_passed: { label: "Test passed", tone: "success" },
+    test_unsuccessful: { label: "Test did not pass", tone: "warning" },
     escalated: { label: "Handed to a human", tone: "warning" },
     unsuccessful: { label: "Not completed", tone: "warning" },
     failed: { label: "Failed", tone: "danger" },

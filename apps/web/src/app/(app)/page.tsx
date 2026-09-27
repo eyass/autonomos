@@ -26,7 +26,7 @@ export default async function OverviewPage() {
   const m = await snapshotMetrics(db, session.org.id);
   const supabase = await createClient();
   const [{ data: trend }, { data: movers }, { data: top }] = await Promise.all([
-    supabase.from("metrics").select("period, value").eq("organization_id", session.org.id).eq("metric", "autonomy_score").eq("dimension", "").order("period").limit(365),
+    supabase.from("metrics").select("period, metric, value").eq("organization_id", session.org.id).in("metric", ["autonomy_score", "autonomy_live"]).eq("dimension", "").order("period").limit(730),
     // What moves the score: agents going live, changing level or pausing, and newly mapped work.
     supabase
       .from("activity_events")
@@ -142,13 +142,20 @@ export default async function OverviewPage() {
     );
   }
 
-  const byMonth = new Map<string, number>();
-  for (const t of trend ?? []) byMonth.set(t.period.slice(0, 7), Number(t.value));
-  const trendData = [...byMonth.entries()].map(([k, v]) => ({
-    period: new Intl.DateTimeFormat("en-GB", { month: "short", year: "2-digit" }).format(new Date(`${k}-01T00:00:00Z`)),
-    value: v,
-  }));
-  const daily = (trend ?? []).slice(-30).map((t) => ({ period: t.period.slice(5), value: Number(t.value) }));
+  // Two series: mapped work already on the company's own software, and what live agents add.
+  // Days recorded before the split was stored count as all existing software (no live agents then).
+  const perDay = new Map<string, { total: number; live: number }>();
+  for (const t of trend ?? []) {
+    const d = perDay.get(t.period) ?? { total: 0, live: 0 };
+    if (t.metric === "autonomy_score") d.total = Number(t.value);
+    else d.live = Number(t.value);
+    perDay.set(t.period, d);
+  }
+  const point = (period: string, d: { total: number; live: number }) => ({ period, live: d.live, baseline: Math.max(0, d.total - d.live) });
+  const byMonth = new Map<string, { total: number; live: number }>();
+  for (const [day, d] of perDay) byMonth.set(day.slice(0, 7), d);
+  const trendData = [...byMonth.entries()].map(([k, d]) => point(new Intl.DateTimeFormat("en-GB", { month: "short", year: "2-digit" }).format(new Date(`${k}-01T00:00:00Z`)), d));
+  const daily = [...perDay.entries()].slice(-30).map(([day, d]) => point(day.slice(5), d));
 
   const chart = trendData.length > 1 ? trendData : daily;
   return (
@@ -193,7 +200,8 @@ export default async function OverviewPage() {
         {chart.length > 1 ? (
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Work that runs without people, over time</CardTitle>
+              <CardTitle>Mapped work without people, over time</CardTitle>
+              <CardDescription>Most of this rises when you map work your software already does. Only the AutonomOS line is agents.</CardDescription>
             </CardHeader>
             <CardContent>
               <AutonomyTrend data={chart} />

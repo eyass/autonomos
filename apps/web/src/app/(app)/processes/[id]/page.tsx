@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
 import { LevelChange, Scores, StatusBadge } from "@/components/domain";
-import { FREQUENCY_LABEL, hours, money, num, pct } from "@/lib/format";
+import { dateTime, FREQUENCY_LABEL, hours, money, num, pct } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { setProcessStatusAction } from "../actions";
-import { JobButton } from "@/components/app/job";
+import { IdeasButton } from "./ideas-button";
 import { latestJob } from "@/server/jobs";
+import { processGate } from "@/server/processes";
 import { ProcessEditor } from "./editor";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
@@ -25,7 +26,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
   const { edit, ideas } = await searchParams;
   const session = await requireSession();
   // Finding ideas runs on the server; after a reload the page follows the one under way.
-  const ideasJob = await latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "opportunities", subject: id });
+  const [ideasJob, gate] = await Promise.all([latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "opportunities", subject: id }), processGate(session, id).catch(() => null)]);
   const supabase = await createClient();
   const { data: p } = await supabase
     .from("processes")
@@ -101,15 +102,29 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
         }
         actions={
           <>
-            {p.status === "draft" ? (
-              <JobButton kind="opportunities" input={{ processId: id, approve: true }} initialJob={ideasJob} pendingLabel="Approving and finding automation ideas…">
-                Approve process
-              </JobButton>
+            {p.status === "draft" || p.status === "candidate" ? (
+              <IdeasButton
+                processId={id}
+                approve
+                label="Approve process"
+                pendingLabel="Approving and finding automation ideas…"
+                initialJob={ideasJob}
+                blockedBy={gate?.gaps ?? []}
+                sensitive={gate?.sensitive ?? []}
+                complianceOwner={gate?.complianceOwner ?? null}
+              />
             ) : null}
-            {p.status !== "draft" && p.status !== "archived" ? (
-              <JobButton kind="opportunities" input={{ processId: id }} initialJob={ideasJob} pendingLabel="Finding automation ideas…">
-                {opportunities?.length ? "Find more ideas" : "Find automation ideas"}
-              </JobButton>
+            {p.status !== "draft" && p.status !== "candidate" && p.status !== "archived" ? (
+              <IdeasButton
+                processId={id}
+                approve={false}
+                label={opportunities?.length ? "Find more ideas" : "Find automation ideas"}
+                pendingLabel="Finding automation ideas…"
+                initialJob={ideasJob}
+                blockedBy={[]}
+                sensitive={gate?.sensitive ?? []}
+                complianceOwner={gate?.complianceOwner ?? null}
+              />
             ) : null}
             {p.status !== "archived" ? (
               <ActionButton
@@ -138,9 +153,26 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
           </AlertDescription>
         </Alert>
       ) : null}
-      {p.status === "draft" ? (
+      {p.status === "candidate" ? (
+        <Alert variant="warning" className="mb-4">
+          <AlertDescription>
+            Candidate: AutonomOS found signs of this work but not enough to trust it yet, so it is kept out of your inventory, metrics and ideas. Add the missing details below and it joins the
+            inventory as a draft.
+          </AlertDescription>
+        </Alert>
+      ) : p.status === "draft" ? (
         <Alert variant="info" className="mb-4">
           <AlertDescription>Draft. Check the steps and numbers, then approve to find ideas for automating it.</AlertDescription>
+        </Alert>
+      ) : null}
+      {gate?.sensitive.length ? (
+        <Alert variant={gate.complianceOwner ? "info" : "warning"} className="mb-4">
+          <AlertDescription>
+            Involves {gate.sensitive.join(" and ")}.{" "}
+            {gate.complianceOwner
+              ? `Compliance sign-off: ${gate.complianceOwner}. Ideas for it keep a person approving anything that moves money, contacts debtors or touches personal data.`
+              : "Automation ideas are generated only once you name who signs off on compliance."}
+          </AlertDescription>
         </Alert>
       ) : null}
       {gaps.length ? (
@@ -341,6 +373,12 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
                 <div>
                   {SOURCE_LABEL[p.discovery_source]}
                   {(p.documents as unknown as { title: string } | null)?.title ? <span className="text-muted-foreground"> · {(p.documents as unknown as { title: string }).title}</span> : null}
+                  <span className="text-muted-foreground"> · {dateTime(p.created_at)}</span>
+                  {p.source_data ? (
+                    <Badge variant={p.source_data === "live" ? "success" : "warning"} className="ml-1.5">
+                      {p.source_data === "live" ? "From live accounts" : p.source_data === "mixed" ? "Live and sample data" : "From sample data"}
+                    </Badge>
+                  ) : null}
                 </div>
               </div>
             </CardContent>

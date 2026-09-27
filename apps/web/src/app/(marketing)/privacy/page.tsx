@@ -56,10 +56,21 @@ export default function PrivacyPage() {
         <h2>Where data is stored</h2>
         <p>Your data is stored in the region your workspace was set up in, the EU or the US.</p>
 
+        <h2>Who is responsible for what</h2>
+        <p>
+          For the business data in a workspace (processes, connected systems and what agents work on), the organisation that owns the workspace is the controller and we act as its processor, following
+          its instructions. For account and billing data about the people who use AutonomOS, we are the controller.
+        </p>
+        <p>
+          Organisations that need a data processing agreement can ask for one at <a href={`mailto:${CONTACT_EMAIL}?subject=Data%20processing%20agreement`}>{CONTACT_EMAIL}</a>. It covers the
+          subprocessors listed here, and we tell customers before adding one.
+        </p>
+
         <h2>How long we keep it</h2>
         <p>
-          Run history, tool inputs and outputs, and audit events are kept for the life of the workspace. Deleting a workspace deletes its data. There is no self-serve deletion yet;{" "}
-          <a href={`mailto:${CONTACT_EMAIL}?subject=Delete%20workspace`}>contact us to delete a workspace</a>.
+          Run history, tool inputs and outputs, and audit events are kept for the life of the workspace. An owner can delete a workspace in Settings, under Danger zone; that deletes its processes,
+          agents, runs, connections and audit history. Copies in our database provider&apos;s backups are removed when those backups expire. To delete your own account, or for anything this does not
+          cover, <a href={`mailto:${CONTACT_EMAIL}?subject=Delete%20my%20data`}>contact us</a>.
         </p>
 
         <h2>Your rights</h2>

@@ -7,7 +7,7 @@ import { toolsForIntegrations } from "@autonomos/integrations";
 import { tidyTitle, type AutonomyLevel } from "@autonomos/schemas";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
-import { companyContext, connectedSystemEvidence } from "./processes";
+import { companyContext, connectedSystemEvidence, processGate } from "./processes";
 
 export async function loadProcessForAnalysis(session: Session, processId: string) {
   const db = adminDb();
@@ -49,6 +49,11 @@ export async function loadProcessForAnalysis(session: Session, processId: string
 export async function generateOpportunitiesForProcess(session: Session, processId: string) {
   const { row, analysis, hourlyCost } = await loadProcessForAnalysis(session, processId);
   if (row.status === "draft") throw new HttpError(409, "Review the process before generating opportunities");
+  // Regulated work gets ideas only once someone owns the compliance sign-off.
+  const gate = await processGate(session, processId);
+  if (gate.sensitive.length && !gate.complianceOwner) {
+    throw new HttpError(409, `This process involves ${gate.sensitive.join(" and ")}. Name who signs off on compliance before automation ideas are generated.`);
+  }
   const generated = await generateOpportunities({
     company: await companyContext(session),
     process: analysis,

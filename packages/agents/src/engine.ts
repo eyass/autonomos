@@ -477,7 +477,8 @@ async function complete(ctx: RunContext, store: RunStore, state: RunState, step:
   }
   await step({ type: "completed", description: result, status: "succeeded" });
   const metrics = await finalizeMetrics(ctx, store, success);
-  const outcome = ctx.run.mode === "test" ? "test_completed" : success ? (drafted ? "drafted" : "completed") : "unsuccessful";
+  // A test that finished is not the same as a test that passed: only a successful one counts.
+  const outcome = ctx.run.mode === "test" ? (success ? "test_passed" : "test_unsuccessful") : success ? (drafted ? "drafted" : "completed") : "unsuccessful";
   await store.saveRun(ctx, {
     state,
     status: "completed",

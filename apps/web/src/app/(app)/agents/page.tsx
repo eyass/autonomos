@@ -105,7 +105,14 @@ export default async function AgentsPage() {
                         Pause
                       </ActionButton>
                     ) : (
-                      <ActionButton size="sm" variant="ghost" action={activateAction.bind(null, a.id)}>
+                      <ActionButton
+                        size="sm"
+                        variant="ghost"
+                        action={activateAction.bind(null, a.id)}
+                        confirm={`Activate ${a.name}?`}
+                        confirmLabel="Activate"
+                        confirmDetail="It starts acting in the connected systems within its autonomy level. Open the agent to see exactly which systems are live and what it can change."
+                      >
                         Activate
                       </ActionButton>
                     )}

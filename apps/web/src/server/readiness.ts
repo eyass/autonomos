@@ -1,14 +1,14 @@
 import "server-only";
 import { isMockMode } from "@autonomos/ai";
 import { getTool } from "@autonomos/integrations";
-import { executeRun, markRunFailed, RetryableRunError } from "@autonomos/agents";
+import { executeRun, markRunFailed, RetryableRunError, testGate, toolGate } from "@autonomos/agents";
 import { SupabaseRunStore } from "@autonomos/db";
 import { enqueueRun, triggerConfigured } from "@autonomos/workflows";
 import { after } from "next/server";
 import { adminDb, type Session } from "@/lib/session";
 
 export type ReadinessCheck = {
-  key: "runtime" | "model" | "approvers" | "integrations" | "test";
+  key: "runtime" | "model" | "approvers" | "integrations" | "tools" | "test";
   label: string;
   ok: boolean;
   // What is wrong and what to do about it, in customer language.
@@ -67,37 +67,47 @@ export async function executionReadiness(session: Session): Promise<Readiness> {
   ]);
 }
 
-// Readiness for one agent: can it be tested, and can it go live?
-export async function agentReadiness(session: Session, agentId: string, tools: string[], purpose: "test" | "activate"): Promise<Readiness> {
+// Readiness for one agent: can it be tested, and can it go live? Every rule is decided here
+// on the server (activation re-checks it), never only by what the page shows.
+type AgentForReadiness = { id: string; versionId: string | null };
+type ConfigForReadiness = { tools: string[]; trigger: { type: string; event?: string } };
+
+export async function agentReadiness(session: Session, agent: AgentForReadiness, config: ConfigForReadiness, purpose: "test" | "activate"): Promise<Readiness> {
   const base = await executionReadiness(session);
   const db = adminDb();
   const { data: conns } = await db.from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected");
   const connected = new Set([...(conns ?? []).map((c) => c.integration_key), "knowledge"]);
-  const missing = [...new Set(tools.map((t) => getTool(t)?.integration).filter((i): i is string => Boolean(i) && !connected.has(i!)))];
+  const tools = config.tools.map((t) => getTool(t)).filter((d): d is NonNullable<typeof d> => Boolean(d));
+  const missing = [...new Set(tools.map((t) => t.integration).filter((i) => !connected.has(i)))];
   const checks = base.checks.filter((c) => c.key !== "integrations" && (purpose === "activate" || c.key !== "approvers"));
   checks.push({
     key: "integrations",
-    label: "Systems this agent uses",
+    label: "Its systems are connected",
     ok: missing.length === 0,
-    detail: missing.length ? `Connect ${missing.join(" and ")} first.` : "All connected.",
+    detail: missing.length ? `Connect ${missing.join(" and ")} first.` : "Every system its tools use is connected.",
     href: "/integrations",
     blocking: true,
   });
+  // Connected is not the same as equipped: the agent itself must be able to read the work.
+  const coverage = toolGate(
+    tools.map((t) => ({ key: t.key, access: t.access, integration: t.integration })),
+    config.trigger,
+  );
+  checks.push({ key: "tools", label: "It can read the work", ok: coverage.ok, detail: coverage.detail, href: `/agents/${agent.id}/edit`, blocking: true });
   if (purpose === "activate") {
-    const { count } = await db
+    const { data: runs } = await db
       .from("agent_runs")
-      .select("id", { count: "exact", head: true })
+      .select("status, outcome, success, input, agent_version_id, summary")
       .eq("organization_id", session.org.id)
-      .eq("agent_id", agentId)
+      .eq("agent_id", agent.id)
       .eq("mode", "test")
-      .eq("status", "completed");
-    checks.push({
-      key: "test",
-      label: "Successful test",
-      ok: (count ?? 0) > 0,
-      detail: count ? "At least one test finished." : "Run a test first and check what the agent would do.",
-      blocking: true,
-    });
+      .order("queued_at", { ascending: false })
+      .limit(20);
+    const gate = testGate(
+      (runs ?? []).map((r) => ({ status: r.status, outcome: r.outcome, success: r.success, input: r.input, versionId: r.agent_version_id, summary: r.summary })),
+      agent.versionId,
+    );
+    checks.push({ key: "test", label: "A passed test on real input", ok: gate.ok, detail: gate.detail, blocking: true });
   }
   return summarise(checks);
 }
@@ -108,8 +118,8 @@ export async function agentReadiness(session: Session, agentId: string, tools: s
 export type AgentPhase = "live" | "paused" | "blocked" | "needs_test" | "ready";
 export type AgentState = { phase: AgentPhase; title: string; description: string; canActivate: boolean; testBlockedReason: string | null; readiness: Readiness };
 
-export async function agentState(session: Session, agent: { id: string; status: string }, tools: string[]): Promise<AgentState> {
-  const readiness = await agentReadiness(session, agent.id, tools, "activate");
+export async function agentState(session: Session, agent: AgentForReadiness & { status: string }, config: ConfigForReadiness): Promise<AgentState> {
+  const readiness = await agentReadiness(session, agent, config, "activate");
   const failing = readiness.checks.filter((c) => c.blocking && !c.ok);
   const model = readiness.checks.find((c) => c.key === "model");
   const testBlockedReason = model && !model.ok ? model.detail : null;
@@ -119,8 +129,8 @@ export async function agentState(session: Session, agent: { id: string; status: 
     live: others.length ? ["Needs attention", "Live, but something it depends on is missing."] : ["Live", "Everything this agent needs is in place."],
     paused: ["Paused", "Ready to go live again whenever you activate it."],
     blocked: ["Before going live", `${others.length} thing${others.length === 1 ? "" : "s"} to fix first.`],
-    needs_test: ["Test it next", "Run a test to see exactly what it would do. Activate unlocks after a finished test."],
-    ready: ["Ready to go live", "Everything this agent needs is in place, including a finished test."],
+    needs_test: ["Test it next", "Activate unlocks once the latest test on this version passes on a sample record."],
+    ready: ["Ready to go live", "Its systems are connected, it can read the work, and its latest test passed on a sample record."],
   };
   const [title, description] = words[phase];
   return { phase, title, description, canActivate: agent.status !== "active" && failing.length === 0, testBlockedReason, readiness };

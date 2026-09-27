@@ -51,8 +51,13 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     Number(p.estimated_occurrences_per_month ?? 0) * Number(p.estimated_minutes_per_occurrence ?? 0);
   // Drafts waiting for a person come first: with any, the list opens on them.
   const toReview = (rows ?? []).filter((p) => p.status === "draft").length;
+  // Candidates are thin finds kept out of the inventory until someone fills them in.
+  const candidates = (rows ?? []).filter((p) => p.status === "candidate").length;
+  const inventory = (rows ?? []).filter((p) => p.status !== "archived" && p.status !== "candidate").length;
   const view = q.status ? "filtered" : (q.view ?? (toReview ? "review" : "all"));
-  let list = (rows ?? []).filter((p) => (q.status ? p.status === q.status : view === "review" ? p.status === "draft" : p.status !== "archived"));
+  let list = (rows ?? []).filter((p) =>
+    q.status ? p.status === q.status : view === "review" ? p.status === "draft" : view === "candidates" ? p.status === "candidate" : p.status !== "archived" && p.status !== "candidate",
+  );
   if (q.department) list = list.filter((p) => p.department_id === q.department);
   if (q.autonomy) list = list.filter((p) => String(effective(p)) === q.autonomy);
   if (q.risk) list = list.filter((p) => (q.risk === "high" ? p.risk_level >= 4 : q.risk === "low" ? p.risk_level <= 2 : p.risk_level === 3));
@@ -104,23 +109,32 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Work" description="Your recurring work, and ideas to automate it." actions={actions} />
       <WorkTabs active="processes" />
-      {!q.status && toReview ? (
+      {!q.status && (toReview || candidates) ? (
         <nav aria-label="Which processes" className="mb-3 flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/processes?view=review"
-            aria-current={view === "review" ? "page" : undefined}
-            className={`rounded-full border px-3 py-1 ${view === "review" ? "border-primary bg-primary/10 font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            Needs review ({toReview})
-          </Link>
-          <Link
-            href="/processes?view=all"
-            aria-current={view === "all" ? "page" : undefined}
-            className={`rounded-full border px-3 py-1 ${view === "all" ? "border-primary bg-primary/10 font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            All ({(rows ?? []).filter((p) => p.status !== "archived").length})
-          </Link>
+          {(
+            [
+              ["review", `Needs review (${toReview})`, toReview > 0],
+              ["all", `Inventory (${inventory})`, true],
+              ["candidates", `Candidates (${candidates})`, candidates > 0],
+            ] as const
+          )
+            .filter(([, , show]) => show)
+            .map(([key, label]) => (
+              <Link
+                key={key}
+                href={`/processes?view=${key}`}
+                aria-current={view === key ? "page" : undefined}
+                className={`rounded-full border px-3 py-1 ${view === key ? "border-primary bg-primary/10 font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {label}
+              </Link>
+            ))}
         </nav>
+      ) : null}
+      {view === "candidates" ? (
+        <p className="mb-3 text-sm text-muted-foreground">
+          Signs of work that AutonomOS could not describe well enough yet: low confidence, no workflow or no numbers. They stay out of your metrics and ideas until you fill them in, or archive them.
+        </p>
       ) : null}
       {q.drafted ? (
         <Alert variant="agent" className="mb-4">
@@ -156,7 +170,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
             </NativeSelect>
             <NativeSelect name="status" defaultValue={q.status ?? ""} aria-label="Status">
               <NativeSelectOption value="">Any status</NativeSelectOption>
-              {["draft", "reviewed", "active", "archived"].map((s) => (
+              {["candidate", "draft", "reviewed", "active", "archived"].map((s) => (
                 <NativeSelectOption key={s} value={s}>
                   {s[0]!.toUpperCase() + s.slice(1)}
                 </NativeSelectOption>
@@ -184,7 +198,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
           </>
         }
       >
-        {view === "review" || view === "all" ? <input type="hidden" name="view" value={view} /> : null}
+        {view === "review" || view === "all" || view === "candidates" ? <input type="hidden" name="view" value={view} /> : null}
         <Input name="q" placeholder="Search processes" defaultValue={q.q} aria-label="Search processes" className="flex-1 sm:max-w-72" />
       </FilterBar>
       <Card className="@container gap-0 overflow-hidden py-0 sm:py-0">
