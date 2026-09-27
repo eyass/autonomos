@@ -1,8 +1,10 @@
 "use client";
 import { Activity, Bot, Building2, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Plug, Settings, Workflow } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { toast } from "sonner";
+import { requestJob } from "@/components/app/job";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogoMark, Wordmark } from "@/components/brand/logo";
@@ -54,7 +56,6 @@ export function AppSidebar({
   name,
   workspaces,
   switchWorkspace,
-  createSample,
   signOut,
 }: {
   pendingApprovals: number;
@@ -64,12 +65,12 @@ export function AppSidebar({
   name: string;
   workspaces: Workspace[];
   switchWorkspace: (id: string) => Promise<unknown>;
-  createSample: () => Promise<unknown>;
   signOut: () => Promise<unknown>;
 }) {
   const path = usePathname();
   const [pending, start] = useTransition();
   const { setOpenMobile } = useSidebar();
+  const router = useRouter();
   const group = (items: NavItem[]) => (
     <SidebarGroup>
       <SidebarGroupContent>
@@ -166,7 +167,18 @@ export function AppSidebar({
                   </DropdownMenuItem>
                 ))}
                 {workspaces.some((w) => w.is_demo) ? null : (
-                  <DropdownMenuItem disabled={pending} onSelect={() => start(async () => void (await createSample()))}>
+                  <DropdownMenuItem
+                    disabled={pending}
+                    onSelect={() =>
+                      start(async () => {
+                        // Set up on the server; the Workspaces page follows it to the end.
+                        const r = await requestJob("sample_workspace");
+                        if (!r.ok) return void toast.error(r.error);
+                        setOpenMobile(false);
+                        router.push("/workspaces");
+                      })
+                    }
+                  >
                     <FlaskConical />
                     {pending ? "Setting up…" : "Explore a sample workspace"}
                   </DropdownMenuItem>

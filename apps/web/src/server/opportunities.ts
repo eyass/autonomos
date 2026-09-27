@@ -58,7 +58,12 @@ export async function generateOpportunitiesForProcess(session: Session, processI
   });
   const db = adminDb();
   const ids: string[] = [];
+  // Asking again (or a job run a second time) never adds an idea the process already has.
+  const { data: had } = await db.from("automation_opportunities").select("title").eq("organization_id", session.org.id).eq("process_id", processId);
+  const known = new Set((had ?? []).map((h) => h.title.trim().toLowerCase()));
   for (const o of generated) {
+    if (known.has(o.title.trim().toLowerCase())) continue;
+    known.add(o.title.trim().toLowerCase());
     const current = Math.max(1, Math.min(5, o.currentAutonomyLevel)) as AutonomyLevel;
     const target = Math.max(current, Math.min(5, o.targetAutonomyLevel)) as AutonomyLevel;
     // Deterministic process scores anchor the model's opportunity estimates.

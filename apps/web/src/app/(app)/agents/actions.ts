@@ -1,5 +1,4 @@
 "use server";
-import { SAMPLE_TICKETS } from "@autonomos/integrations";
 import { AgentConfigSchema } from "@autonomos/schemas";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -18,7 +17,6 @@ import {
   startTestRunWithSample,
   updateAgentConfig,
 } from "@/server/agents";
-import { defaultAgentConfig } from "@/server/opportunities";
 
 export async function createAgentAction(input: { processId: string; opportunityId: string | null; config: unknown }) {
   const result = await runAction(async () =>
@@ -26,21 +24,6 @@ export async function createAgentAction(input: { processId: string; opportunityI
   );
   if (!result.ok) return result;
   redirect(`/agents/${result.data}?created=1`);
-}
-
-// One click from an opportunity to a tested agent: build it from the proposed
-// configuration, then run a simulated test straight away.
-export async function buildAndTestAgentAction(opportunityId: string) {
-  const result = await runAction(async () => {
-    const session = await requireSessionOrThrow();
-    const { opportunity, config } = await defaultAgentConfig(session, z.string().uuid().parse(opportunityId));
-    if (!config.tools.length) throw new HttpError(409, "Connect the systems this agent needs first");
-    const agentId = await createAgent(session, { processId: opportunity.process_id, opportunityId: opportunity.id, config });
-    const runId = config.tools.includes("zendesk.read_ticket") ? await startTestRunWithSample(session, agentId, SAMPLE_TICKETS[0]!.key) : await startTestRun(session, agentId, {});
-    return runId;
-  });
-  if (!result.ok) return result;
-  redirect(`/activity/${result.data}?built=1`);
 }
 
 export async function updateAgentAction(agentId: string, config: unknown, note: string) {

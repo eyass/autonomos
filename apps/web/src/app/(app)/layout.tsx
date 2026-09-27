@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { listWorkspaces } from "@/server/platform";
-import { createSampleWorkspaceAction, signOutAction, markNotificationsRead, switchWorkspaceAction } from "./shell-actions";
+import { signOutAction, markNotificationsRead, switchWorkspaceAction } from "./shell-actions";
 import { Logo } from "@/components/brand/logo";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -35,7 +35,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         orgId={session.org.id}
         workspaces={workspaces}
         switchWorkspace={switchWorkspaceAction}
-        createSample={createSampleWorkspaceAction}
         signOut={signOutAction}
         email={session.user.email}
         name={`${session.user.firstName} ${session.user.lastName}`.trim()}

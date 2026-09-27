@@ -1,3 +1,5 @@
+import { JobButton } from "@/components/app/job";
+import { latestJob } from "@/server/jobs";
 import { Plus } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
 import { ButtonLink } from "@/components/app/button-link";
@@ -7,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { isAdmin, requireSession } from "@/lib/session";
 import { listWorkspaces } from "@/server/platform";
 import { DeleteWorkspace } from "../settings/forms";
-import { createSampleWorkspaceAction, switchWorkspaceAction } from "../shell-actions";
+import { switchWorkspaceAction } from "../shell-actions";
 import { RenameWorkspace } from "./rename";
 
 export const metadata = { title: "Workspaces" };
@@ -17,6 +19,7 @@ const ROLE: Record<string, string> = { owner: "Owner", admin: "Admin", member: "
 // Every workspace you belong to: switch between them, add one, and rename or delete the one you are in.
 export default async function WorkspacesPage() {
   const session = await requireSession();
+  const sampleJob = await latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "sample_workspace" });
   const workspaces = await listWorkspaces(session);
   const current = workspaces.find((w) => w.id === session.org.id);
   const others = workspaces.filter((w) => w.id !== session.org.id);
@@ -32,9 +35,9 @@ export default async function WorkspacesPage() {
               Add workspace
             </ButtonLink>
             {workspaces.some((w) => w.is_demo) ? null : (
-              <ActionButton variant="outline" action={createSampleWorkspaceAction} pendingLabel="Setting up…">
+              <JobButton variant="outline" kind="sample_workspace" initialJob={sampleJob} pendingLabel="Setting up…">
                 Explore a sample workspace
-              </ActionButton>
+              </JobButton>
             )}
           </>
         }

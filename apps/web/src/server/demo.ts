@@ -5,21 +5,20 @@ import { adminDb, HttpError, sessionFor, type Session } from "@/lib/session";
 import { createAgent, simulateSandboxTicket, startTestRunWithSample } from "@/server/agents";
 import { seedDemoOrganization } from "@/server/demo-seed";
 import { defaultAgentConfig } from "@/server/opportunities";
-import { listWorkspaces, switchWorkspace } from "@/server/platform";
 
 // "Explore a sample workspace": a fictional company with sandbox systems and a Refund Agent.
 // Nothing is faked: when the agent runtime is connected, the agent really runs on three
 // sample tickets, so Overview, Activity and Approvals fill with real results (one routine
 // refund, one that waits for your approval, one prompt-injection attempt that is escalated).
+// Runs as a background job; switching to the new workspace is left to the caller, because
+// only a request can set the workspace cookie.
 export async function createSampleWorkspace(session: Session) {
-  const existing = (await listWorkspaces(session)).find((w) => w.is_demo);
-  if (existing) {
-    await switchWorkspace(session, existing.id);
-    return { organizationId: existing.id, created: false, runs: 0 };
-  }
+  // Service client: this runs in a background job, outside the person's request.
+  const { data: memberships } = await adminDb().from("organization_members").select("organizations(id, is_demo)").eq("user_id", session.user.id);
+  const existing = (memberships ?? []).map((m) => m.organizations as unknown as { id: string; is_demo: boolean } | null).find((o) => o?.is_demo);
+  if (existing) return { organizationId: existing.id, created: false, runs: 0 };
   const db = adminDb();
   const { organizationId, opportunityId, processId } = await seedDemoOrganization(db, session.user.id, { name: "Northwind Marketplace (sample)", isDemo: true });
-  await switchWorkspace(session, organizationId);
   const demo = await sessionFor(session.user.id, organizationId);
   if (!demo) throw new HttpError(500, "Sample workspace was created but could not be opened");
   await audit(demo, { action: "organization.sample_created" });

@@ -2,9 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runAction } from "@/lib/actions";
-import { rateLimit } from "@/lib/rate-limit";
 import { requireSessionOrThrow } from "@/lib/session";
-import { refreshWebsiteProfile } from "@/server/company-profile";
 import {
   archiveDepartment,
   CompanySettingsSchema,
@@ -102,15 +100,6 @@ export async function updateProfileAction(_: unknown, form: FormData) {
       }),
     ),
   );
-}
-
-export async function refreshProfileAction() {
-  return runAction(async () => {
-    const session = await requireSessionOrThrow();
-    rateLimit(`website:${session.user.id}`, 6, 60_000);
-    const analysis = await refreshWebsiteProfile(session);
-    return { pages: analysis.pagesRead.length, tools: analysis.detectedTools.map((t) => t.name) };
-  });
 }
 
 export async function createApiKeyAction(_: unknown, form: FormData) {

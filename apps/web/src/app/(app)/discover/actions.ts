@@ -5,7 +5,7 @@ import { runAction } from "@/lib/actions";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireSessionOrThrow } from "@/lib/session";
 import { z } from "zod";
-import { cancelInterviewTurn, DocumentImportSchema, finishInterview, importDocument, retryInterviewTurn, runInterviewTurn, startInterview, submitInterviewAnswer } from "@/server/processes";
+import { cancelInterviewTurn, finishInterview, retryInterviewTurn, runInterviewTurn, startInterview, submitInterviewAnswer } from "@/server/processes";
 import { acceptProposals, activeDiscoveryRun, getDiscoveryRun, rejectProposal, runDiscovery, startDiscoveryRun, undoRejectProposal } from "@/server/system-discovery";
 
 export async function startInterviewAction(department: string) {
@@ -40,14 +40,6 @@ export async function cancelInterviewAction(sessionId: string) {
 
 export async function finishInterviewAction(sessionId: string, titles: string[]) {
   return runAction(async () => finishInterview(await requireSessionOrThrow(), sessionId, titles));
-}
-
-export async function importDocumentAction(input: { title: string; content: string; source: "upload" | "paste" }) {
-  return runAction(async () => {
-    const session = await requireSessionOrThrow();
-    rateLimit(`ai:${session.user.id}`, 30, 60_000);
-    return importDocument(session, DocumentImportSchema.parse(input));
-  });
 }
 
 // Discovery from connected systems, driven step by step so the page shows each system being read.

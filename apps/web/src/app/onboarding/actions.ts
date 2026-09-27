@@ -1,19 +1,9 @@
 "use server";
 import { redirect } from "next/navigation";
 import { runAction } from "@/lib/actions";
-import { rateLimit } from "@/lib/rate-limit";
-import { getUser, HttpError, requireSessionOrThrow } from "@/lib/session";
-import { analyseWebsite, saveWebsiteProfile, WebsiteAnalysisSchema } from "@/server/company-profile";
+import { requireSessionOrThrow } from "@/lib/session";
+import { saveWebsiteProfile, WebsiteAnalysisSchema } from "@/server/company-profile";
 import { AboutSchema, completeOnboarding, CreateOrgSchema, createOrganization, saveAbout } from "@/server/org";
-
-export async function analyseWebsiteAction(website: string) {
-  return runAction(async () => {
-    const user = await getUser();
-    if (!user) throw new HttpError(401, "Sign in first");
-    rateLimit(`website:${user.id}`, 6, 60_000);
-    return analyseWebsite({ website, email: user.email ?? "" });
-  });
-}
 
 export async function createCompanyAction(_: unknown, form: FormData) {
   const result = await runAction(async () => {

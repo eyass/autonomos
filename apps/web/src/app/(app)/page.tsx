@@ -1,3 +1,5 @@
+import { JobButton } from "@/components/app/job";
+import { latestJob } from "@/server/jobs";
 import { snapshotMetrics } from "@autonomos/db";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { CircleCheck } from "lucide-react";
@@ -11,13 +13,12 @@ import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
 import { StatStrip } from "@/components/app/stat-card";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ActionButton } from "@/components/action-button";
-import { createSampleWorkspaceAction } from "./shell-actions";
 
 export const metadata = { title: "Home" };
 
 export default async function OverviewPage() {
   const session = await requireSession();
+  const sampleJob = await latestJob({ userId: session.user.id, organizationId: session.org.id, kind: "sample_workspace" });
   await reconcileStuckRuns(session.org.id);
   const db = adminDb();
   // Recompute and store today's snapshot so the trend always includes today.
@@ -119,9 +120,9 @@ export default async function OverviewPage() {
         {!session.org.isDemo && playbook.filter((p) => p.done).length < 3 ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>Want to see it working first?</span>
-            <ActionButton size="sm" variant="outline" action={createSampleWorkspaceAction} pendingLabel="Setting up…">
+            <JobButton size="sm" variant="outline" kind="sample_workspace" initialJob={sampleJob} pendingLabel="Setting up…">
               Explore a sample workspace
-            </ActionButton>
+            </JobButton>
           </div>
         ) : null}
       </CardContent>
