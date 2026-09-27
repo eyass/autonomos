@@ -2,6 +2,10 @@ import { StatusBadge } from "@/components/domain";
 import { dateTime } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { ActionButton } from "@/components/action-button";
+import { Badge } from "@/components/ui/badge";
+import { markHandledAction } from "./actions";
 import { ApprovalCard, type ApprovalView } from "./card";
 import { EmptyState } from "@/components/app/empty-state";
 import { LinkTabs } from "@/components/app/link-tabs";
@@ -23,11 +27,22 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     .order("requested_at", { ascending: false })
     .limit(100);
   q = resolved ? q.neq("status", "pending") : q.eq("status", "pending");
-  const { data } = await q;
+  const [{ data }, { data: handoffs }] = await Promise.all([
+    q,
+    // Work agents handed to a person, until someone marks it handled. Tests included, labelled.
+    supabase
+      .from("agent_runs")
+      .select("id, mode, summary, finished_at, agents(name)")
+      .eq("organization_id", session.org.id)
+      .eq("outcome", "escalated")
+      .is("handled_at", null)
+      .order("finished_at", { ascending: false })
+      .limit(30),
+  ]);
   const tabs = (
     <LinkTabs
       items={[
-        { href: "/approvals", label: "Needs your approval", active: !resolved },
+        { href: "/approvals", label: `Needs a person${(data?.length ?? 0) + (handoffs?.length ?? 0) && !resolved ? ` (${(data?.length ?? 0) + (handoffs?.length ?? 0)})` : ""}`, active: !resolved },
         { href: "/approvals?view=resolved", label: "Resolved", active: resolved },
       ]}
     />
@@ -95,9 +110,33 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
             <ApprovalCard key={a.id} a={a} canApprove={session.canApprove} />
           ))}
         </div>
-      ) : (
-        <EmptyState title="Nothing needs your approval." description="When an agent prepares an action that needs a human, it appears here and you get notified." />
-      )}
+      ) : !handoffs?.length ? (
+        <EmptyState
+          title="Nothing needs a person right now."
+          description="Actions an agent prepares for approval, and work it hands to a person, appear here and you get notified. Run a test from an agent to see one."
+        />
+      ) : null}
+      {handoffs?.length ? (
+        <section className={views.length ? "mt-6" : ""}>
+          <h2 className="mb-2 text-sm font-semibold">Handed to a person</h2>
+          <Card className="gap-0 py-0">
+            {handoffs.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0 sm:px-5">
+                <Link href={`/activity/${r.id}`} className="min-w-0 flex-1 hover:underline">
+                  <div className="text-sm font-medium">{r.summary ?? "Needs a person"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {(r.agents as unknown as { name: string } | null)?.name} · {dateTime(r.finished_at)}
+                  </div>
+                </Link>
+                {r.mode === "test" ? <Badge variant="secondary">Test</Badge> : null}
+                <ActionButton size="sm" variant="outline" action={markHandledAction.bind(null, r.id)}>
+                  Mark handled
+                </ActionButton>
+              </div>
+            ))}
+          </Card>
+        </section>
+      ) : null}
     </>
   );
 }

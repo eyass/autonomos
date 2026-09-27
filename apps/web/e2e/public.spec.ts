@@ -66,3 +66,10 @@ test("public pages fit a phone screen", async ({ page }) => {
     await expectNoHorizontalOverflow(page, path);
   }
 });
+
+test("addresses people type land on real pages", async ({ page }) => {
+  await page.goto("/pricing");
+  await expect(page).toHaveURL(/\/#pricing$/);
+  await page.goto("/blog");
+  await expect(page).toHaveURL(/\/docs$/);
+});
