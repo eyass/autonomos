@@ -38,7 +38,7 @@ export function TestPanel({ agentId, ticketDriven, samples, blockedReason }: { a
     <Card id="test">
       <CardHeader>
         <CardTitle>Test run</CardTitle>
-        <CardDescription>Runs the agent end to end. Actions that change things are simulated, never executed.</CardDescription>
+        <CardDescription>Actions that change things are simulated.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {ticketDriven ? (
@@ -78,9 +78,7 @@ export function LivePanel({ agentId, samples, ticketDriven, sandbox }: { agentId
     <Card>
       <CardHeader>
         <CardTitle>{ticketDriven ? "Send a sandbox ticket" : "Run now"}</CardTitle>
-        <CardDescription>
-          {ticketDriven ? "A customer ticket arrives in the sandbox Zendesk and the live agent picks it up, exactly as a real one would." : "Start a production run now."}
-        </CardDescription>
+        <CardDescription>{ticketDriven ? "The live agent picks it up like a real ticket." : "Start a production run now."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {ticketDriven ? (
@@ -165,7 +163,7 @@ export function AutonomyControl({ agentId, level, hasMoney, threshold, canChange
       >
         {pending ? "Saving…" : "Change autonomy"}
       </Button>
-      <p className="text-xs text-muted-foreground">Autonomy never changes automatically. Each change creates a new configuration version.</p>
+      <p className="text-xs text-muted-foreground">Never changes automatically. Each change is a new version.</p>
     </div>
   );
 }

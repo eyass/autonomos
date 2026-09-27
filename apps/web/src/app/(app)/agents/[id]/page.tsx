@@ -20,7 +20,7 @@ import { AutonomyControl, LivePanel, TestPanel } from "./controls";
 import { ButtonLink } from "@/components/app/button-link";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
-import { StatCard } from "@/components/app/stat-card";
+import { StatStrip } from "@/components/app/stat-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,12 +140,15 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
         </Alert>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Runs" value={stats?.runs ?? 0} hint={stats?.testRuns ? `+ ${stats.testRuns} test` : undefined} />
-        <StatCard label="Success rate" value={pct(stats?.successRate)} hint={`${pct(stats?.humanInterventionRate)} needed a human`} />
-        <StatCard label="Hours saved" value={hours((stats?.hoursSaved ?? 0) * 60)} hint={`${money(stats?.estimatedValue ?? 0, session.org.currency)} value`} />
-        <StatCard label="AI cost" value={usd(stats?.aiCost ?? 0)} />
-      </div>
+      <StatStrip
+        className="mb-6"
+        items={[
+          { label: "Runs", value: stats?.runs ?? 0, hint: stats?.testRuns ? `+ ${stats.testRuns} test` : undefined },
+          { label: "Success", value: pct(stats?.successRate), hint: `${pct(stats?.humanInterventionRate)} needed a human` },
+          { label: "Saved", value: hours((stats?.hoursSaved ?? 0) * 60), hint: money(stats?.estimatedValue ?? 0, session.org.currency) },
+          { label: "AI cost", value: usd(stats?.aiCost ?? 0) },
+        ]}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-start-3 lg:row-start-1">
@@ -212,7 +215,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
           <Card>
             <CardHeader>
               <CardTitle>How it works</CardTitle>
-              <CardDescription>{`Configuration version ${version.version}`}</CardDescription>
+              <CardDescription>{`Version ${version.version}`}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5 text-sm md:grid-cols-2">
               <div className="md:col-span-2">
@@ -220,58 +223,69 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                 <p>{config.instructions.objective}</p>
                 <p className="mt-1 text-muted-foreground">{triggerLabel}</p>
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <div className="mb-1 text-xs font-medium text-muted-foreground">What the agent can do</div>
-                <ul className="space-y-0.5">
+                <ul className="flex flex-wrap gap-1.5">
                   {config.tools.map((t) => {
                     const def = getTool(t);
                     return (
-                      <li key={t} className="flex flex-wrap items-center gap-x-2">
-                        {def?.label ?? t} {def?.access === "write" ? <Badge variant="info">takes action</Badge> : null}
+                      <li key={t}>
+                        <Badge variant={def?.access === "write" ? "info" : "secondary"}>
+                          {def?.label ?? t}
+                          {def?.access === "write" ? " · acts" : ""}
+                        </Badge>
                       </li>
                     );
                   })}
                 </ul>
               </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Needs your approval when</div>
-                <ul className="list-inside list-disc">
-                  {config.autonomyLevel <= 3 ? <li>Any action (L{config.autonomyLevel})</li> : null}
-                  {(config.autonomyLevel >= 4 ? config.policy.approvalRequiredFor : []).map((t) => (
-                    <li key={t}>{getTool(t)?.label ?? t}</li>
-                  ))}
-                  {(config.autonomyLevel >= 4 ? config.policy.amountThresholds : []).map((t) => (
-                    <li key={t.tool}>
-                      {getTool(t.tool)?.label ?? t.tool} above {money(t.maxWithoutApproval, session.org.currency)}
-                    </li>
-                  ))}
-                  <li>Confidence below {Math.round(config.policy.confidenceThreshold * 100)}%</li>
-                  {config.policy.conditions.map((c) => (
-                    <li key={c.label}>{c.label}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Rules</div>
-                <ul className="list-inside list-disc">
-                  {config.instructions.rules.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Hands to a human when</div>
-                <ul className="list-inside list-disc">
-                  {config.instructions.escalationConditions.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
-                  {config.policy.hardLimits.map((h) => (
-                    <li key={h.tool}>
-                      {getTool(h.tool)?.label ?? h.tool} above {money(h.max, session.org.currency)} (never executed)
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <Collapsible className="md:col-span-2">
+                <CollapsibleTrigger className="group inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+                  Approvals, rules and hand-offs
+                  <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 grid gap-5 md:grid-cols-3">
+                  <div>
+                    <div className="mb-1 text-xs font-medium text-muted-foreground">Needs your approval when</div>
+                    <ul className="list-inside list-disc">
+                      {config.autonomyLevel <= 3 ? <li>Any action (L{config.autonomyLevel})</li> : null}
+                      {(config.autonomyLevel >= 4 ? config.policy.approvalRequiredFor : []).map((t) => (
+                        <li key={t}>{getTool(t)?.label ?? t}</li>
+                      ))}
+                      {(config.autonomyLevel >= 4 ? config.policy.amountThresholds : []).map((t) => (
+                        <li key={t.tool}>
+                          {getTool(t.tool)?.label ?? t.tool} above {money(t.maxWithoutApproval, session.org.currency)}
+                        </li>
+                      ))}
+                      <li>Confidence below {Math.round(config.policy.confidenceThreshold * 100)}%</li>
+                      {config.policy.conditions.map((c) => (
+                        <li key={c.label}>{c.label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs font-medium text-muted-foreground">Rules</div>
+                    <ul className="list-inside list-disc">
+                      {config.instructions.rules.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs font-medium text-muted-foreground">Hands to a human when</div>
+                    <ul className="list-inside list-disc">
+                      {config.instructions.escalationConditions.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                      {config.policy.hardLimits.map((h) => (
+                        <li key={h.tool}>
+                          {getTool(h.tool)?.label ?? h.tool} above {money(h.max, session.org.currency)} (never executed)
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
             <Collapsible className="border-t border-border px-4 py-3 text-sm sm:px-5">
               <CollapsibleTrigger className="group inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">

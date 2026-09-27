@@ -87,7 +87,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader title="Approvals" description="Actions agents have prepared and are waiting for a person to decide." />
+      <PageHeader title="Approvals" description="Actions waiting for a person to decide." />
       {tabs}
       {views.length ? (
         <div className="space-y-4">

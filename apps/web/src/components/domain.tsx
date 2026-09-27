@@ -157,8 +157,8 @@ type FlowStep = { title: string; actor: "agent" | "human" | "system"; approval?:
 // Before/after comparison, central to understanding an opportunity (PRD section 110).
 export function BeforeAfter({ today, proposed }: { today: Array<{ title: string; performedBy?: string | null }>; proposed: FlowStep[] }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <FlowColumn title="Today" subtitle="Human-led" steps={today.map((s) => ({ title: s.title, actor: /customer|system/i.test(s.performedBy ?? "") ? "system" : "human" }))} />
+    <div className={cn("grid gap-4", today.length ? "md:grid-cols-2" : "")}>
+      {today.length ? <FlowColumn title="Today" subtitle="Human-led" steps={today.map((s) => ({ title: s.title, actor: /customer|system/i.test(s.performedBy ?? "") ? "system" : "human" }))} /> : null}
       <FlowColumn title="Proposed" subtitle="Agent-led" steps={proposed} highlight />
     </div>
   );

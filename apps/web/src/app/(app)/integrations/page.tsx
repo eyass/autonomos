@@ -19,7 +19,7 @@ export default async function IntegrationsPage() {
       <LiveRefresh active={mapping} />
       <PageHeader
         title="Integrations"
-        description="Systems AutonomOS can read from and act in. Connecting does not give any agent access; each agent gets an explicit list of allowed actions."
+        description="Connecting gives no agent access by itself. Each agent gets its own list of allowed actions."
         actions={canUseComposio() ? <AddSystems canManage={isAdmin(session)} /> : null}
       />
       {!isAdmin(session) ? <p className="mb-4 text-sm text-muted-foreground">Only admins can connect or disconnect integrations.</p> : null}

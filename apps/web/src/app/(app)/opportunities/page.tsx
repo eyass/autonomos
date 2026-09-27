@@ -45,7 +45,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
   const rejected = q.status === "rejected";
   return (
     <>
-      <PageHeader title="Opportunities" description="Where agents should take over work, best first. Risk is shown separately and never hidden in the ranking." />
+      <PageHeader title="Opportunities" description="Where agents should take over work, best first." />
       <LinkTabs
         items={[
           { href: "/opportunities", label: "Open", active: !rejected },

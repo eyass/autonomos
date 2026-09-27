@@ -37,7 +37,7 @@ export default async function AgentsPage() {
   const metrics = await computeOrgMetrics(adminDb(), session.org.id, new Date(0));
   return (
     <>
-      <PageHeader title="Agents" description="Agents that run your processes. Only active agents act on their own." />
+      <PageHeader title="Agents" description="Only active agents act on their own." />
       <Card className="gap-0 overflow-hidden py-0 sm:py-0">
         <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 sm:[&_td:first-child]:pl-6 sm:[&_th:first-child]:pl-6">
           <TableHeader>

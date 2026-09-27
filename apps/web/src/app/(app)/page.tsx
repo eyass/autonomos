@@ -8,7 +8,7 @@ import { AutonomyTrend } from "./trend";
 import { ButtonLink } from "@/components/app/button-link";
 import { PageHeader } from "@/components/app/page-header";
 import { RowLink } from "@/components/app/row-link";
-import { StatCard } from "@/components/app/stat-card";
+import { StatStrip } from "@/components/app/stat-card";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActionButton } from "@/components/action-button";
 import { createSampleWorkspaceAction } from "./shell-actions";
@@ -110,46 +110,47 @@ export default async function OverviewPage() {
   const chart = trendData.length > 1 ? trendData : daily;
   return (
     <>
-      <PageHeader title="Overview" description="How autonomous your company is, and what should become autonomous next." />
+      <PageHeader title="Overview" />
       {playbookCard}
       <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-3">
-        <Card>
-          <CardContent>
-            <div className="text-xs font-medium text-muted-foreground">Company autonomy score</div>
-            <div className="mt-2 font-display text-5xl font-semibold tracking-tight text-brand tabular-nums sm:text-6xl" data-testid="autonomy-score">
-              {pct(m.autonomyScore)}
+        <Card className={chart.length > 1 ? "" : "lg:col-span-3"}>
+          <CardContent className="flex items-end justify-between gap-4">
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Company autonomy</div>
+              <div className="mt-1 font-display text-5xl font-semibold tracking-tight text-brand tabular-nums" data-testid="autonomy-score">
+                {pct(m.autonomyScore)}
+              </div>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">Share of mapped human work that agents handle, weighted by time.</p>
+            <p className="max-w-48 text-right text-xs text-muted-foreground">of mapped human work, weighted by time, is done by agents</p>
           </CardContent>
         </Card>
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Autonomy over time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {chart.length > 1 ? <AutonomyTrend data={chart} /> : <p className="py-8 text-center text-sm text-muted-foreground">The trend appears after the first days of use.</p>}
-          </CardContent>
-        </Card>
+        {chart.length > 1 ? (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Autonomy over time</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AutonomyTrend data={chart} />
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:mb-6 lg:grid-cols-4">
-        <StatCard label="Active agents" value={num(m.activeAgents)} hint={`${m.processesAutomated} of ${m.processesMapped} processes`} />
-        <StatCard
-          label="Hours saved"
-          value={hours(m.minutesSaved)}
-          hint={
-            m.productionRuns
-              ? `${money(m.valueCreated, m.currency)} of work this month${m.roi !== null ? `, ${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}× its AI cost` : ""}`
-              : "Counts production runs only"
-          }
-        />
-        <StatCard label="Tasks done" value={num(m.tasksExecuted)} hint={m.productionRuns ? `${num(m.humanInterventions)} needed a human` : "No production runs yet"} />
-        <StatCard
-          label="AI spend this month"
-          value={usd(m.aiCost)}
-          hint={`Setup ${usd(m.aiCostBySource.setup)} · tests ${usd(m.aiCostBySource.test)} · production ${usd(m.aiCostBySource.production)}`}
-        />
-      </div>
+      <StatStrip
+        className="mb-4 lg:mb-6"
+        items={[
+          { label: "Active agents", value: num(m.activeAgents), hint: `${m.processesAutomated} of ${m.processesMapped} processes` },
+          {
+            label: "Hours saved",
+            value: hours(m.minutesSaved),
+            hint: m.productionRuns
+              ? `${money(m.valueCreated, m.currency)} this month${m.roi !== null ? `, ${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}× AI cost` : ""}`
+              : "From production runs",
+          },
+          { label: "Tasks done", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
+          { label: "AI spend", value: usd(m.aiCost), hint: "this month" },
+        ]}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
         <Card>
@@ -182,7 +183,7 @@ export default async function OverviewPage() {
             </div>
           ) : (
             <CardContent>
-              <p className="text-sm text-muted-foreground">Approve a process to see what to automate next. Opportunities already turned into agents are on the Agents page.</p>
+              <p className="text-sm text-muted-foreground">Approve a process to see what to automate next.</p>
             </CardContent>
           )}
         </Card>
