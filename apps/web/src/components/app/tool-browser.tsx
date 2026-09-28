@@ -1,11 +1,11 @@
 "use client";
 import { Check, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { browseToolsAction, connectDirectoryAction, connectSandboxAction } from "@/app/(app)/integrations/actions";
 import { SystemLogo } from "@/app/(app)/integrations/add-systems";
-import type { BrowseCategory, BrowseTool } from "@/server/tool-browser";
+import type { BrowseCategory, BrowseEntry, BrowseTool } from "@/server/tool-browser";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,29 +16,42 @@ import { Spinner } from "@/components/ui/spinner";
 export function ToolBrowser({
   categories,
   initialTools,
+  special,
+  connected,
+  detected,
   canManage,
   returnTo,
 }: {
   categories: BrowseCategory[];
   initialTools: BrowseTool[];
+  // The Found on your website and Connected views, built on the server.
+  special: Partial<Record<string, BrowseTool[]>>;
+  // The workspace's own state, laid over the (cached) directory.
+  connected: Record<string, string | null>;
+  detected: string[];
   canManage: boolean;
   // Where a live sign-in comes back to.
   returnTo: string;
 }) {
   const [view, setView] = useState("popular");
   const [query, setQuery] = useState("");
-  const [tools, setTools] = useState<BrowseTool[]>(initialTools);
+  const [remote, setRemote] = useState<BrowseTool[]>(initialTools);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE);
+  const [justConnected, setJustConnected] = useState<Record<string, string>>({});
+  const all = useDirectory(connected, detected);
   const seq = useRef(0);
   const first = useRef(true);
 
   useEffect(() => {
-    // The first view comes from the server; reload only when the view or search changes.
+    // Once the whole directory is here every view is worked out in the browser. Until then
+    // (the first seconds of a visit) the server answers, as it did before.
     if (first.current) {
       first.current = false;
       return;
     }
+    if (all || special[view]) return;
     const id = ++seq.current;
     const t = setTimeout(
       async () => {
@@ -48,15 +61,25 @@ export function ToolBrowser({
         setLoading(false);
         if (!r.ok) return setError(r.error);
         setError(null);
-        setTools(r.data);
+        setRemote(r.data);
       },
       query ? 250 : 0,
     );
     return () => clearTimeout(t);
-  }, [view, query]);
+  }, [view, query, all, special]);
+
+  const computed = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const inView = special[view];
+    if (inView) return q ? inView.filter((t) => t.name.toLowerCase().includes(q)) : inView;
+    if (!all) return null;
+    return q ? searchAll(all, q) : view === "popular" ? popular(all) : inGroup(all, view);
+  }, [all, view, query, special]);
+  const tools = (computed ?? remote).map((t) => (justConnected[t.key] ? { ...t, connected: true, provider: justConnected[t.key]! } : t));
+  const shown = tools.slice(0, limit);
 
   const current = categories.find((c) => c.key === view);
-  const markConnected = (key: string, provider: string) => setTools((all) => all.map((t) => (t.key === key ? { ...t, connected: true, provider } : t)));
+  const markConnected = (key: string, provider: string) => setJustConnected((m) => ({ ...m, [key]: provider }));
 
   return (
     <div className="grid gap-4 md:grid-cols-[13rem_minmax(0,1fr)]" data-testid="tool-browser">
@@ -65,7 +88,10 @@ export function ToolBrowser({
           <div key={c.key} className="contents">
             <button
               type="button"
-              onClick={() => setView(c.key)}
+              onClick={() => {
+                setView(c.key);
+                setLimit(PAGE);
+              }}
               aria-current={view === c.key ? "page" : undefined}
               className={`flex shrink-0 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-sm whitespace-nowrap transition-colors md:w-full ${
                 view === c.key ? "bg-brand-soft font-medium text-brand-strong" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -83,26 +109,100 @@ export function ToolBrowser({
       <section className="min-w-0 space-y-3" aria-live="polite">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-sm font-semibold">{query ? `Results for “${query}”` : (current?.label ?? "Tools")}</h2>
-          {loading ? <Spinner className="size-4 text-muted-foreground" /> : null}
+          {loading && !computed ? <Spinner className="size-4 text-muted-foreground" /> : null}
           <div className="relative ml-auto w-full sm:w-64">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search all tools" aria-label="Search all tools" className="h-9 pl-8" />
+            <Input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setLimit(PAGE);
+              }}
+              placeholder="Search all tools"
+              aria-label="Search all tools"
+              className="h-9 pl-8"
+            />
           </div>
         </div>
         {view === "detected" && !query ? <p className="text-xs text-muted-foreground">Named on your website, shown as its tools, or found in your email setup.</p> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {!tools.length && !loading ? (
+        {!tools.length && !(loading && !computed) ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{query ? `No tool matches “${query}”.` : "Nothing here yet."}</p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {tools.map((t) => (
-              <ToolCard key={t.key} tool={t} canManage={canManage} returnTo={returnTo} onConnected={markConnected} />
-            ))}
-          </ul>
+          <>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {shown.map((t, i) => (
+                <ToolCard key={t.key} tool={t} eager={i < 12} canManage={canManage} returnTo={returnTo} onConnected={markConnected} />
+              ))}
+            </ul>
+            {tools.length > shown.length ? (
+              <div className="flex justify-center pt-1">
+                <Button variant="outline" size="sm" onClick={() => setLimit((l) => l + PAGE * 2)}>
+                  Show more ({tools.length - shown.length})
+                </Button>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
     </div>
   );
+}
+
+const PAGE = 60;
+
+// The whole directory, fetched once in the background (the browser keeps it for an hour),
+// with this workspace's connections and detected tools laid over it.
+function useDirectory(connected: Record<string, string | null>, detected: string[]) {
+  const [raw, setRaw] = useState<BrowseEntry[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/tools/directory")
+      .then((r) => (r.ok ? (r.json() as Promise<{ tools: BrowseEntry[] }>) : null))
+      .then((d) => {
+        if (live && d?.tools.length) setRaw(d.tools);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return useMemo(() => {
+    if (!raw) return null;
+    const found = new Set(detected);
+    return raw.map((t) => ({ ...t, connected: t.key in connected, provider: connected[t.key] ?? null, detected: found.has(t.key) }));
+  }, [raw, connected, detected]);
+}
+
+const byRank = (a: BrowseEntry, b: BrowseEntry) => a.rank - b.rank || a.order - b.order || a.name.localeCompare(b.name);
+
+function popular(all: BrowseEntry[]) {
+  const known = all.filter((t) => t.rank < 999);
+  return (known.length ? known : all).sort(byRank).slice(0, 36);
+}
+
+function inGroup(all: BrowseEntry[], group: string) {
+  return all.filter((t) => t.groups.includes(group)).sort(byRank);
+}
+
+// Name matches first, then category and description matches, best known first.
+function searchAll(all: BrowseEntry[], q: string) {
+  const compact = q.replace(/\s+/g, "");
+  const score = (t: BrowseEntry) => {
+    const name = t.name.toLowerCase();
+    if (name === q || t.slug === q) return 0;
+    if (name.startsWith(q)) return 1;
+    if (name.includes(q) || t.slug.includes(compact)) return 2;
+    if (t.category.toLowerCase().includes(q)) return 3;
+    if (t.description.toLowerCase().includes(q)) return 4;
+    return 9;
+  };
+  return all
+    .map((t) => ({ t, s: score(t) }))
+    .filter((x) => x.s < 9)
+    .sort((a, b) => a.s - b.s || byRank(a.t, b.t))
+    .slice(0, 60)
+    .map((x) => x.t);
 }
 
 // The line under the special views (Most popular, Found on your website, Connected).
@@ -111,7 +211,19 @@ function isSpecialEnd(categories: BrowseCategory[], i: number) {
   return special(categories[i]!.key) && categories[i + 1] !== undefined && !special(categories[i + 1]!.key);
 }
 
-function ToolCard({ tool: t, canManage, returnTo, onConnected }: { tool: BrowseTool; canManage: boolean; returnTo: string; onConnected: (key: string, provider: string) => void }) {
+function ToolCard({
+  tool: t,
+  eager,
+  canManage,
+  returnTo,
+  onConnected,
+}: {
+  tool: BrowseTool;
+  eager: boolean;
+  canManage: boolean;
+  returnTo: string;
+  onConnected: (key: string, provider: string) => void;
+}) {
   const [choosing, setChoosing] = useState(false);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -132,7 +244,7 @@ function ToolCard({ tool: t, canManage, returnTo, onConnected }: { tool: BrowseT
   return (
     <li className="flex min-w-0 flex-col gap-2 rounded-lg border bg-card p-3" data-testid={`integration-${t.key}`}>
       <div className="flex items-start gap-3">
-        <SystemLogo src={t.logo} name={t.name} className="size-8" eager />
+        <SystemLogo src={t.logo} name={t.name} className="size-8" eager={eager} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-sm font-medium">{t.name}</span>

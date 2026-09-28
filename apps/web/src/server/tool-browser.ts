@@ -197,3 +197,28 @@ export async function browseTools(session: Session, view: string, query = ""): P
     .filter((r) => !q || `${r.name} ${r.category} ${r.description}`.toLowerCase().includes(q))
     .map((r) => fromCatalog(r, ctx));
 }
+
+// Every tool with what the browser needs to show any view by itself: its groups and how
+// well known it is. Loaded once per visit so switching category or searching is instant.
+export type BrowseEntry = BrowseTool & { groups: string[]; rank: number; order: number };
+
+const RANK = new Map<string, number>([...POPULAR_TOOLKITS, ...POPULAR_BACKFILL].map((slug, i) => [slug, i]));
+const CONNECT_ORDER = { signin: 0, key: 1, setup: 2 } as const;
+
+export async function browseAll(session: Session): Promise<BrowseEntry[]> {
+  const ctx = await context(session);
+  if (ctx.live) {
+    try {
+      return (await listDirectory()).map((t) => ({
+        ...fromDirectory(t, ctx),
+        description: t.description.slice(0, 120),
+        groups: t.groups,
+        rank: RANK.get(t.slug) ?? 999,
+        order: CONNECT_ORDER[t.connect],
+      }));
+    } catch (e) {
+      console.error("tool directory", e);
+    }
+  }
+  return ctx.catalog.filter((r) => r.source !== "directory").map((r, i) => ({ ...fromCatalog(r, ctx), groups: [groupOfCatalog(r)], rank: i, order: 0 }));
+}
