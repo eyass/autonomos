@@ -252,12 +252,24 @@ export async function authPlan(slug: string): Promise<AuthPlan> {
 // Read-only actions of a toolkit, for reading an arbitrary connected system.
 export type ToolMeta = { slug: string; version: string | null; properties: Record<string, { type?: string }>; required: string[]; tags: string[] };
 
+// The toolkit's current version: without it Composio answers with a legacy catalogue
+// ("00000000_00") whose actions the current version may no longer have.
 export async function readOnlyTools(toolkit: string): Promise<ToolMeta[]> {
-  const d = await get<{ items: Array<{ slug: string; version?: string; tags?: string[]; input_parameters?: { properties?: Record<string, { type?: string }>; required?: string[] } }> }>("/tools", {
-    toolkit_slug: toolkit,
-    limit: "200",
-  });
-  return d.items
+  type Raw = { slug: string; version?: string; tags?: string[]; input_parameters?: { properties?: Record<string, { type?: string }>; required?: string[] } };
+  const items: Raw[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < 5; page++) {
+    const d = await get<{ items: Raw[]; next_cursor?: string | null }>("/tools", {
+      toolkit_slug: toolkit,
+      toolkit_versions: "latest",
+      limit: "500",
+      ...(cursor ? { cursor } : {}),
+    });
+    items.push(...d.items);
+    if (!d.next_cursor) break;
+    cursor = d.next_cursor;
+  }
+  return items
     .map((t) => ({ slug: t.slug, version: t.version ?? null, properties: t.input_parameters?.properties ?? {}, required: t.input_parameters?.required ?? [], tags: t.tags ?? [] }))
     .filter((t) => t.tags.includes("readOnlyHint"));
 }
