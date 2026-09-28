@@ -1,7 +1,7 @@
 import { isPaused } from "./services";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { emptyRunState, type ActionRecord, type ApprovalRecord, type RunContext, type RunState, type RunStore, type StepRecord } from "@autonomos/agents";
-import type { ConnectionInfo, KnowledgeSearch, SandboxRecord, SandboxStore } from "@autonomos/integrations";
+import { registerSnapshots, type ConnectionInfo, type KnowledgeSearch, type SandboxRecord, type SandboxStore, type ToolSnapshot } from "@autonomos/integrations";
 import type { ModelUsageRecord } from "@autonomos/ai";
 import { PolicyConfigSchema, InstructionsSchema, TriggerConfigSchema, type AutonomyLevel } from "@autonomos/schemas";
 import type { Database, Json } from "./database.types";
@@ -35,10 +35,12 @@ export class SupabaseRunStore implements RunStore {
     const [agent, version, tools, process, organization] = await Promise.all([
       this.db.from("agents").select("id, name, status").eq("organization_id", org).eq("id", run.agent_id).single(),
       this.db.from("agent_versions").select("*").eq("organization_id", org).eq("id", run.agent_version_id).single(),
-      this.db.from("agent_tools").select("tool_key").eq("organization_id", org).eq("agent_version_id", run.agent_version_id),
+      this.db.from("agent_tools").select("tool_key, definition").eq("organization_id", org).eq("agent_version_id", run.agent_version_id),
       this.db.from("processes").select("id, title, description, department_id, estimated_minutes_per_occurrence").eq("organization_id", org).eq("id", run.process_id).single(),
       this.db.from("organizations").select("id, name, description, industry, agents_paused, agents_paused_until").eq("id", org).single(),
     ]);
+    // Composio tools run with the definition stored on this version.
+    registerSnapshots(must(tools, "load tools").map((t) => t.definition as unknown as ToolSnapshot | null));
     const a = must(agent, "load agent");
     const v = must(version, "load version");
     const p = must(process, "load process");

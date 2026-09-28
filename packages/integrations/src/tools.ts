@@ -1,27 +1,9 @@
 import { z } from "zod";
 
-export type RiskTag =
-  | "financial"
-  | "outbound_message"
-  | "deletion"
-  | "bulk_outbound"
-  | "customer_account"
-  | "billing_change"
-  | "sensitive_export"
-  | "contract"
-  | "employee";
+export type RiskTag = "financial" | "outbound_message" | "deletion" | "bulk_outbound" | "customer_account" | "billing_change" | "sensitive_export" | "contract" | "employee";
 
 // PRD section 72: these always require approval by default.
-export const HIGH_RISK_TAGS: RiskTag[] = [
-  "financial",
-  "deletion",
-  "contract",
-  "employee",
-  "bulk_outbound",
-  "customer_account",
-  "billing_change",
-  "sensitive_export",
-];
+export const HIGH_RISK_TAGS: RiskTag[] = ["financial", "deletion", "contract", "employee", "bulk_outbound", "customer_account", "billing_change", "sensitive_export"];
 
 export type ToolDefinition<I extends z.ZodType = z.ZodType> = {
   key: string;
@@ -39,14 +21,16 @@ export type ToolDefinition<I extends z.ZodType = z.ZodType> = {
   approvalTitle?: (args: z.infer<I>) => string;
   // Field that carries a monetary amount, for threshold policies.
   amountField?: string;
+  // Tools loaded from Composio carry the toolkit's own JSON schema, shown to the model as is.
+  source?: "builtin" | "composio";
+  jsonSchema?: Record<string, unknown>;
 };
 
 function tool<I extends z.ZodType>(def: ToolDefinition<I>): ToolDefinition<I> {
   return def;
 }
 
-const money = (amount: number, currency: string) =>
-  new Intl.NumberFormat("en-IE", { style: "currency", currency: currency.toUpperCase() }).format(amount);
+const money = (amount: number, currency: string) => new Intl.NumberFormat("en-IE", { style: "currency", currency: currency.toUpperCase() }).format(amount);
 
 export const TOOLS = [
   tool({
@@ -193,14 +177,52 @@ export type ToolKey = (typeof TOOLS)[number]["key"];
 
 const BY_KEY = new Map<string, ToolDefinition>(TOOLS.map((t) => [t.key, t as unknown as ToolDefinition]));
 
-export function getTool(key: string): ToolDefinition | undefined {
-  return BY_KEY.get(key);
+// Tools loaded from Composio at runtime (see composio-tools.ts), keyed "composio:<SLUG>". They are
+// registered from each agent version's stored snapshot before use, so a version always runs with
+// the tool definition it was built with.
+const DYNAMIC = new Map<string, ToolDefinition>();
+
+export const isComposioTool = (key: string) => key.startsWith("composio:");
+
+export function registerTool(def: ToolDefinition) {
+  if (!BY_KEY.has(def.key)) DYNAMIC.set(def.key, def);
 }
 
+export function getTool(key: string): ToolDefinition | undefined {
+  return BY_KEY.get(key) ?? DYNAMIC.get(key) ?? (isComposioTool(key) ? unknownComposioTool(key) : undefined);
+}
+
+// A Composio tool whose snapshot is not loaded in this process: treated as a write with no known
+// risk, the most conservative reading, until the real definition is registered.
+function unknownComposioTool(key: string): ToolDefinition {
+  const slug = key.slice("composio:".length);
+  const words = slug.split("_");
+  return {
+    key,
+    integration: (words[0] ?? "").toLowerCase(),
+    label:
+      words
+        .slice(1)
+        .join(" ")
+        .toLowerCase()
+        .replace(/^./, (c) => c.toUpperCase()) || slug,
+    description: slug,
+    access: "write",
+    riskTags: [],
+    reversible: false,
+    input: z.record(z.string(), z.unknown()),
+    modifiableFields: [],
+    source: "composio",
+  };
+}
+
+// The built-in tools for these integrations (Composio tools come from composioToolsFor).
 export function toolsForIntegrations(connected: string[]): ToolDefinition[] {
   const set = new Set([...connected, "knowledge"]);
   return TOOLS.filter((t) => set.has(t.integration)) as unknown as ToolDefinition[];
 }
+
+export const BUILTIN_INTEGRATIONS = new Set(TOOLS.map((t) => t.integration));
 
 export function isHighRisk(def: ToolDefinition): boolean {
   return def.riskTags.some((t) => HIGH_RISK_TAGS.includes(t));

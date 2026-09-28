@@ -329,7 +329,9 @@ export function applyApprovalChanges(toolKey: string, args: Record<string, unkno
 async function decide(ctx: RunContext, state: RunState, store: RunStore): Promise<AgentDecision> {
   const tools = ctx.version.tools.map((key) => {
     const def = getTool(key);
-    return def ? { key, description: def.description, access: def.access, input_schema: z.toJSONSchema(def.input, { io: "input" }) } : { key, description: "Unavailable", access: "read" };
+    return def
+      ? { key, description: def.description, access: def.access, input_schema: def.jsonSchema ?? z.toJSONSchema(def.input, { io: "input" }) }
+      : { key, description: "Unavailable", access: "read" };
   });
   const { object, usage } = await generateStructured({
     purpose: "agent_decision",

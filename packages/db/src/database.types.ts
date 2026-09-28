@@ -470,16 +470,19 @@ export type Database = {
       agent_tools: {
         Row: {
           agent_version_id: string;
+          definition: Json | null;
           organization_id: string;
           tool_key: string;
         };
         Insert: {
           agent_version_id: string;
+          definition?: Json | null;
           organization_id: string;
           tool_key: string;
         };
         Update: {
           agent_version_id?: string;
+          definition?: Json | null;
           organization_id?: string;
           tool_key?: string;
         };

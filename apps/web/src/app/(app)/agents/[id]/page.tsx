@@ -1,4 +1,5 @@
 import { LevelMeter } from "@/components/brand/logo";
+import { registerWorkspaceTools } from "@/server/tool-catalog";
 import { autonomyRecommendation } from "@autonomos/agents";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { computeOrgMetrics } from "@autonomos/db";
@@ -44,6 +45,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
   const { id } = await params;
   const { created } = await searchParams;
   const session = await requireSession();
+  await registerWorkspaceTools(session.org.id);
   await reconcileStuckRuns(session.org.id);
   let loaded;
   try {

@@ -24,7 +24,7 @@ export default async function NewAgentPage({ searchParams }: { searchParams: Pro
           <AlertDescription>No integrations are connected, so the agent has nothing it can act on yet.</AlertDescription>
         </Alert>
       ) : null}
-      <NewAgentWizard initial={initial} tools={toolOptions(connected)} processId={o.process_id} opportunityId={o.id} />
+      <NewAgentWizard initial={initial} tools={await toolOptions(session, connected)} processId={o.process_id} opportunityId={o.id} />
     </>
   );
 }

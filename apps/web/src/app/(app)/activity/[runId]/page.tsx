@@ -1,4 +1,5 @@
 import { getTool } from "@autonomos/integrations";
+import { registerWorkspaceTools } from "@/server/tool-catalog";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
   const { runId } = await params;
   const { built } = await searchParams;
   const session = await requireSession();
+  await registerWorkspaceTools(session.org.id);
   await reconcileStuckRuns(session.org.id);
   const supabase = await createClient();
   const { data: run } = await supabase

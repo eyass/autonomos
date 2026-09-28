@@ -1,9 +1,9 @@
 import "server-only";
+import { availableTools } from "./tool-catalog";
 import { policyForTools } from "@autonomos/agents";
 import type { AgentConfig } from "@autonomos/schemas";
 import { generateAgentDraft, generateOpportunities, type ProcessForAnalysis } from "@autonomos/ai";
 import { blendScore, opportunityScore } from "@autonomos/agents";
-import { toolsForIntegrations } from "@autonomos/integrations";
 import { tidyTitle, type AutonomyLevel } from "@autonomos/schemas";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
@@ -153,7 +153,8 @@ export async function draftAgentForOpportunity(session: Session, opportunityId: 
   if (!o) throw new HttpError(404, "Opportunity not found");
   const { analysis } = await loadProcessForAnalysis(session, o.process_id);
   const connected = await connectedIntegrationKeys(session);
-  const tools = toolsForIntegrations(connected);
+  // Built-in tools and every connected toolkit's Composio actions.
+  const tools = await availableTools(session, connected);
   const draft = await generateAgentDraft({
     company: await companyContext(session),
     process: analysis,
