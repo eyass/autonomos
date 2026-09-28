@@ -52,6 +52,27 @@ describe("Composio directory", () => {
     expect(planFor({ slug: "d", name: "D", auth_config_details: [detail("API_KEY"), detail("DCR_OAUTH")] })).toEqual({ managed: false, scheme: "DCR_OAUTH" });
     expect(planFor({ slug: "x", name: "X", auth_config_details: [detail("API_KEY", [{ name: "base_url" }]), detail("OAUTH2", [{ name: "client_id" }])] })).toBeNull();
   });
+  it("reads a toolkit's actions from its current version, across pages", async () => {
+    process.env.COMPOSIO_API_KEY = "test";
+    const urls: string[] = [];
+    const pages = [
+      { items: [{ slug: "FRESHDESK_GET_TICKETS", version: "20260828_00", tags: ["readOnlyHint"] }], next_cursor: "c2" },
+      { items: [{ slug: "FRESHDESK_CREATE_TICKET", version: "20260828_00", tags: [] }], next_cursor: null },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: URL) => {
+        urls.push(String(url));
+        return new Response(JSON.stringify(pages[urls.length - 1]));
+      }),
+    );
+    const { readOnlyTools } = await import("./directory");
+    const tools = await readOnlyTools("freshdesk");
+    expect(tools.map((t) => [t.slug, t.version])).toEqual([["FRESHDESK_GET_TICKETS", "20260828_00"]]);
+    expect(urls).toHaveLength(2);
+    expect(urls.every((u) => new URL(u).searchParams.get("toolkit_versions") === "latest")).toBe(true);
+    expect(new URL(urls[1]!).searchParams.get("cursor")).toBe("c2");
+  });
   it("lists twenty popular systems", () => {
     expect(POPULAR_TOOLKITS).toHaveLength(20);
     expect(POPULAR_TOOLKITS).toEqual(expect.arrayContaining(["gmail", "googlecalendar", "outlook", "facebook", "stripe"]));
@@ -109,5 +130,27 @@ describe("scan limits and the general reader", () => {
     });
     expect(genericItem({ subject: "Call anna@example.com", status: "open" })!.title).toBe("Call [someone@example.com]");
     expect(genericItem({ id: 1 })).toBeNull();
+  });
+});
+
+describe("generic readers", () => {
+  const tool = (slug: string, properties: Record<string, { type?: string }> = {}) => ({ slug, version: "1", properties, required: [], tags: ["readOnlyHint"] });
+  it("skips configuration and deleted records, and falls back to a get of a plural", async () => {
+    const { genericCandidates } = await import("./scan");
+    const picked = genericCandidates([
+      tool("FRESHDESK_LIST_EMAIL_CONFIGS"),
+      tool("FRESHDESK_LIST_TICKET_FORMS"),
+      tool("ZENDESK_GET_DELETED_TICKETS"),
+      tool("FRESHDESK_GET_TICKETS", { per_page: { type: "integer" }, created_since: { type: "string" } }),
+    ]).map((r) => [r.slug, r.limitParam, r.since?.param]);
+    expect(picked).toEqual([["FRESHDESK_GET_TICKETS", "per_page", "created_since"]]);
+  });
+  it("ranks a get of a plural after list actions", async () => {
+    const { genericCandidates } = await import("./scan");
+    expect(genericCandidates([tool("ACME_GET_TICKETS"), tool("ACME_LIST_TICKETS"), tool("ACME_SEARCH_ORDERS")]).map((r) => r.slug)).toEqual([
+      "ACME_LIST_TICKETS",
+      "ACME_SEARCH_ORDERS",
+      "ACME_GET_TICKETS",
+    ]);
   });
 });

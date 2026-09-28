@@ -276,6 +276,8 @@ async function scanSandbox(integration: string, s: SandboxStore, limit: ScanLimi
   return paymentsScan("sandbox", payments, refunds, limit, now);
 }
 
+const LEGACY_VERSION = "00000000_00";
+
 // Toolkits whose versions are pinned in the Composio client; others are read with the
 // version the tool catalogue reports (reads only, so a newer version is safe).
 const PINNED = new Set(["zendesk", "stripe", "slack", "gmail"]);
@@ -287,7 +289,7 @@ export async function exec(ctx: Pick<ScanContext, "organizationId" | "connection
     userId: ctx.organizationId,
     connectedAccountId: ctx.connection.externalAccountId,
     arguments: args,
-    ...(PINNED.has(toolkit) ? {} : version && version !== "00000000_00" ? { version } : { dangerouslySkipVersionCheck: true }),
+    ...(PINNED.has(toolkit) ? {} : version && version !== LEGACY_VERSION ? { version } : { dangerouslySkipVersionCheck: true }),
   })) as {
     successful?: boolean;
     error?: string | null;
@@ -500,6 +502,8 @@ export const SINCE_PARAMS = [
   "updated_after",
   "updatedAfter",
   "modified_since",
+  "created_since",
+  "updated_since",
   "modified_after",
   "timeMin",
   "time_min",
@@ -596,6 +600,9 @@ function curatedReads(toolkit: string, sinceIso: string, max: number): Read[] | 
       ];
     case "jira":
       return [{ slug: "JIRA_SEARCH_FOR_ISSUES_USING_JQL_GET", args: { jql: `created >= -${days}d ORDER BY created DESC`, max_results: max, fields: "summary,status,issuetype,created" } }];
+    case "freshdesk":
+      // Freshdesk takes the timestamp without milliseconds.
+      return [{ slug: "FRESHDESK_GET_TICKETS", args: { per_page: Math.min(max, 100), created_since: sinceIso.replace(/\.\d{3}Z$/, "Z"), sort_by: "created_at", sort_order: "desc" } }];
     case "intercom":
       return [{ slug: "INTERCOM_LIST_CONVERSATIONS", args: { per_page: Math.min(max, 150) } }];
     case "googlesheets":
@@ -609,7 +616,7 @@ function curatedReads(toolkit: string, sinceIso: string, max: number): Read[] | 
 export const WORK =
   /(TICKET|DEAL|CONVERSATION|ISSUE|TASK|MESSAGE|EMAIL|ORDER|INVOICE|EVENT|LEAD|OPPORTUNIT|CASE|POST|COMMENT|RECORD|FILE|CAMPAIGN|PAYMENT|TRANSACTION|BOOKING|APPOINTMENT|REQUEST|SUBMISSION|RESPONSE|NOTE|ACTIVIT)/;
 export const CONFIG =
-  /(ATTACHMENT|DOWNLOAD|FILE_CONTENT|SCHEMA|FIELD|PROPERT|SCOPE|TOKEN|WEBHOOK|SETTING|TEMPLATE|IMPORT|EXPORT|TYPE|USER|ADMIN|MEMBER|ROLE|PERMISSION|LABEL|TAG|FOLDER|WORKSPACE|TEAM|BOARD|BASE|LIST_LISTS|CATEGOR|CURRENC|LOCALE|TIMEZONE|APP)/;
+  /(ATTACHMENT|DOWNLOAD|FILE_CONTENT|SCHEMA|FIELD|PROPERT|SCOPE|TOKEN|WEBHOOK|SETTING|CONFIG|MAILBOX|DELETED|ARCHIVED|SPAM|(^|_)FORMS?(_|$)|TEMPLATE|IMPORT|EXPORT|TYPE|USER|ADMIN|MEMBER|ROLE|PERMISSION|LABEL|TAG|FOLDER|WORKSPACE|TEAM|BOARD|BASE|LIST_LISTS|CATEGOR|CURRENC|LOCALE|TIMEZONE|APP)/;
 
 async function scanGeneric(integration: string, toolkit: string, ctx: ScanContext, limit: ScanLimit, now: Date): Promise<SystemScan> {
   const sinceIso = new Date(now.getTime() - limit.days * 86_400_000).toISOString();
@@ -617,7 +624,8 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
   if (!reads && toolkit === "microsoft_teams") return scanTeams(integration, ctx, limit, now);
   const perRead = (n: number) => Math.ceil(limit.max / Math.min(2, Math.max(1, n)));
   // Read actions the inventory found working; otherwise pick candidates from the catalogue.
-  let readers: InventoryReader[] = ctx.inventory?.readers ?? [];
+  // Readers saved from a legacy catalogue ("00000000_00") may not exist in the current version.
+  let readers: InventoryReader[] = (ctx.inventory?.readers ?? []).filter((r) => r.version !== LEGACY_VERSION);
   if (!reads && !readers.length) readers = genericCandidates(await readOnlyTools(toolkit).catch(() => []));
   if (!reads) reads = readers.map((r) => ({ slug: r.slug, args: readerArgs(r, sinceIso, perRead(readers.length)), version: r.version ?? null }));
   if (!reads.length) {
@@ -670,7 +678,7 @@ async function scanGeneric(integration: string, toolkit: string, ctx: ScanContex
 // actions that list across the account.
 export function genericCandidates(tools: ToolMeta[], n = 4): InventoryReader[] {
   return tools
-    .filter((t) => t.required.length === 0 && /(LIST|FETCH|SEARCH|GET_ALL|RECENT)/.test(t.slug) && WORK.test(t.slug) && !CONFIG.test(t.slug.replace(/^[A-Z]+_/, "")))
+    .filter((t) => t.required.length === 0 && (/(LIST|FETCH|SEARCH|GET_ALL|RECENT)/.test(t.slug) || PLURAL_GET.test(t.slug)) && WORK.test(t.slug) && !CONFIG.test(t.slug.replace(/^[A-Z]+_/, "")))
     .sort((a, b) => rank(a.slug) + idFilters(a.properties) - (rank(b.slug) + idFilters(b.properties)))
     .slice(0, n)
     .map(readerFor);
@@ -891,9 +899,14 @@ async function scanTeams(integration: string, ctx: ScanContext, limit: ScanLimit
 
 export const idFilters = (props: Record<string, unknown>) => (Object.keys(props).some((k) => /^[a-z]+_id$/.test(k)) ? 3 : 0);
 
+// "GET_TICKETS": a get of a plural is a list (Freshdesk names its lists this way).
+const PLURAL_GET = /_GET_[A-Z_]*[A-RT-Z]S$/;
+
 export function rank(slug: string) {
   if (/LIST/.test(slug)) return 0;
   if (/FETCH|RECENT|GET_ALL/.test(slug)) return 1;
+  // Last, so a plural get only fills in where a toolkit has no list action.
+  if (PLURAL_GET.test(slug) && !/SEARCH/.test(slug)) return 4;
   return 2;
 }
 
