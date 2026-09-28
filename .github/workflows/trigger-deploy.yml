@@ -62,4 +62,5 @@ jobs:
           done
       - name: Deploy
         if: env.TRIGGER_ACCESS_TOKEN != ''
-        run: pnpm --filter @autonomos/workflows exec trigger deploy --env-file ../../.env.local --skip-update-check
+        # An absolute path: the CLI resolves the env file from its own working directory, not the repo root.
+        run: pnpm --filter @autonomos/workflows exec trigger deploy --env-file "$GITHUB_WORKSPACE/.env.local" --skip-update-check
