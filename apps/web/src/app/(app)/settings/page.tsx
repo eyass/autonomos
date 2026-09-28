@@ -395,7 +395,7 @@ export default async function SettingsPage() {
                         {p.name}
                         {key === (org?.plan ?? "design_partner") ? <Badge variant="success">Current</Badge> : null}
                       </div>
-                      <div className="mt-1 text-muted-foreground">{p.price ? `${p.price} ${session.org.currency} / month` : "By agreement"}</div>
+                      <div className="mt-1 text-muted-foreground">{p.price ? `${p.price} ${session.org.currency} / month` : "Free"}</div>
                       <div className="mt-1 text-muted-foreground">
                         {p.activeAgents} live agents · {num(p.runsPerMonth)} runs · then {p.overagePerRun} per run
                       </div>

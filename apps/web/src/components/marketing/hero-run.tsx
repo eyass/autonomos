@@ -1,16 +1,17 @@
 import { Check, CircleDot, Hand } from "lucide-react";
 import { LevelMeter } from "@/components/brand/logo";
+import { ToolLogo, type ToolSlug } from "./tools";
 
 // The hero's product picture: one agent run as the app shows it, stopped at the approval a
 // policy asked for. Illustrative, the same furniture-marketplace scenario as the sandbox.
-const STEPS = [
-  { done: true, text: "Read the ticket: a sofa arrived damaged, the customer asks for a refund" },
-  { done: true, text: "Found the order and its payment in Stripe: €72.00" },
-  { done: true, text: "Checked it against your refund policy: eligible" },
-  { done: false, text: "Above €50, so a person approves the refund before it is sent" },
+const STEPS: Array<{ done: boolean; text: string; tool?: ToolSlug }> = [
+  { done: true, text: "Read ticket: sofa arrived damaged", tool: "zendesk" },
+  { done: true, text: "Found the payment: €72.00", tool: "stripe" },
+  { done: true, text: "Refund policy: eligible" },
+  { done: false, text: "Above €50: a person approves", tool: "stripe" },
 ];
 
-const CHECKS = ["Tool allowed: stripe.create_refund", "Under the €500 hard limit", "No instructions aimed at the agent"];
+const CHECKS = ["Tool allowed", "Under the €500 cap", "No prompt injection"];
 
 export function HeroRun() {
   return (
@@ -29,9 +30,10 @@ export function HeroRun() {
       </div>
       <ol className="space-y-2.5 px-4 py-4 text-[13px] leading-snug">
         {STEPS.map((s) => (
-          <li key={s.text} className="flex gap-2.5">
-            {s.done ? <Check size={15} className="mt-px shrink-0 text-success" aria-hidden /> : <Hand size={15} className="mt-px shrink-0 text-highlight-strong" aria-hidden />}
-            <span className={s.done ? "text-muted-foreground" : "font-medium"}>{s.text}</span>
+          <li key={s.text} className="flex items-center gap-2.5">
+            {s.done ? <Check size={15} className="shrink-0 text-success" aria-hidden /> : <Hand size={15} className="shrink-0 text-highlight-strong" aria-hidden />}
+            <span className={`flex-1 ${s.done ? "text-muted-foreground" : "font-medium"}`}>{s.text}</span>
+            {s.tool ? <ToolLogo tool={s.tool} size={18} className="border border-border" /> : null}
           </li>
         ))}
       </ol>

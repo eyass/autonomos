@@ -4,6 +4,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 const PAGES: Array<{ path: string; heading: RegExp }> = [
   { path: "/security", heading: /Security at AutonomOS/ },
+  { path: "/solutions", heading: /Agents for every team/ },
+  { path: "/solutions/finance", heading: /Finance on autopilot/ },
+  { path: "/solutions/people", heading: /People on autopilot/ },
   { path: "/docs", heading: /Getting started/ },
   { path: "/docs/autonomy-levels", heading: /Autonomy levels/ },
   { path: "/docs/running-agents", heading: /Running agents/ },

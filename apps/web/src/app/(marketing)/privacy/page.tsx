@@ -5,7 +5,7 @@ import { CONTACT_EMAIL, DraftNotice, PageIntro, Prose, RetentionList, Subprocess
 const description = "What data AutonomOS processes, why, who helps us process it, and your choices.";
 
 export const metadata: Metadata = {
-  // Draft until counsel signs off: readable by design partners, kept out of search results.
+  // Draft until counsel signs off: readable by customers, kept out of search results.
   robots: { index: false, follow: true },
   title: "Privacy policy",
   description,

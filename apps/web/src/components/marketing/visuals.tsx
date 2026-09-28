@@ -2,6 +2,7 @@ import { AUTONOMY_COEFFICIENTS, AUTONOMY_LEVELS, type AutonomyLevel } from "@aut
 import { ArrowRight, Ban, Check, FlaskConical, Hand, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LevelMeter } from "@/components/brand/logo";
+import { TOOLS, ToolLogo, type ToolSlug } from "./tools";
 
 // Product pictures for the landing page. All illustrative, built from the same furniture
 // marketplace scenario as the sandbox, and drawn with the app's own tokens so they read as the
@@ -18,9 +19,9 @@ function Frame({ label, className, children }: { label: string; className?: stri
 
 // Step 1: the process inventory drafted from connected systems.
 const PROCESSES = [
-  { title: "Refund requests", source: "Zendesk", hours: 43 },
-  { title: "Invoice questions", source: "Gmail", hours: 18 },
-  { title: "Failed payment follow-up", source: "Stripe", hours: 11 },
+  { title: "Refund requests", tool: "zendesk" as ToolSlug, hours: 43 },
+  { title: "Invoice questions", tool: "google" as ToolSlug, hours: 18 },
+  { title: "Failed payment follow-up", tool: "stripe" as ToolSlug, hours: 11 },
 ];
 
 export function InventoryVisual() {
@@ -39,7 +40,7 @@ export function InventoryVisual() {
               <span className="h-1.5 flex-1 rounded-full bg-muted">
                 <span className="block h-full rounded-full bg-brand" style={{ width: `${(p.hours / max) * 100}%` }} />
               </span>
-              <span className="shrink-0 rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground">{p.source}</span>
+              <ToolLogo tool={p.tool} size={16} className="rounded-sm" />
             </div>
           </li>
         ))}
@@ -81,7 +82,7 @@ export function OpportunityVisual() {
         ))}
       </dl>
       <p className="mt-2.5 rounded-md border border-dashed border-border px-2 py-1.5 text-[11px] leading-snug text-muted-foreground">
-        <span className="font-medium text-foreground">Why it is worth it:</span> an agent could take over about 17 h a month; it touches money.
+        <span className="font-medium text-foreground">Why:</span> ~17 h a month, and it touches money.
       </p>
     </Frame>
   );
@@ -102,13 +103,13 @@ export function AgentVisual() {
       </div>
       <ol className="mt-2.5 space-y-1.5 text-[11px]">
         <li className="flex items-center gap-2 rounded-md bg-success-soft px-2 py-1.5 text-success">
-          <FlaskConical size={12} /> Test passed, every write simulated
+          <FlaskConical size={12} /> Test passed, writes simulated
         </li>
         <li className="flex items-center gap-2 rounded-md bg-brand-soft px-2 py-1.5 text-brand-strong">
           <Play size={12} /> Live on new tickets
         </li>
         <li className="flex items-center gap-2 rounded-md bg-highlight-soft px-2 py-1.5 text-highlight-strong">
-          <Hand size={12} /> 3 refunds waiting for your approval
+          <Hand size={12} /> 3 refunds to approve
         </li>
       </ol>
     </Frame>
@@ -118,16 +119,16 @@ export function AgentVisual() {
 // The policy engine: every action an agent proposes passes the same checks, in code, and ends
 // in one of three outcomes. The highlighted path is the hero's €72 refund.
 const CHECKS = [
-  { label: "Is the tool on the agent's allowlist?", result: "Yes" },
-  { label: "Is the emergency stop on?", result: "No" },
+  { label: "Tool on the allowlist?", result: "Yes" },
+  { label: "Emergency stop on?", result: "No" },
   { label: "Over the €500 hard limit?", result: "No" },
-  { label: "Over the €50 approval threshold?", result: "Yes", hot: true },
+  { label: "Over the €50 approval limit?", result: "Yes", hot: true },
 ];
 
 const OUTCOMES = [
-  { icon: Play, title: "Runs", body: "Routine and within every limit", tone: "border-border bg-card text-foreground" },
-  { icon: Hand, title: "Waits for a person", body: "An approval rule applies: this refund", tone: "border-highlight bg-highlight-soft text-highlight-strong ring-2 ring-highlight/30", hot: true },
-  { icon: Ban, title: "Denied", body: "Off the allowlist, over a hard limit, or stopped", tone: "border-border bg-card text-foreground" },
+  { icon: Play, title: "Runs", body: "Within every limit", tone: "border-border bg-card text-foreground" },
+  { icon: Hand, title: "Waits for a person", body: "This refund", tone: "border-highlight bg-highlight-soft text-highlight-strong ring-2 ring-highlight/30", hot: true },
+  { icon: Ban, title: "Denied", body: "Not allowed, over a cap, or stopped", tone: "border-border bg-card text-foreground" },
 ];
 
 export function PolicyFlow() {
@@ -141,7 +142,7 @@ export function PolicyFlow() {
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="eyebrow text-muted-foreground">Agent proposes</p>
           <p className="mt-2 font-mono text-sm font-semibold">stripe.create_refund</p>
-          <p className="mt-1 text-sm text-muted-foreground">€72.00 to the customer, reason: damaged delivery</p>
+          <p className="mt-1 text-sm text-muted-foreground">€72.00, damaged delivery</p>
         </div>
         <Connector />
         <div className="rounded-xl border border-brand/30 bg-brand-soft/60 p-4">
@@ -195,8 +196,8 @@ export function HoursByLevel() {
   return (
     <figure className="rounded-xl border border-border bg-card p-5">
       <figcaption>
-        <p className="text-base font-semibold">Where the 43 hours go at each level</p>
-        <p className="mt-1 text-sm text-muted-foreground">Filled: hours the agent takes over each month. Track: hours your team keeps.</p>
+        <p className="text-base font-semibold">Hours a month the agent takes over</p>
+        <p className="mt-1 text-sm text-muted-foreground">Filled: agent. Track: your team.</p>
       </figcaption>
       <div className="sr-only">
         <table>
@@ -236,7 +237,7 @@ export function HoursByLevel() {
           </li>
         ))}
       </ol>
-      <p className="mt-4 text-xs text-muted-foreground">Illustrative: 320 requests at about 8 minutes each. Levels move one at a time, and an agent only moves up when its record earns it.</p>
+      <p className="mt-4 text-xs text-muted-foreground">Illustrative: 320 requests at about 8 minutes each.</p>
     </figure>
   );
 }
@@ -244,8 +245,8 @@ export function HoursByLevel() {
 // Setup, as the person does it: website, tools, first agent. The tool count is Composio's
 // directory (1,562 toolkits in September 2026); the popular ones all support one-click sign-in.
 export const TOOL_COUNT = "1,500+";
-const POPULAR = ["Gmail", "Slack", "HubSpot", "Stripe", "Zendesk", "Salesforce", "Outlook", "Notion", "Jira", "Intercom", "Google Drive", "Asana"];
-const CONNECTED = new Set(["Gmail", "Zendesk", "Stripe"]);
+const POPULAR: ToolSlug[] = ["google", "slack", "hubspot", "stripe", "zendesk", "salesforce", "outlook", "notion", "atlassian", "intercom", "shopify", "asana"];
+const CONNECTED = new Set<ToolSlug>(["google", "zendesk", "stripe"]);
 
 function SetupStep({ n, title, body, children }: { n: number; title: string; body: string; children: React.ReactNode }) {
   return (
@@ -263,7 +264,7 @@ function SetupStep({ n, title, body, children }: { n: number; title: string; bod
 export function SetupFlow() {
   return (
     <ol className="grid gap-4 lg:grid-cols-3">
-      <SetupStep n={1} title="Add your website" body="AutonomOS reads it and drafts your company profile: what you sell, your teams and the tools you likely use.">
+      <SetupStep n={1} title="Add your website" body="We draft your company profile from it.">
         <Frame label="Example: a website address entered, and a company profile drafted from it">
           <p className="eyebrow text-muted-foreground">Company website</p>
           <div className="mt-2 flex items-center gap-2">
@@ -280,19 +281,21 @@ export function SetupFlow() {
           </ul>
         </Frame>
       </SetupStep>
-      <SetupStep n={2} title="Connect your tools" body="Over 1,500 tools. The most used connect in one click with their own sign-in; for the rest we set up sign-in once for your workspace.">
+      <SetupStep n={2} title="Connect your tools" body="Popular tools in one click. We set up the rest for you.">
         <Frame label={`Example: popular tools such as Gmail, Slack, HubSpot and Stripe, three of them connected, and ${TOOL_COUNT} more`}>
           <ul className="grid grid-cols-3 gap-1.5">
             {POPULAR.map((t) => (
               <li
                 key={t}
-                className={cn(
-                  "flex h-8 items-center justify-center gap-1 truncate rounded-md border px-1 text-[11px] font-medium",
-                  CONNECTED.has(t) ? "border-success/40 bg-success-soft text-success" : "border-border bg-background",
-                )}
+                title={TOOLS[t]}
+                className={cn("relative flex h-10 items-center justify-center rounded-md border", CONNECTED.has(t) ? "border-success/50 bg-success-soft" : "border-border bg-background")}
               >
-                {CONNECTED.has(t) ? <Check size={11} className="shrink-0" /> : null}
-                <span className="truncate">{t}</span>
+                <ToolLogo tool={t} size={22} label={false} />
+                {CONNECTED.has(t) ? (
+                  <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-success text-white">
+                    <Check size={10} />
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -302,7 +305,7 @@ export function SetupFlow() {
           </p>
         </Frame>
       </SetupStep>
-      <SetupStep n={3} title="Build your first agent" body="Pick one of the ideas found in your work. AutonomOS builds the agent and tests it on sandbox data before it touches a live account.">
+      <SetupStep n={3} title="Build your first agent" body="Pick an idea. It is tested on sandbox data first.">
         <Frame label="Example: a refund agent being built and tested, the test passed">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold">Refund agent</p>
