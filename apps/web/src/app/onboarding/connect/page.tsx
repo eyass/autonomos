@@ -6,6 +6,7 @@ import { ToolBrowser } from "@/components/app/tool-browser";
 import { browseCategories, browseTools } from "@/server/tool-browser";
 import { ActionButton } from "@/components/action-button";
 import { Button } from "@/components/ui/button";
+import { BottomBar } from "../bottom-bar";
 import { Steps } from "../steps";
 import { finishOnboardingAction } from "../actions";
 
@@ -44,20 +45,17 @@ export default async function ConnectPage() {
           returnTo="/onboarding/connect"
         />
       </div>
-      <div className="mt-6">
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href="/onboarding/about">
-              <ArrowLeft />
-              Back to company info
-            </Link>
-          </Button>
-          <ActionButton action={finishOnboardingAction} pendingLabel="Starting…">
-            Continue
-          </ActionButton>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">Next, AutonomOS drafts your first process inventory from your website and connected systems.</p>
-      </div>
+      <BottomBar wide hint="Next, AutonomOS drafts your first process inventory from your website and connected systems.">
+        <Button asChild variant="outline">
+          <Link href="/onboarding/about">
+            <ArrowLeft />
+            Back to company info
+          </Link>
+        </Button>
+        <ActionButton action={finishOnboardingAction} pendingLabel="Starting…">
+          Continue
+        </ActionButton>
+      </BottomBar>
     </>
   );
 }
