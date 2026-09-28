@@ -1,5 +1,5 @@
 "use client";
-import { Check, Search, Sparkles } from "lucide-react";
+import { Check, Search, Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -51,12 +51,14 @@ export function ToolBrowser({
       first.current = false;
       return;
     }
-    if (all || special[view]) return;
+    const searching = query.trim().length > 0;
+    if (all || (special[view] && !searching)) return;
     const id = ++seq.current;
     const t = setTimeout(
       async () => {
         setLoading(true);
-        const r = await browseToolsAction(view, query);
+        // A search always looks across every category.
+        const r = await browseToolsAction(searching ? "popular" : view, query);
         if (id !== seq.current) return;
         setLoading(false);
         if (!r.ok) return setError(r.error);
@@ -71,80 +73,130 @@ export function ToolBrowser({
   const computed = useMemo(() => {
     const q = query.trim().toLowerCase();
     const inView = special[view];
-    if (inView) return q ? inView.filter((t) => t.name.toLowerCase().includes(q)) : inView;
+    if (inView && !q) return inView;
     if (!all) return null;
     return q ? searchAll(all, q) : view === "popular" ? popular(all) : inGroup(all, view);
   }, [all, view, query, special]);
   const tools = (computed ?? remote).map((t) => (justConnected[t.key] ? { ...t, connected: true, provider: justConnected[t.key]! } : t));
   const shown = tools.slice(0, limit);
 
+  const searching = query.trim().length > 0;
   const current = categories.find((c) => c.key === view);
+  const searchBox = useRef<HTMLInputElement>(null);
+  const choose = (key: string) => {
+    // Picking a category ends a search, so the category shows in full.
+    setView(key);
+    setQuery("");
+    setLimit(PAGE);
+  };
+
+  // "/" jumps to the search box, as on most sites with a big catalog.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      e.preventDefault();
+      searchBox.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const markConnected = (key: string, provider: string) => setJustConnected((m) => ({ ...m, [key]: provider }));
 
   return (
-    <div className="grid gap-4 md:grid-cols-[13rem_minmax(0,1fr)]" data-testid="tool-browser">
-      <nav aria-label="Tool categories" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 [scrollbar-width:none]">
-        {categories.map((c, i) => (
-          <div key={c.key} className="contents">
-            <button
-              type="button"
-              onClick={() => {
-                setView(c.key);
-                setLimit(PAGE);
-              }}
-              aria-current={view === c.key ? "page" : undefined}
-              className={`flex shrink-0 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-sm whitespace-nowrap transition-colors md:w-full ${
-                view === c.key ? "bg-brand-soft font-medium text-brand-strong" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              } ${isSpecialEnd(categories, i) ? "md:mb-2" : ""}`}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                {c.key === "popular" ? <Sparkles className="size-3.5" /> : null}
-                {c.label}
-              </span>
-              {c.count !== null ? <span className="text-xs tabular-nums opacity-70">{c.count}</span> : null}
-            </button>
-          </div>
-        ))}
-      </nav>
-      <section className="min-w-0 space-y-3" aria-live="polite">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-sm font-semibold">{query ? `Results for “${query}”` : (current?.label ?? "Tools")}</h2>
-          {loading && !computed ? <Spinner className="size-4 text-muted-foreground" /> : null}
-          <div className="relative ml-auto w-full sm:w-64">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setLimit(PAGE);
-              }}
-              placeholder="Search all tools"
-              aria-label="Search all tools"
-              className="h-9 pl-8"
-            />
-          </div>
-        </div>
-        {view === "detected" && !query ? <p className="text-xs text-muted-foreground">Named on your website, shown as its tools, or found in your email setup.</p> : null}
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {!tools.length && !(loading && !computed) ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{query ? `No tool matches “${query}”.` : "Nothing here yet."}</p>
+    <div className="space-y-4" data-testid="tool-browser">
+      <div className="relative">
+        <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          ref={searchBox}
+          type="search"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setLimit(PAGE);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setQuery("");
+          }}
+          placeholder={`Search ${all ? `all ${all.length.toLocaleString("en")}` : "all"} tools, for example Freshdesk, HubSpot or Xero`}
+          aria-label="Search all tools"
+          className="h-12 rounded-xl bg-card pr-12 pl-12 text-base shadow-sm md:text-base [&::-webkit-search-cancel-button]:hidden"
+        />
+        {query ? (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              searchBox.current?.focus();
+            }}
+            aria-label="Clear search"
+            className="absolute top-1/2 right-3 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
         ) : (
-          <>
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {shown.map((t, i) => (
-                <ToolCard key={t.key} tool={t} eager={i < 12} canManage={canManage} returnTo={returnTo} onConnected={markConnected} />
-              ))}
-            </ul>
-            {tools.length > shown.length ? (
-              <div className="flex justify-center pt-1">
-                <Button variant="outline" size="sm" onClick={() => setLimit((l) => l + PAGE * 2)}>
-                  Show more ({tools.length - shown.length})
-                </Button>
-              </div>
-            ) : null}
-          </>
+          <kbd className="pointer-events-none absolute top-1/2 right-4 hidden -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-xs text-muted-foreground sm:block">
+            /
+          </kbd>
         )}
-      </section>
+      </div>
+      <div className="grid gap-4 md:grid-cols-[13rem_minmax(0,1fr)]">
+        <nav aria-label="Tool categories" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 [scrollbar-width:none]">
+          {categories.map((c, i) => (
+            <div key={c.key} className="contents">
+              <button
+                type="button"
+                onClick={() => choose(c.key)}
+                aria-current={view === c.key && !searching ? "page" : undefined}
+                className={`flex shrink-0 items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-sm whitespace-nowrap transition-colors md:w-full ${
+                  view === c.key && !searching ? "bg-brand-soft font-medium text-brand-strong" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                } ${isSpecialEnd(categories, i) ? "md:mb-2" : ""}`}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  {c.key === "popular" ? <Sparkles className="size-3.5" /> : null}
+                  {c.label}
+                </span>
+                {c.count !== null ? <span className="text-xs tabular-nums opacity-70">{c.count}</span> : null}
+              </button>
+            </div>
+          ))}
+        </nav>
+        <section className="min-w-0 space-y-3" aria-live="polite">
+          <div className="flex min-h-7 flex-wrap items-center gap-3">
+            <h2 className="text-sm font-semibold">
+              {searching ? (
+                <>
+                  {computed ? `${tools.length === 60 ? "Top 60" : tools.length} ${tools.length === 1 ? "result" : "results"}` : "Results"} for “{query.trim()}”
+                  <span className="font-normal text-muted-foreground"> across all categories</span>
+                </>
+              ) : (
+                (current?.label ?? "Tools")
+              )}
+            </h2>
+            {loading && !computed ? <Spinner className="size-4 text-muted-foreground" /> : null}
+          </div>
+          {view === "detected" && !searching ? <p className="text-xs text-muted-foreground">Named on your website, shown as its tools, or found in your email setup.</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {!tools.length && !(loading && !computed) ? (
+            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{query ? `No tool matches “${query}”.` : "Nothing here yet."}</p>
+          ) : (
+            <>
+              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {shown.map((t, i) => (
+                  <ToolCard key={t.key} tool={t} eager={i < 12} canManage={canManage} returnTo={returnTo} onConnected={markConnected} />
+                ))}
+              </ul>
+              {tools.length > shown.length ? (
+                <div className="flex justify-center pt-1">
+                  <Button variant="outline" size="sm" onClick={() => setLimit((l) => l + PAGE * 2)}>
+                    Show more ({tools.length - shown.length})
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
