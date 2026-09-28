@@ -41,7 +41,11 @@ export async function executeTool(key: string, rawArgs: unknown, ctx: ToolExecut
     return { results: await ctx.knowledge.search(String(args.query)) };
   }
   if (!ctx.connection) throw new ToolError("not_connected", `${def.integration} is not connected`);
-  if (ctx.connection.provider === "sandbox") return runSandbox(def, args, ctx);
+  if (ctx.connection.provider === "sandbox") {
+    // Sample data exists only for the built-in systems; every other toolkit runs on a live account.
+    if (def.source === "composio") throw new ToolError("not_connected", `${def.integration} needs a live connection; sample data covers only the built-in systems`);
+    return runSandbox(def, args, ctx);
+  }
   return runComposio(def, args, ctx);
 }
 
@@ -304,7 +308,8 @@ export function getComposio(): Composio {
 }
 
 async function runComposio(def: ToolDefinition, args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<unknown> {
-  const mapping = COMPOSIO_MAPPINGS[def.key];
+  // Composio tools are the action itself; built-in tools map onto one.
+  const mapping: ComposioMapping | undefined = def.source === "composio" ? { slug: def.key.slice("composio:".length), toArgs: ({ __idempotency_key: _, ...a }) => a } : COMPOSIO_MAPPINGS[def.key];
   if (!mapping) throw new ToolError("not_connected", `${def.key} cannot be connected to a live account yet`);
   if (!ctx.connection?.externalAccountId) throw new ToolError("not_connected", `${def.integration} has no connected account`);
   try {

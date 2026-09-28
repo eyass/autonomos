@@ -17,7 +17,7 @@ export default async function EditAgentPage({ params }: { params: Promise<{ id: 
         title={`Edit ${agent.name}`}
         description={`Currently version ${version.version}. Saving creates version ${version.version + 1}; past runs keep pointing at the version they used.`}
       />
-      <EditAgentForm agentId={id} initial={config} tools={toolOptions(connected)} />
+      <EditAgentForm agentId={id} initial={config} tools={await toolOptions(session, connected, config.tools)} />
     </>
   );
 }

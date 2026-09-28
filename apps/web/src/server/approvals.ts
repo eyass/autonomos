@@ -1,4 +1,5 @@
 import "server-only";
+import { registerWorkspaceTools } from "@/server/tool-catalog";
 import { applyApprovalChanges, INTERVENTION_MINUTES } from "@autonomos/agents";
 import { getTool, ToolError } from "@autonomos/integrations";
 import { sendNotification } from "@autonomos/db";
@@ -13,6 +14,7 @@ export async function resolveApproval(session: Session, approvalId: string, raw:
   if (!session.canApprove) throw new HttpError(403, "You are not allowed to approve agent actions");
   const decision = ApprovalDecisionSchema.parse(raw);
   const db = adminDb();
+  await registerWorkspaceTools(session.org.id);
   const { data: approval } = await db.from("approval_requests").select("*, agents(name, process_id)").eq("organization_id", session.org.id).eq("id", approvalId).maybeSingle();
   if (!approval) throw new HttpError(404, "Approval not found");
   if (approval.status !== "pending") throw new HttpError(409, `This approval was already ${approval.status}`);

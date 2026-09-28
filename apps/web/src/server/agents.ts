@@ -1,7 +1,7 @@
 import "server-only";
 import { applyGuardrails, guardrailsFor, policyForTools } from "@autonomos/agents";
 import { createRun, RunNotAllowedError } from "@autonomos/db";
-import { buildSandboxTicket, getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
+import { buildSandboxTicket, getTool, registerSnapshots, SAMPLE_TICKETS, snapshotOf, type ToolSnapshot } from "@autonomos/integrations";
 import { AgentConfigSchema, PolicyConfigSchema, type AgentConfig, type PolicyConfig } from "@autonomos/schemas";
 import { deactivateAgentSchedule, TriggerNotConfiguredError, upsertAgentSchedule } from "@autonomos/workflows";
 import { sandboxStore } from "@autonomos/db";
@@ -10,6 +10,7 @@ import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
 import { connectedIntegrationKeys } from "./opportunities";
 import { agentReadiness, enqueueOrFail } from "./readiness";
 import { assertAgentAllowance } from "@/server/platform";
+import { availableTools } from "@/server/tool-catalog";
 import { processGate } from "@/server/processes";
 
 function mapRunError(error: unknown): never {
@@ -18,11 +19,14 @@ function mapRunError(error: unknown): never {
   throw error;
 }
 
-async function assertToolsAllowed(session: Session, tools: string[]) {
-  const connected = new Set([...(await connectedIntegrationKeys(session)), "knowledge"]);
+async function assertToolsAllowed(session: Session, tools: string[], kept: string[] = []) {
+  const keys = await connectedIntegrationKeys(session);
+  const connected = new Set([...keys, "knowledge"]);
+  // The tools the workspace can offer now, plus any the current version already had.
+  const offered = new Set([...(await availableTools(session, keys)).map((t) => t.key), ...kept]);
   for (const key of tools) {
     const def = getTool(key);
-    if (!def) throw new HttpError(400, `Unknown tool ${key}`);
+    if (!def || !offered.has(key)) throw new HttpError(400, `Unknown tool ${key}`);
     if (!connected.has(def.integration)) throw new HttpError(400, `Connect ${def.integration} before giving the agent "${def.label}"`);
   }
 }
@@ -47,7 +51,10 @@ async function insertVersion(session: Session, agentId: string, version: number,
     .select("id")
     .single();
   if (error || !data) throw new Error(`version: ${error?.message}`);
-  const { error: toolError } = await db.from("agent_tools").insert([...new Set(config.tools)].map((tool_key) => ({ organization_id: session.org.id, agent_version_id: data.id, tool_key })));
+  // Composio tools are stored with their definition, so this version keeps the tool it was made with.
+  const { error: toolError } = await db
+    .from("agent_tools")
+    .insert([...new Set(config.tools)].map((tool_key) => ({ organization_id: session.org.id, agent_version_id: data.id, tool_key, definition: snapshotOf(getTool(tool_key)) as never })));
   if (toolError) throw new Error(`tools: ${toolError.message}`);
   return data.id;
 }
@@ -70,8 +77,9 @@ async function guardedConfig(session: Session, processId: string, config: AgentC
 }
 
 export async function createAgent(session: Session, input: { processId: string; opportunityId: string | null; config: AgentConfig }) {
+  // Tools first: this also loads the Composio tool definitions the guardrails classify.
+  await assertToolsAllowed(session, AgentConfigSchema.parse(input.config).tools);
   const config = await guardedConfig(session, input.processId, AgentConfigSchema.parse(input.config), "create");
-  await assertToolsAllowed(session, config.tools);
   const db = adminDb();
   const { data: process } = await db.from("processes").select("id, department_id").eq("organization_id", session.org.id).eq("id", input.processId).maybeSingle();
   if (!process) throw new HttpError(404, "Process not found");
@@ -106,11 +114,12 @@ export async function loadAgentConfig(session: Session, agentId: string, version
   const db = adminDb();
   const { data: agent } = await db.from("agents").select("*").eq("organization_id", session.org.id).eq("id", agentId).maybeSingle();
   if (!agent) throw new HttpError(404, "Agent not found");
-  let query = db.from("agent_versions").select("*, agent_tools(tool_key)").eq("organization_id", session.org.id).eq("agent_id", agentId);
+  let query = db.from("agent_versions").select("*, agent_tools(tool_key, definition)").eq("organization_id", session.org.id).eq("agent_id", agentId);
   query = versionId ? query.eq("id", versionId) : query.order("version", { ascending: false }).limit(1);
   const { data: versions } = await query;
   const v = versions?.[0];
   if (!v) throw new HttpError(404, "Agent has no configuration");
+  registerSnapshots(((v.agent_tools as unknown as Array<{ definition: ToolSnapshot | null }>) ?? []).map((t) => t.definition));
   const config: AgentConfig = AgentConfigSchema.parse({
     name: agent.name,
     description: agent.description,
@@ -128,8 +137,8 @@ export async function loadAgentConfig(session: Session, agentId: string, version
 // Every configuration change creates a new immutable version (PRD section 85).
 export async function updateAgentConfig(session: Session, agentId: string, next: AgentConfig, note: string) {
   const { agent, version, config: previous } = await loadAgentConfig(session, agentId);
+  await assertToolsAllowed(session, AgentConfigSchema.parse(next).tools, previous.tools);
   const config = await guardedConfig(session, agent.process_id, AgentConfigSchema.parse(next), "update");
-  await assertToolsAllowed(session, config.tools);
   const versionId = await insertVersion(session, agentId, version.version + 1, config, note);
   const db = adminDb();
   await db
@@ -223,7 +232,7 @@ export async function activateAgent(session: Session, agentId: string) {
   const readiness = await agentReadiness(session, { id: agentId, versionId: version.id }, config, "activate");
   const blocking = readiness.checks.filter((c) => c.blocking && !c.ok);
   if (blocking.length) throw new HttpError(409, `Not ready to go live: ${blocking.map((c) => `${c.label}: ${c.detail}`).join(" ")}`);
-  await assertToolsAllowed(session, config.tools);
+  await assertToolsAllowed(session, config.tools, config.tools);
   if (agent.status !== "active") await assertAgentAllowance(session);
   try {
     await syncSchedule(session, agentId, config, agent.trigger_schedule_id);

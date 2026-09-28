@@ -1,5 +1,6 @@
 import "server-only";
-import { getTool, isInventory, toolsForIntegrations } from "@autonomos/integrations";
+import { availableTools, registerWorkspaceTools } from "@/server/tool-catalog";
+import { getTool, isInventory, toolsForIntegrations, type ToolDefinition } from "@autonomos/integrations";
 import { dateTime, relative } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { adminDb, isAdmin, type Session } from "@/lib/session";
@@ -71,6 +72,7 @@ function inventoryView(c: { inventory: unknown; inventory_status: string | null;
 }
 
 export async function loadIntegrations(session: Session): Promise<IntegrationView[]> {
+  await registerWorkspaceTools(session.org.id);
   const supabase = await createClient();
   const [{ data: catalog }, { data: connections }] = await Promise.all([
     supabase.from("integrations").select("*").order("sort_order"),
@@ -91,7 +93,7 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
   if (connections?.length) {
     const { data: actions } = await adminDb().from("agent_actions").select("tool, created_at").eq("organization_id", session.org.id).order("created_at", { ascending: false }).limit(300);
     for (const a of actions ?? []) {
-      const key = String(a.tool).split(".")[0]!;
+      const key = getTool(String(a.tool))?.integration ?? String(a.tool).split(".")[0]!;
       if (!lastUsed.has(key)) lastUsed.set(key, a.created_at);
     }
   }
@@ -122,6 +124,9 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
   }
   // Directory systems appear once an organisation has connected them.
   const connectedKeys = new Set((connections ?? []).map((c) => c.integration_key));
+  // What agents could do in each connected system: built-in tools, or the toolkit's Composio actions.
+  const offered = new Map<string, ToolDefinition[]>();
+  for (const t of await availableTools(session, [...connectedKeys])) offered.set(t.integration, [...(offered.get(t.integration) ?? []), t]);
   return (catalog ?? [])
     .filter((i) => i.source !== "directory" || connectedKeys.has(i.key))
     .map((i) => {
@@ -135,12 +140,8 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
         logo: i.logo ?? null,
         source: (i.source as "curated" | "directory") ?? "curated",
         permissions: (i.permissions as string[]) ?? [],
-        agentReads: toolsForIntegrations([i.key])
-          .filter((t) => t.integration === i.key && t.access === "read")
-          .map((t) => t.label),
-        agentActs: toolsForIntegrations([i.key])
-          .filter((t) => t.integration === i.key && t.access === "write")
-          .map((t) => t.label),
+        agentReads: (offered.get(i.key) ?? toolsForIntegrations([i.key]).filter((t) => t.integration === i.key)).filter((t) => t.access === "read").map((t) => t.label),
+        agentActs: (offered.get(i.key) ?? toolsForIntegrations([i.key]).filter((t) => t.integration === i.key)).filter((t) => t.access === "write").map((t) => t.label),
         status: (c?.status ?? "not_connected") as IntegrationView["status"],
         provider: c?.provider ?? null,
         accountLabel: c?.account_label ?? null,

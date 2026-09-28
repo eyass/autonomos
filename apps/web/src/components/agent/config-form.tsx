@@ -68,6 +68,7 @@ export function AgentConfigForm({
 }) {
   const [step, setStep] = useState(0);
   const [c, setC] = useState<AgentConfig>(initial);
+  const [toolQuery, setToolQuery] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -196,30 +197,48 @@ export function AgentConfigForm({
                   <AlertDescription>Connect an integration first.</AlertDescription>
                 </Alert>
               ) : null}
+              {tools.length > 12 ? <Input value={toolQuery} onChange={(e) => setToolQuery(e.target.value)} placeholder="Find an action, e.g. create invoice" aria-label="Find an action" /> : null}
+              {/* One group per system; each opens when it has chosen tools or the search matches. */}
               <div className="space-y-2">
-                {tools.map((t) => (
-                  <FieldLabel key={t.key} htmlFor={`tool-${t.key}`}>
-                    <Field orientation="horizontal" className="items-start">
-                      <Checkbox
-                        id={`tool-${t.key}`}
-                        className="mt-0.5"
-                        checked={c.tools.includes(t.key)}
-                        onCheckedChange={(v) => set("tools", v === true ? [...c.tools, t.key] : c.tools.filter((x) => x !== t.key))}
-                      />
-                      <FieldContent>
-                        <FieldTitle className="flex-wrap">
-                          {t.label} <span className="font-normal text-muted-foreground">· {t.integration}</span>
-                        </FieldTitle>
-                        <FieldDescription>{t.description}</FieldDescription>
-                        {t.access === "write" ? (
-                          <Badge variant={t.highRisk ? "warning" : "info"}>{t.highRisk ? "takes action, approval by default" : "takes action"}</Badge>
-                        ) : (
-                          <Badge variant="secondary">read only</Badge>
-                        )}
-                      </FieldContent>
-                    </Field>
-                  </FieldLabel>
-                ))}
+                {[...new Set(tools.map((t) => t.integration))].map((system) => {
+                  const q = toolQuery.trim().toLowerCase();
+                  const inSystem = tools.filter((t) => t.integration === system && (!q || `${t.label} ${t.description}`.toLowerCase().includes(q)));
+                  if (!inSystem.length) return null;
+                  const chosen = inSystem.filter((t) => c.tools.includes(t.key)).length;
+                  return (
+                    <details key={system} open={Boolean(q) || chosen > 0 || tools.length <= 12} className="rounded-md border border-border">
+                      <summary className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm font-medium capitalize">
+                        {system.replaceAll("_", " ")}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {chosen ? `${chosen} of ${inSystem.length} chosen` : `${inSystem.length} action${inSystem.length === 1 ? "" : "s"}`}
+                        </span>
+                      </summary>
+                      <div className="space-y-2 border-t border-border p-3">
+                        {inSystem.map((t) => (
+                          <FieldLabel key={t.key} htmlFor={`tool-${t.key}`}>
+                            <Field orientation="horizontal" className="items-start">
+                              <Checkbox
+                                id={`tool-${t.key}`}
+                                className="mt-0.5"
+                                checked={c.tools.includes(t.key)}
+                                onCheckedChange={(v) => set("tools", v === true ? [...c.tools, t.key] : c.tools.filter((x) => x !== t.key))}
+                              />
+                              <FieldContent>
+                                <FieldTitle className="flex-wrap">{t.label}</FieldTitle>
+                                <FieldDescription className="line-clamp-2">{t.description}</FieldDescription>
+                                {t.access === "write" ? (
+                                  <Badge variant={t.highRisk ? "warning" : "info"}>{t.highRisk ? "takes action, approval by default" : "takes action"}</Badge>
+                                ) : (
+                                  <Badge variant="secondary">read only</Badge>
+                                )}
+                              </FieldContent>
+                            </Field>
+                          </FieldLabel>
+                        ))}
+                      </div>
+                    </details>
+                  );
+                })}
               </div>
             </>
           ) : null}
