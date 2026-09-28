@@ -74,12 +74,13 @@ const slugify = (s: string) =>
 export async function generatePlaybookFor(session: Session, toolkitKey: string, goal?: string): Promise<string> {
   requirePlatformAdmin(session);
   const key = integrationKeyFor(toolkitFor(toolkitKey));
-  const [toolkit, tools] = await Promise.all([getToolkit(toolkitFor(key)).catch(() => null), toolsForToolkit(key)]);
-  if (!tools.some((t) => t.integration === key)) throw new HttpError(409, `No actions are available for ${toolkit?.name ?? key} yet`);
+  const [toolkit, tools, names] = await Promise.all([getToolkit(toolkitFor(key)).catch(() => null), toolsForToolkit(key), toolkitInfo([key])]);
+  const name = toolkit?.name ?? names.get(key)?.name ?? key;
+  if (!tools.some((t) => t.integration === key)) throw new HttpError(409, `No actions are available for ${name} yet`);
   const db = adminDb();
   const { data: existing } = await db.from("playbooks").select("title").contains("toolkits", [key]);
   const draft = await generatePlaybook({
-    tool: { key, name: toolkit?.name ?? key, description: toolkit?.description ?? "" },
+    tool: { key, name, description: toolkit?.description ?? "" },
     goal: goal?.trim() || undefined,
     availableTools: tools.map((t) => ({ key: t.key, label: t.label, description: t.description, access: t.access })),
     existingTitles: (existing ?? []).map((e) => e.title),
