@@ -5,6 +5,7 @@ import { requireSessionOrThrow } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { connectFromDirectory, connectSandbox, disconnect, directoryCategories, refreshInventory, searchIntegrationDirectory, startOAuthConnection } from "@/server/integrations";
 import { rotateWebhookSecret } from "@/server/platform";
+import { browseTools } from "@/server/tool-browser";
 
 export async function connectSandboxAction(key: string) {
   return runAction(async () => connectSandbox(await requireSessionOrThrow(), key));
@@ -45,4 +46,8 @@ export async function connectDirectoryAction(slug: string, returnTo?: string) {
   const result = await runAction(async () => connectFromDirectory(await requireSessionOrThrow(), String(slug), process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000", returnTo));
   if (!result.ok) return result;
   redirect(result.data);
+}
+
+export async function browseToolsAction(view: string, query = "") {
+  return runAction(async () => browseTools(await requireSessionOrThrow(), String(view).slice(0, 40), String(query ?? "")));
 }

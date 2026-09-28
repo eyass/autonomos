@@ -1,9 +1,11 @@
 // Company website reader for agentic onboarding.
 //
-// Reads a handful of pages that say the most about a company (home, about, pricing,
-// product, careers, support, integrations), its structured data (JSON-LD), and which
-// tools it runs (script signatures on the pages and the domain's MX records). The
-// result is evidence for the company profile model, not the profile itself.
+// Reads the pages that say the most about a company (home, about, pricing, product, careers
+// and team pages, support, integrations), found from its links and its sitemap; its
+// structured data (JSON-LD); and which tools it runs: script signatures on the pages, the
+// domain's MX records, and the tools it names or shows as logos (a "tools we use" list).
+// Sites that render in the browser are read from their JavaScript bundles. The result is
+// evidence for the company profile model, not the profile itself.
 //
 // Security: every URL, including each redirect hop, must resolve to a public address.
 // Private, loopback, link-local and metadata ranges are refused unless `allowPrivate`
@@ -11,6 +13,7 @@
 import { lookup, resolveMx } from "node:dns/promises";
 import { isIP } from "node:net";
 import { parse, type HTMLElement } from "node-html-parser";
+import { bundleCopy, chunkName, chunkUrls, isScriptRendered, linkTextFromPath, mentionedTools, PRIVATE_CHUNK, scriptUrls, sitemapUrls, type MentionSource, type ToolMention } from "./website-extras";
 
 export type DetectedTool = { key: string; name: string; evidence: string };
 
@@ -203,14 +206,16 @@ async function readCapped(res: Response): Promise<string> {
   return new TextDecoder("utf-8", { fatal: false }).decode(Buffer.concat(chunks));
 }
 
-async function fetchHtml(start: string, opts: Required<Pick<CrawlOptions, "timeoutMs" | "allowPrivate">> & { fetchImpl: typeof fetch }) {
+type FetchOpts = Required<Pick<CrawlOptions, "timeoutMs" | "allowPrivate">> & { fetchImpl: typeof fetch };
+
+async function fetchResource(start: string, opts: FetchOpts, want: { accept: string; type: RegExp; label: string }) {
   let url = new URL(start);
   for (let hop = 0; hop < 5; hop++) {
     await assertPublicUrl(url, opts.allowPrivate);
     const res = await opts.fetchImpl(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(opts.timeoutMs),
-      headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml" },
+      headers: { "user-agent": USER_AGENT, accept: want.accept },
     });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
@@ -221,10 +226,71 @@ async function fetchHtml(start: string, opts: Required<Pick<CrawlOptions, "timeo
     }
     if (!res.ok) throw new WebsiteError(`${url.hostname} answered with status ${res.status}`);
     const type = res.headers.get("content-type") ?? "";
-    if (!/html/i.test(type)) throw new WebsiteError(`${url.pathname} is not a web page`);
+    if (!want.type.test(type)) throw new WebsiteError(`${url.pathname} is not ${want.label}`);
     return { url: url.toString(), html: await readCapped(res) };
   }
   throw new WebsiteError("Too many redirects");
+}
+
+const fetchHtml = (url: string, opts: FetchOpts) => fetchResource(url, opts, { accept: "text/html,application/xhtml+xml", type: /html/i, label: "a web page" });
+const fetchXml = (url: string, opts: FetchOpts) => fetchResource(url, opts, { accept: "application/xml,text/xml", type: /xml|text\/plain/i, label: "a sitemap" });
+const fetchScript = (url: string, opts: FetchOpts) =>
+  fetchResource(url, opts, { accept: "application/javascript,text/javascript,*/*", type: /javascript|ecmascript|text\/plain|octet-stream/i, label: "a script" });
+
+// The site's sitemap (from robots.txt or /sitemap.xml), one level of sitemap index deep.
+async function sitemapLinks(origin: string, opts: FetchOpts): Promise<Array<{ href: string; text: string }>> {
+  const locations = new Set([`${origin}/sitemap.xml`]);
+  try {
+    const robots = await fetchResource(`${origin}/robots.txt`, opts, { accept: "text/plain", type: /text\/plain/i, label: "robots.txt" });
+    for (const m of robots.html.matchAll(/^\s*sitemap:\s*(\S+)/gim)) locations.add(m[1]!);
+  } catch {
+    // No robots.txt: try the usual location only.
+  }
+  const pages: string[] = [];
+  for (const loc of [...locations].slice(0, 3)) {
+    try {
+      const first = sitemapUrls((await fetchXml(loc, opts)).html);
+      pages.push(...first.pages);
+      for (const child of first.sitemaps.filter((c) => !/image|video|news|product|post|blog/i.test(c)).slice(0, 3)) {
+        pages.push(...sitemapUrls((await fetchXml(child, opts)).html).pages);
+      }
+    } catch {
+      // No sitemap there.
+    }
+    if (pages.length) break;
+  }
+  return [...new Set(pages)].slice(0, 400).map((href) => ({ href, text: linkTextFromPath(href) }));
+}
+
+// For sites that render in the browser: the copy in their JavaScript, one entry per
+// code-split chunk (one per page on most sites), and the tool logos they embed.
+async function bundlePages(homeUrl: string, html: string, opts: FetchOpts): Promise<{ pages: WebsitePage[]; logos: MentionSource[] }> {
+  const entries = scriptUrls(html, homeUrl).slice(0, 3);
+  const scripts = new Map<string, string>();
+  for (const r of await Promise.allSettled(entries.map((u) => fetchScript(u, opts)))) if (r.status === "fulfilled") scripts.set(r.value.url, r.value.html);
+  const chunks = [...new Set([...scripts].flatMap(([u, js]) => chunkUrls(js, u)))].filter((u) => !scripts.has(u) && !PRIVATE_CHUNK.test(chunkName(u))).slice(0, 60);
+  for (let i = 0; i < chunks.length; i += 10) {
+    const batch = await Promise.allSettled(chunks.slice(i, i + 10).map((u) => fetchScript(u, opts)));
+    for (const r of batch) if (r.status === "fulfilled") scripts.set(r.value.url, r.value.html);
+  }
+  const pages: WebsitePage[] = [];
+  const logos: MentionSource[] = [];
+  for (const [url, js] of scripts) {
+    const name = chunkName(url);
+    const { text, logos: names } = bundleCopy(js, 3500);
+    const title = name.replace(/([a-z])([A-Z])/g, "$1 $2");
+    if (names.length) logos.push({ where: `${title} page`, text: names.join(", "), strength: "logo" });
+    if (text.length > 150) pages.push({ url, kind: kindOfChunk(name), title, text });
+  }
+  // Pages that say the most about the company first, then the longest.
+  const order = (p: WebsitePage) => (p.kind === "page" ? 1 : 0);
+  return { pages: pages.sort((a, b) => order(a) - order(b) || b.text.length - a.text.length).slice(0, 14), logos };
+}
+
+function kindOfChunk(name: string): string {
+  const n = name.toLowerCase();
+  for (const k of PAGE_KINDS) if (k.pattern.test(n)) return k.kind;
+  return /^(index|home|main|app)$/.test(n) ? "home" : "page";
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +303,7 @@ const PAGE_KINDS: Array<{ kind: string; pattern: RegExp; weight: number }> = [
   { kind: "pricing", pattern: /pricing|plans|prijzen|tarieven|preise/, weight: 7 },
   { kind: "customers", pattern: /customers|case-stud|clients|klanten|testimonials|stories/, weight: 5 },
   { kind: "careers", pattern: /careers|jobs|vacatures|werken-bij|join-us|hiring|karriere/, weight: 6 },
+  { kind: "teams", pattern: /teams?\b|departments|engineering|tech(nology)?-?stack|our-stack|tools/, weight: 6 },
   { kind: "support", pattern: /support|help|faq|contact|klantenservice|service/, weight: 6 },
   { kind: "integrations", pattern: /integrations|partners|marketplace\/apps|apps|ecosystem/, weight: 5 },
 ];
@@ -401,7 +468,7 @@ export function mailProviderFromMx(exchanges: string[]): "google" | "microsoft" 
 
 export async function crawlWebsite(input: string, options: CrawlOptions = {}): Promise<WebsiteSnapshot> {
   const opts = {
-    maxPages: options.maxPages ?? 6,
+    maxPages: options.maxPages ?? 10,
     timeoutMs: options.timeoutMs ?? 8000,
     allowPrivate: options.allowPrivate ?? false,
     fetchImpl: options.fetchImpl ?? fetch,
@@ -418,20 +485,36 @@ export async function crawlWebsite(input: string, options: CrawlOptions = {}): P
   const domain = new URL(home.url).hostname.replace(/^www\./, "");
   const meta = (name: string) => root.querySelector(`meta[name="${name}"], meta[property="${name}"]`)?.getAttribute("content")?.trim() || null;
 
+  const homeText = pageText(root);
   const links = root.querySelectorAll("a[href]").map((a) => ({ href: a.getAttribute("href") ?? "", text: a.text.replace(/\s+/g, " ").trim() }));
-  const chosen = choosePages(rankLinks(home.url, links), opts.maxPages - 1);
-  const pages: WebsitePage[] = [{ url: home.url, kind: "home", title: root.querySelector("title")?.text.trim() ?? "", text: pageText(root) }];
+  // The sitemap lists pages the home page does not link to (team pages, product pages).
+  links.push(...(await sitemapLinks(new URL(home.url).origin, opts)));
+  const scriptRendered = isScriptRendered(home.html, homeText);
+  const pages: WebsitePage[] = [{ url: home.url, kind: "home", title: root.querySelector("title")?.text.trim() ?? "", text: homeText }];
   const htmls = [home.html];
+  const sources: MentionSource[] = [];
 
-  const results = await Promise.allSettled(chosen.map((c) => fetchHtml(c.url, opts).then((r) => ({ ...r, kind: c.kind }))));
-  for (const r of results) {
-    if (r.status !== "fulfilled") continue;
-    const page = parse(r.value.html);
-    htmls.push(r.value.html);
-    pages.push({ url: r.value.url, kind: r.value.kind, title: page.querySelector("title")?.text.trim() ?? "", text: pageText(page, 4000) });
+  if (scriptRendered) {
+    // The HTML of every page is the same empty shell: read the app's bundles instead.
+    const bundle = await bundlePages(home.url, home.html, opts).catch(() => ({ pages: [], logos: [] as MentionSource[] }));
+    pages.push(...bundle.pages);
+    sources.push(...bundle.logos);
+  } else {
+    const chosen = choosePages(rankLinks(home.url, links), opts.maxPages - 1);
+    const results = await Promise.allSettled(chosen.map((c) => fetchHtml(c.url, opts).then((r) => ({ ...r, kind: c.kind }))));
+    for (const r of results) {
+      if (r.status !== "fulfilled") continue;
+      const page = parse(r.value.html);
+      htmls.push(r.value.html);
+      pages.push({ url: r.value.url, kind: r.value.kind, title: page.querySelector("title")?.text.trim() ?? "", text: pageText(page, 4000) });
+      sources.push(...logoSources(page, r.value.kind));
+    }
+    sources.push(...logoSources(root, "home"));
   }
+  for (const p of pages) sources.push({ where: `${p.kind === "page" ? p.title : p.kind} page`, text: `${p.title}\n${p.text}` });
 
   const { tools, other } = detectTools(htmls.join("\n"));
+  const mentions = mentionedTools(sources);
   let mailProvider: WebsiteSnapshot["mailProvider"] = null;
   try {
     const mx = await (options.resolveMxImpl ?? resolveMx)(domain);
@@ -440,8 +523,16 @@ export async function crawlWebsite(input: string, options: CrawlOptions = {}): P
     // No MX records, or DNS unavailable: not evidence either way.
   }
   const detected = [...tools];
-  if (mailProvider === "google") detected.push({ key: "gmail", name: "Gmail", evidence: "Company email runs on Google Workspace (MX records)" });
-  if (mailProvider === "microsoft") detected.push({ key: "outlook", name: "Outlook", evidence: "Company email runs on Microsoft 365 (MX records)" });
+  const add = (t: DetectedTool) => {
+    if (!detected.some((d) => d.key === t.key)) detected.push(t);
+  };
+  if (mailProvider === "google") add({ key: "gmail", name: "Gmail", evidence: "Company email runs on Google Workspace (MX records)" });
+  if (mailProvider === "microsoft") add({ key: "outlook", name: "Outlook", evidence: "Company email runs on Microsoft 365 (MX records)" });
+  for (const m of mentions) add({ key: m.key, name: m.name, evidence: mentionEvidence(m) });
+  // Logos of technology that is not a business tool (React, Python) describe the stack.
+  const logoNames = sources.filter((s) => s.strength === "logo").flatMap((s) => s.text.split(/,\s*/));
+  const named = new Set(detected.map((d) => d.name.toLowerCase()));
+  const stack = logoNames.filter((n) => n && !named.has(n.toLowerCase()) && !mentions.some((m) => n.toLowerCase().includes(m.name.toLowerCase())));
 
   return {
     url: home.url,
@@ -453,7 +544,31 @@ export async function crawlWebsite(input: string, options: CrawlOptions = {}): P
     organization: organizationFromJsonLd(root),
     pages,
     detectedTools: detected,
-    otherTechnology: other,
+    otherTechnology: [...new Set([...other, ...stack])].slice(0, 40),
     mailProvider,
   };
 }
+
+// Logos on a page: image alt text and file names ("/logos/jira.svg"), read as tool names.
+function logoSources(page: HTMLElement, kind: string): MentionSource[] {
+  const names = page
+    .querySelectorAll("img")
+    .map((img) => {
+      const alt = img.getAttribute("alt")?.trim() ?? "";
+      const file =
+        (img.getAttribute("src") ?? "")
+          .split("/")
+          .pop()
+          ?.replace(/\.(svg|png|jpe?g|webp|avif)(\?.*)?$/i, "") ?? "";
+      return alt || file.replace(/[-_]+(logo|icon|mark|white|black|color|colour)\b/gi, "").replace(/[-_]+/g, " ");
+    })
+    .filter((n) => n && n.length < 40);
+  return names.length ? [{ where: `${kind} page`, text: names.join(", "), strength: "logo" }] : [];
+}
+
+function mentionEvidence(m: ToolMention): string {
+  if (m.strength === "logo") return `Shown among the tools on the ${m.where}`;
+  if (m.strength === "list") return `Named with other tools on the ${m.where}`;
+  return `Named on the ${m.where}`;
+}
+export { KNOWN_TOOLS, mentionedTools } from "./website-extras";
