@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signUp, uniqueEmail } from "./helpers";
+import { service, signUp, uniqueEmail } from "./helpers";
 
 // Tenant isolation is enforced by the database, not only by application code (PRD section 59).
 describe("row level security", () => {
@@ -40,5 +40,31 @@ describe("row level security", () => {
     const { error: auditDelete } = await a.client.from("audit_events").delete().eq("id", audit![0]!.id);
     const { data: auditAfter } = await a.client.from("audit_events").select("id").eq("id", audit![0]!.id);
     expect(auditDelete !== null || auditAfter?.length === 1).toBe(true);
+  });
+
+  it("shows people published playbooks only, and lets no one write them from the client", async () => {
+    const tag = Math.random().toString(36).slice(2, 8);
+    const { data: rows } = await service()
+      .from("playbooks")
+      .insert([
+        { slug: `rls-draft-${tag}`, title: `Draft ${tag}`, status: "draft" },
+        { slug: `rls-live-${tag}`, title: `Live ${tag}`, status: "published" },
+      ])
+      .select("id, status");
+    const a = await signUp(uniqueEmail("playbooks"));
+    const { data: seen } = await a.client.from("playbooks").select("title").like("slug", `rls-%-${tag}`);
+    expect(seen?.map((r) => r.title)).toEqual([`Live ${tag}`]);
+    const { error: insert } = await a.client.from("playbooks").insert({ slug: `rls-forged-${tag}`, title: "Forged", status: "published" });
+    expect(insert).not.toBeNull();
+    await a.client.from("playbooks").update({ title: "Changed" }).like("slug", `rls-%-${tag}`);
+    const { data: after } = await service().from("playbooks").select("title").like("slug", `rls-%-${tag}`).order("title");
+    expect(after?.map((r) => r.title)).toEqual([`Draft ${tag}`, `Live ${tag}`]);
+    await service()
+      .from("playbooks")
+      .delete()
+      .in(
+        "id",
+        (rows ?? []).map((r) => r.id),
+      );
   });
 });

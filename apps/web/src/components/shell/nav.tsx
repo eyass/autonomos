@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Bot, Building2, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Plug, Settings, Workflow } from "lucide-react";
+import { Activity, BookOpen, Bot, Building2, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Plug, Settings, Sparkles, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -23,13 +23,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-// The loop in five words: see where you stand, answer what waits for you, map the work and
-// what to automate, run agents, look back. Each item says what it holds.
+// The loop: see where you stand, answer what waits for you, map the work and what to automate
+// (or start from a ready-made playbook), run agents, look back. Each item says what it holds.
 type NavItem = { href: string; label: string; hint?: string; icon: typeof LayoutDashboard; also?: string[] };
 const MAIN: NavItem[] = [
   { href: "/", label: "Home", hint: "How autonomous you are", icon: LayoutDashboard },
   { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox },
   { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"] },
+  { href: "/playbooks", label: "Playbooks", hint: "Templates to start from", icon: BookOpen },
   { href: "/agents", label: "Agents", hint: "Doing the work for you", icon: Bot },
   { href: "/activity", label: "History", hint: "Everything that happened", icon: Activity },
 ];
@@ -57,6 +58,7 @@ export function AppSidebar({
   workspaces,
   switchWorkspace,
   signOut,
+  platformAdmin = false,
 }: {
   pendingApprovals: number;
   orgName: string;
@@ -66,6 +68,8 @@ export function AppSidebar({
   workspaces: Workspace[];
   switchWorkspace: (id: string) => Promise<unknown>;
   signOut: () => Promise<unknown>;
+  // Site administrators also see the studio where ready-made playbooks are made.
+  platformAdmin?: boolean;
 }) {
   const path = usePathname();
   const [pending, start] = useTransition();
@@ -135,7 +139,7 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         {group(MAIN)}
-        <div className="mt-auto">{group(ADMIN)}</div>
+        <div className="mt-auto">{group(platformAdmin ? [{ href: "/admin/playbooks", label: "Playbook studio", icon: Sparkles }, ...ADMIN] : ADMIN)}</div>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>

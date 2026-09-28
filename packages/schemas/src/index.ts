@@ -452,3 +452,25 @@ export const SystemDiscoverySchema = z.object({
   processes: z.array(SystemProcessProposalSchema).describe("Every recurring process found, most evidenced first"),
 });
 export type SystemDiscovery = z.infer<typeof SystemDiscoverySchema>;
+
+// ---------------------------------------------------------------------------
+// Playbooks: ready-made templates for a tool, drafted by AI for the site's administrators
+// ---------------------------------------------------------------------------
+
+export const PlaybookDraftSchema = z.object({
+  title: z.string().describe(TITLE_HINT),
+  summary: z.string().describe("One sentence on what the playbook does and why it is worth it"),
+  department: z.enum(DEPARTMENTS),
+  trigger: z.string().describe("What starts the work, for example: a new ticket arrives"),
+  steps: z.array(DiscoveredStepSchema).describe("The process as a person does it today, 3 to 8 steps"),
+  estimatedMinutesPerOccurrence: z.number().nonnegative().describe("Minutes a person spends each time"),
+  agent: z.object({
+    name: z.string().describe("Named after the work, never with Agent, Bot or AI"),
+    description: z.string(),
+    autonomyLevel: z.number().int().min(2).max(4).describe("2 drafts, 3 proposes for approval, 4 acts on routine cases"),
+    instructions: InstructionsSchema,
+    tools: z.array(z.string()).describe("Tool keys from availableTools, the smallest set that does the job"),
+    successCriteria: z.array(z.string()),
+  }),
+});
+export type PlaybookDraft = z.infer<typeof PlaybookDraftSchema>;

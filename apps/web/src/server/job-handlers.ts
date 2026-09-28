@@ -7,6 +7,7 @@ import { analyseWebsite, refreshWebsiteProfile } from "@/server/company-profile"
 import { createSampleWorkspace } from "@/server/demo";
 import type { JobKind } from "@/server/jobs";
 import { defaultAgentConfig, generateOpportunitiesForProcess } from "@/server/opportunities";
+import { generatePlaybookFor } from "@/server/playbooks";
 import { DocumentImportSchema, importDocument, setComplianceOwner, setProcessStatus, confirmProcess } from "@/server/processes";
 
 // What each background job does. Each one can run a second time after its server stopped
@@ -95,5 +96,12 @@ export const HANDLERS: Record<JobKind, (ctx: Context) => Promise<Result>> = {
   sample_workspace: async (ctx) => {
     const r = await createSampleWorkspace(needSession(ctx));
     return { ...r, href: `/api/workspaces/switch?to=${r.organizationId}` };
+  },
+
+  // A site administrator drafting a ready-made playbook for a tool. Each run adds a new draft.
+  playbook: async (ctx) => {
+    const { toolkit, goal } = z.object({ toolkit: z.string().min(1), goal: z.string().max(500).optional() }).parse(ctx.input);
+    const id = await generatePlaybookFor(needSession(ctx), toolkit, goal);
+    return { id, href: `/admin/playbooks/${id}?drafted=1` };
   },
 };

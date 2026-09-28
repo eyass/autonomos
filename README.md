@@ -136,6 +136,8 @@ Costs are recorded per call from a price table in `packages/ai/src/models.ts` (G
 
 Every integration can connect in **sandbox** mode, backed by the `sandbox_records` table with realistic customers, payments and refund history. With `COMPOSIO_API_KEY`, the Connect button starts a Composio OAuth flow for the live account. The Composio action slugs and argument names for Zendesk, Stripe, Slack and Gmail were checked against the live Composio catalog and toolkit versions are pinned in `packages/integrations/src/providers.ts`.
 
+**Ready-made playbooks.** Site administrators, listed by email in `PLATFORM_ADMIN_EMAILS`, see a Playbook studio at `/admin/playbooks`. It drafts a playbook for any tool with AI from the tool's real actions (one tool, or every popular tool without one), and the administrator edits and publishes it. Published playbooks appear to every workspace at `/playbooks`: starting from one adds the process with the workspace's own volume and an automation idea whose agent is the playbook's, which then goes through the usual test and activation gates.
+
 Integration events arrive at `POST /api/webhooks/:connectionId` with `X-AutonomOS-Signature: sha256=<HMAC of the body>`. The URL and secret are shown to admins on the Integrations page.
 
 ## Production (Vercel + Supabase + Trigger.dev)

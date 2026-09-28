@@ -1,6 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
+// A site administrator for the playbook studio test. Set once, so workers share it.
+process.env.E2E_PLATFORM_ADMIN ??= `e2e-playbooks-${Date.now()}@example.com`;
+
 const env = {
+  PLATFORM_ADMIN_EMAILS: process.env.E2E_PLATFORM_ADMIN,
   AI_MOCK: "1",
   TRIGGER_SECRET_KEY: "tr_dev_e2e_stub",
   TRIGGER_API_URL: "http://127.0.0.1:3999",
