@@ -2,6 +2,7 @@
 import { DEPARTMENTS } from "@autonomos/schemas";
 import { useActionState } from "react";
 import { saveAboutAction } from "../actions";
+import { BottomBar } from "../bottom-bar";
 import { FormField } from "@/components/app/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -39,9 +40,11 @@ export function AboutForm({ summary, areas }: { summary: string; areas: string[]
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           ) : null}
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Continue"}
-          </Button>
+          <BottomBar>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving…" : "Continue"}
+            </Button>
+          </BottomBar>
         </form>
       </CardContent>
     </Card>

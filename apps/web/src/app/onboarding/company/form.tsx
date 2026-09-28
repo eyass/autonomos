@@ -18,6 +18,7 @@ import type { WebsiteAnalysis } from "@/server/company-profile";
 import type { JobView } from "@/server/jobs";
 import { requestJob, useJob } from "@/components/app/job";
 import { createCompanyAction } from "../actions";
+import { BottomBar } from "../bottom-bar";
 
 const READING_STEPS = ["Reading your homepage", "Finding the about, pricing and careers pages", "Checking which tools you use", "Writing your company profile"];
 
@@ -228,7 +229,7 @@ function ReviewForm({ analysis, website, onRestart }: { analysis: WebsiteAnalysi
               <AlertDescription>{state.error}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2">
+          <BottomBar hint="Next, connect the tools you use.">
             <Button type="submit" disabled={pending}>
               {pending ? <Spinner /> : null}
               Create company
@@ -238,7 +239,7 @@ function ReviewForm({ analysis, website, onRestart }: { analysis: WebsiteAnalysi
                 Back
               </Button>
             )}
-          </div>
+          </BottomBar>
         </CardContent>
       </Card>
     </form>
