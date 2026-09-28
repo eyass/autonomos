@@ -156,8 +156,8 @@ export function AddSystems({
                     Connected
                   </Badge>
                 ) : t.managedAuth ? (
-                  <Button size="sm" variant="outline" disabled={Boolean(connecting)} onClick={() => connect(t.slug)}>
-                    {connecting === t.slug ? "Opening…" : "Connect"}
+                  <Button size="sm" variant="outline" disabled={Boolean(connecting)} onClick={() => connect(t.slug)} title={t.usesKey ? "Connects with an API key or login from your account" : undefined}>
+                    {connecting === t.slug ? "Opening…" : t.usesKey ? "Connect with key" : "Connect"}
                   </Button>
                 ) : (
                   <span className="shrink-0 text-xs text-muted-foreground" title="An administrator sets up sign-in for this system once before it can be connected.">

@@ -35,6 +35,23 @@ describe("Composio directory", () => {
     const [gmail] = await searchDirectory("gmail");
     expect(gmail).toMatchObject({ managedAuth: true, logo: "g.png", category: "Email & chat", groups: ["communication"] });
   });
+  it("tells sign-in, own-key and needs-setup toolkits apart", async () => {
+    const { connectKind } = await withDirectory();
+    expect(connectKind({ composio_managed_auth_schemes: ["OAUTH2"], auth_schemes: ["OAUTH2"] })).toBe("signin");
+    expect(connectKind({ auth_schemes: ["DCR_OAUTH"] })).toBe("signin");
+    expect(connectKind({ auth_schemes: ["API_KEY"] })).toBe("key");
+    expect(connectKind({ auth_schemes: ["OAUTH2", "BASIC"] })).toBe("key");
+    expect(connectKind({ auth_schemes: ["OAUTH2"] })).toBe("setup");
+    expect(connectKind({ auth_schemes: ["S2S_OAUTH2"] })).toBe("setup");
+  });
+  it("plans a connection only through schemes needing nothing registered by us", async () => {
+    const { planFor } = await withDirectory();
+    const detail = (mode: string, required: unknown[] = []) => ({ mode, fields: { auth_config_creation: { required } } });
+    expect(planFor({ slug: "g", name: "G", composio_managed_auth_schemes: ["OAUTH2"] })).toEqual({ managed: true });
+    expect(planFor({ slug: "c", name: "C", auth_config_details: [detail("OAUTH2", [{ name: "client_id" }]), detail("API_KEY")] })).toEqual({ managed: false, scheme: "API_KEY" });
+    expect(planFor({ slug: "d", name: "D", auth_config_details: [detail("API_KEY"), detail("DCR_OAUTH")] })).toEqual({ managed: false, scheme: "DCR_OAUTH" });
+    expect(planFor({ slug: "x", name: "X", auth_config_details: [detail("API_KEY", [{ name: "base_url" }]), detail("OAUTH2", [{ name: "client_id" }])] })).toBeNull();
+  });
   it("lists twenty popular systems", () => {
     expect(POPULAR_TOOLKITS).toHaveLength(20);
     expect(POPULAR_TOOLKITS).toEqual(expect.arrayContaining(["gmail", "googlecalendar", "outlook", "facebook", "stripe"]));

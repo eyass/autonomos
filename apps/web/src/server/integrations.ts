@@ -1,5 +1,5 @@
 import "server-only";
-import { composioConfigured, directoryGroups, getComposio, getToolkit, integrationKeyFor, sandboxSeed, searchDirectory, startComposioConnection, toolkitFor } from "@autonomos/integrations";
+import { composioConfigured, directoryGroups, getComposio, getToolkit, integrationKeyFor, NeedsSetupError, sandboxSeed, searchDirectory, startComposioConnection, toolkitFor } from "@autonomos/integrations";
 import { sandboxStore } from "@autonomos/db";
 import { audit, activity, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
@@ -17,7 +17,7 @@ export function canUseComposio() {
 // The Composio directory: search every toolkit, connect any of them.
 // ---------------------------------------------------------------------------
 
-export type DirectoryEntry = { slug: string; key: string; name: string; description: string; logo: string | null; category: string; managedAuth: boolean; connected: boolean };
+export type DirectoryEntry = { slug: string; key: string; name: string; description: string; logo: string | null; category: string; managedAuth: boolean; usesKey: boolean; connected: boolean };
 
 export async function directoryCategories() {
   if (!composioConfigured()) return [];
@@ -40,11 +40,15 @@ export async function searchIntegrationDirectory(session: Session, query: string
       description: t.description.slice(0, 160),
       logo: t.logo,
       category: t.category,
-      managedAuth: t.managedAuth || custom.has(key),
+      // Connectable without anything set up by us first.
+      managedAuth: t.connect !== "setup" || custom.has(key),
+      usesKey: t.connect === "key" && !custom.has(key),
       connected: connected.has(key),
     };
   });
 }
+
+const needsSetup = (name: string) => `${name} needs a one-time sign-in setup on our side before it can be connected. Contact support and we will enable it for your workspace.`;
 
 function safeAuthConfigs(): Record<string, string> {
   try {
@@ -61,8 +65,8 @@ export async function connectFromDirectory(session: Session, slug: string, appUr
   const toolkit = await getToolkit(slug);
   if (!toolkit) throw new HttpError(404, "That system is not available to connect.");
   const key = integrationKeyFor(toolkit.slug);
-  if (!toolkit.managedAuth && !safeAuthConfigs()[key]) {
-    throw new HttpError(409, `${toolkit.name} needs a one-time sign-in setup before it can be connected. Contact support and we will enable it for your workspace.`);
+  if (toolkit.connect === "setup" && !safeAuthConfigs()[key]) {
+    throw new HttpError(409, needsSetup(toolkit.name));
   }
   const db = adminDb();
   await db.from("integrations").upsert(
@@ -134,10 +138,13 @@ export const safeReturnTo = (path?: string | null) => (path && /^\/[A-Za-z0-9/_-
 export async function startOAuthConnection(session: Session, key: string, appUrl: string, returnTo?: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
   if (!canUseComposio()) throw new HttpError(400, "Connecting a live account is not available for this system yet.");
-  await permissionsFor(key);
+  const { name } = await permissionsFor(key);
   const next = safeReturnTo(returnTo);
   const callback = `${appUrl}/api/integrations/callback?integration=${encodeURIComponent(key)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
-  const { redirectUrl } = await startComposioConnection(session.org.id, key, callback);
+  const { redirectUrl } = await startComposioConnection(session.org.id, key, callback).catch((e: unknown) => {
+    if (e instanceof NeedsSetupError) throw new HttpError(409, needsSetup(name));
+    throw e;
+  });
   if (!redirectUrl) throw new HttpError(502, "The sign-in page could not be opened. Try again in a minute.");
   return redirectUrl;
 }

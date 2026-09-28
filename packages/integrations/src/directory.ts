@@ -11,8 +11,24 @@ export type DirectoryToolkit = {
   groups: string[];
   // Composio can run the sign-in for this toolkit without a custom OAuth app.
   managedAuth: boolean;
+  // How a customer connects it: signs in, enters their own API key or login on Composio's
+  // hosted page, or not at all until we register an app with the vendor ("setup").
+  connect: ConnectKind;
   version: string | null;
 };
+
+export type ConnectKind = "signin" | "key" | "setup";
+
+// Auth schemes a customer completes on their own, with nothing registered by us first:
+// dynamic client registration signs in; the rest ask for the customer's own credentials.
+export const SELF_SERVE_SCHEMES = ["DCR_OAUTH", "API_KEY", "BEARER_TOKEN", "BASIC", "BASIC_WITH_JWT"] as const;
+
+export function connectKind(t: { no_auth?: boolean; composio_managed_auth_schemes?: string[]; auth_schemes?: string[] }): ConnectKind {
+  if (t.no_auth || (t.composio_managed_auth_schemes?.length ?? 0) > 0) return "signin";
+  const schemes = t.auth_schemes ?? [];
+  if (schemes.includes("DCR_OAUTH")) return "signin";
+  return schemes.some((s) => (SELF_SERVE_SCHEMES as readonly string[]).includes(s)) ? "key" : "setup";
+}
 
 // The 20 systems companies connect most. All support Composio-managed sign-in.
 export const POPULAR_TOOLKITS = [
@@ -104,6 +120,7 @@ type RawToolkit = {
   slug: string;
   name: string;
   composio_managed_auth_schemes?: string[];
+  auth_schemes?: string[];
   no_auth?: boolean;
   deprecated?: unknown;
   meta?: { description?: string; logo?: string; categories?: Array<{ name: string }>; version?: string };
@@ -120,6 +137,7 @@ function shape(t: RawToolkit): DirectoryToolkit {
     category: groups[0] ? groupLabel(groups[0]) : titleCase(t.meta?.categories?.[0]?.name ?? "Other"),
     groups,
     managedAuth: Boolean(t.no_auth) || (t.composio_managed_auth_schemes?.length ?? 0) > 0,
+    connect: connectKind(t),
     version: t.meta?.version ?? null,
   };
 }
@@ -166,6 +184,8 @@ export async function popularToolkits(exclude: ReadonlySet<string> = new Set(), 
     .slice(0, count);
 }
 
+const CONNECT_ORDER: Record<ConnectKind, number> = { signin: 0, key: 1, setup: 2 };
+
 const POPULARITY = new Map<string, number>([...POPULAR_TOOLKITS, ...POPULAR_BACKFILL].map((slug, i) => [slug, i]));
 
 // An empty query gives the popular list, without the systems in `connected` (toolkit slugs).
@@ -176,7 +196,7 @@ export async function searchDirectory(query: string, limit = 30, connected: Read
   if (!q && !group) return popularToolkits(connected);
   const all = (await listDirectory()).filter((t) => !group || t.groups.includes(group));
   const known = (t: DirectoryToolkit) => POPULARITY.get(t.slug) ?? 999;
-  if (!q) return all.sort((a, b) => known(a) - known(b) || Number(b.managedAuth) - Number(a.managedAuth) || a.name.localeCompare(b.name)).slice(0, limit);
+  if (!q) return all.sort((a, b) => known(a) - known(b) || CONNECT_ORDER[a.connect] - CONNECT_ORDER[b.connect] || a.name.localeCompare(b.name)).slice(0, limit);
   const score = (t: DirectoryToolkit) => {
     const name = t.name.toLowerCase();
     if (name === q || t.slug === q) return 0;
@@ -208,6 +228,25 @@ export async function getToolkit(slug: string): Promise<DirectoryToolkit | null>
   } catch {
     return null;
   }
+}
+
+// How a toolkit can be connected without anything registered by us: Composio-managed
+// sign-in, or the first self-serve scheme whose auth config needs no developer credentials.
+export type AuthPlan = { managed: true } | { managed: false; scheme: (typeof SELF_SERVE_SCHEMES)[number] } | null;
+
+type RawAuthDetails = RawToolkit & {
+  auth_config_details?: Array<{ mode: string; fields?: { auth_config_creation?: { required?: unknown[] } } }>;
+};
+
+export function planFor(t: RawAuthDetails): AuthPlan {
+  if (t.no_auth || (t.composio_managed_auth_schemes?.length ?? 0) > 0) return { managed: true };
+  const free = new Set((t.auth_config_details ?? []).filter((d) => !(d.fields?.auth_config_creation?.required ?? []).length).map((d) => d.mode));
+  const scheme = SELF_SERVE_SCHEMES.find((s) => free.has(s));
+  return scheme ? { managed: false, scheme } : null;
+}
+
+export async function authPlan(slug: string): Promise<AuthPlan> {
+  return planFor(await get<RawAuthDetails>(`/toolkits/${encodeURIComponent(slug)}`, {}));
 }
 
 // Read-only actions of a toolkit, for reading an arbitrary connected system.
