@@ -1,5 +1,6 @@
 import "server-only";
-import { availableTools } from "./tool-catalog";
+import { availableTools, registerWorkspaceTools } from "./tool-catalog";
+import { getPlaybook, playbookAgentConfig } from "./playbooks";
 import { policyForTools } from "@autonomos/agents";
 import type { AgentConfig } from "@autonomos/schemas";
 import { generateAgentDraft, generateOpportunities, type ProcessForAnalysis } from "@autonomos/ai";
@@ -168,6 +169,15 @@ export async function draftAgentForOpportunity(session: Session, opportunityId: 
 // The agent configuration AutonomOS proposes for an opportunity. The wizard starts from it,
 // and "Build and test agent" uses it as-is (every write is still simulated in the test).
 export async function defaultAgentConfig(session: Session, opportunityId: string) {
+  // An idea started from a ready-made playbook builds the playbook's agent, not a new draft.
+  const { data: fromPlaybook } = await adminDb().from("automation_opportunities").select("*").eq("organization_id", session.org.id).eq("id", opportunityId).maybeSingle();
+  if (fromPlaybook?.playbook_id) {
+    const playbook = await getPlaybook(fromPlaybook.playbook_id).catch(() => null);
+    if (playbook) {
+      await registerWorkspaceTools(session.org.id);
+      return { opportunity: fromPlaybook, config: playbookAgentConfig(playbook), connected: await connectedIntegrationKeys(session) };
+    }
+  }
   const { opportunity: o, draft, connected } = await draftAgentForOpportunity(session, opportunityId);
   // Start one level below the target for anything involving money; the user can raise it.
   const level = Math.max(2, Math.min(o.target_autonomy_level, draft.suggestedTools.includes("stripe.create_refund") ? 3 : o.target_autonomy_level, 4)) as AgentConfig["autonomyLevel"];

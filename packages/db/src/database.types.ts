@@ -923,6 +923,7 @@ export type Database = {
           major_risks: string[];
           opportunity_score: number;
           organization_id: string;
+          playbook_id: string | null;
           problem: string;
           process_id: string;
           proposed_agent: NonNullable<Json>;
@@ -959,6 +960,7 @@ export type Database = {
           major_risks?: string[];
           opportunity_score?: number;
           organization_id: string;
+          playbook_id?: string | null;
           problem?: string;
           process_id: string;
           proposed_agent?: NonNullable<Json>;
@@ -995,6 +997,7 @@ export type Database = {
           major_risks?: string[];
           opportunity_score?: number;
           organization_id?: string;
+          playbook_id?: string | null;
           problem?: string;
           process_id?: string;
           proposed_agent?: NonNullable<Json>;
@@ -1032,6 +1035,13 @@ export type Database = {
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "automation_opportunities_playbook_id_fkey";
+            columns: ["playbook_id"];
+            isOneToOne: false;
+            referencedRelation: "playbooks";
             referencedColumns: ["id"];
           },
           {
@@ -1950,6 +1960,68 @@ export type Database = {
           },
           {
             foreignKeyName: "organizations_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      playbooks: {
+        Row: {
+          agent: NonNullable<Json>;
+          created_at: string;
+          created_by: string | null;
+          department: string;
+          estimated_minutes_per_occurrence: number | null;
+          id: string;
+          slug: string;
+          status: string;
+          steps: NonNullable<Json>;
+          summary: string;
+          title: string;
+          tool_snapshots: NonNullable<Json>;
+          toolkits: string[];
+          trigger: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          agent?: NonNullable<Json>;
+          created_at?: string;
+          created_by?: string | null;
+          department?: string;
+          estimated_minutes_per_occurrence?: number | null;
+          id?: string;
+          slug: string;
+          status?: string;
+          steps?: NonNullable<Json>;
+          summary?: string;
+          title: string;
+          tool_snapshots?: NonNullable<Json>;
+          toolkits?: string[];
+          trigger?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          agent?: NonNullable<Json>;
+          created_at?: string;
+          created_by?: string | null;
+          department?: string;
+          estimated_minutes_per_occurrence?: number | null;
+          id?: string;
+          slug?: string;
+          status?: string;
+          steps?: NonNullable<Json>;
+          summary?: string;
+          title?: string;
+          tool_snapshots?: NonNullable<Json>;
+          toolkits?: string[];
+          trigger?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "playbooks_created_by_fkey";
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "users";

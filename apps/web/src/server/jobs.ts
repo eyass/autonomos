@@ -9,7 +9,7 @@ import { adminDb, HttpError, sessionFor, type Session } from "@/lib/session";
 // (a crash, a deploy, the time limit), the next read notices the missing heartbeat and runs
 // it again, up to MAX_ATTEMPTS. Handlers are written so that running twice is safe.
 
-export type JobKind = "website_profile" | "profile_refresh" | "document_import" | "opportunities" | "build_agent" | "sample_workspace";
+export type JobKind = "website_profile" | "profile_refresh" | "document_import" | "opportunities" | "build_agent" | "sample_workspace" | "playbook";
 
 export type JobView = {
   id: string;
@@ -41,6 +41,7 @@ export const JOB_LABELS: Record<JobKind, string> = {
   opportunities: "Finding automation ideas",
   build_agent: "Building and testing the agent",
   sample_workspace: "Setting up the sample workspace",
+  playbook: "Drafting a playbook",
 };
 
 // Handlers are loaded lazily so this module stays light for the routes that only read jobs.

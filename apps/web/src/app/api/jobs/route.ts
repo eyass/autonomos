@@ -3,6 +3,7 @@ import { handle } from "@/lib/actions";
 import { rateLimit } from "@/lib/rate-limit";
 import { adminDb, getUser, HttpError, requireRole, requireSessionOrThrow } from "@/lib/session";
 import { startJob } from "@/server/jobs";
+import { requirePlatformAdmin } from "@/server/playbooks";
 import { DocumentImportSchema, processGate } from "@/server/processes";
 
 // The job starts here and keeps running after this responds, in this function.
@@ -18,6 +19,7 @@ const Body = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("build_agent"), input: z.object({ opportunityId: z.string().uuid() }) }),
   z.object({ kind: z.literal("sample_workspace"), input: z.object({}).default({}) }),
+  z.object({ kind: z.literal("playbook"), input: z.object({ toolkit: z.string().trim().min(1).max(80), goal: z.string().trim().max(500).optional() }) }),
 ]);
 
 // POST /api/jobs — starts a background job (or returns the one already under way for the
@@ -69,6 +71,10 @@ export async function POST(request: Request) {
       case "sample_workspace":
         // Not tied to the current workspace: one sample per person.
         return startJob({ userId: session.user.id, organizationId: session.org.id, kind: body.kind, subject: "sample", input: {} });
+      case "playbook":
+        requirePlatformAdmin(session);
+        rateLimit(`ai:${session.user.id}`, 30, 60_000);
+        return startJob({ ...base, subject: `${body.input.toolkit}:${body.input.goal ?? ""}`.slice(0, 300), input: body.input });
     }
   });
 }

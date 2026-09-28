@@ -11,6 +11,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { listWorkspaces } from "@/server/platform";
 import { signOutAction, markNotificationsRead, switchWorkspaceAction } from "./shell-actions";
 import { Logo } from "@/components/brand/logo";
+import { isPlatformAdmin } from "@/server/playbooks";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         workspaces={workspaces}
         switchWorkspace={switchWorkspaceAction}
         signOut={signOutAction}
+        platformAdmin={isPlatformAdmin(session)}
         email={session.user.email}
         name={`${session.user.firstName} ${session.user.lastName}`.trim()}
       />
