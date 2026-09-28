@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAction } from "@/lib/actions";
 import { requireSessionOrThrow } from "@/lib/session";
 import { startJob } from "@/server/jobs";
-import { deletePlaybook, requirePlatformAdmin, setPlaybookStatus, toolkitsWithoutPlaybooks, updatePlaybook } from "@/server/playbooks";
+import { deletePlaybook, listPlaybooks, requirePlatformAdmin, setPlaybookStatus, STARTER_PLAYBOOKS, updatePlaybook } from "@/server/playbooks";
 
 const lines = z
   .string()
@@ -15,12 +15,19 @@ const lines = z
       .filter(Boolean),
   );
 
+const Step = z.object({
+  title: z.string().max(200),
+  detail: z.string().max(500).default(""),
+  capability: z.string().max(40).nullable(),
+  access: z.enum(["read", "write", "none"]),
+});
+
 const Edit = z.object({
   title: z.string().trim().min(1).max(160),
   summary: z.string().trim().max(1000),
   department: z.string().trim().min(1).max(60),
   trigger: z.string().trim().max(300),
-  steps: lines,
+  steps: z.array(Step).max(12),
   estimatedMinutes: z
     .string()
     .trim()
@@ -29,28 +36,11 @@ const Edit = z.object({
   objective: z.string().trim().max(2000),
   rules: lines,
   escalations: lines,
-  tools: z.array(z.string().min(1)).max(40),
   autonomyLevel: z.coerce.number().int().min(2).max(4),
 });
 
-export async function savePlaybookAction(id: string, form: FormData) {
-  return runAction(async () => {
-    const session = await requireSessionOrThrow();
-    const edit = Edit.parse({
-      title: form.get("title") ?? "",
-      summary: form.get("summary") ?? "",
-      department: form.get("department") ?? "",
-      trigger: form.get("trigger") ?? "",
-      steps: form.get("steps") ?? "",
-      estimatedMinutes: form.get("estimatedMinutes") ?? "",
-      objective: form.get("objective") ?? "",
-      rules: form.get("rules") ?? "",
-      escalations: form.get("escalations") ?? "",
-      tools: form.getAll("tools").map(String),
-      autonomyLevel: form.get("autonomyLevel") ?? 3,
-    });
-    await updatePlaybook(session, id, edit);
-  });
+export async function savePlaybookAction(id: string, raw: Record<string, unknown>) {
+  return runAction(async () => updatePlaybook(await requireSessionOrThrow(), id, Edit.parse(raw)));
 }
 
 export async function setPlaybookStatusAction(id: string, status: "draft" | "published") {
@@ -61,13 +51,13 @@ export async function deletePlaybookAction(id: string) {
   return runAction(async () => deletePlaybook(await requireSessionOrThrow(), id));
 }
 
-// Drafts one playbook for each popular tool that has none yet, a few at a time.
-export async function draftMissingAction() {
+// Drafts the starter library: common recurring work across departments, one job each.
+export async function draftStarterLibraryAction() {
   return runAction(async () => {
     const session = await requireSessionOrThrow();
     requirePlatformAdmin(session);
-    const missing = (await toolkitsWithoutPlaybooks()).slice(0, 6);
-    for (const toolkit of missing) await startJob({ userId: session.user.id, organizationId: session.org.id, kind: "playbook", subject: `${toolkit}:`, input: { toolkit } });
-    return { started: missing.length };
+    if ((await listPlaybooks()).length) return { started: 0 };
+    for (const s of STARTER_PLAYBOOKS) await startJob({ userId: session.user.id, organizationId: session.org.id, kind: "playbook", subject: `${s.department}:${s.goal}`, input: s });
+    return { started: STARTER_PLAYBOOKS.length };
   });
 }

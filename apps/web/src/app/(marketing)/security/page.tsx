@@ -19,6 +19,21 @@ const FLOW = [
   { from: "The agent runner", to: "your live systems", note: "Only for systems connected to a live account, through a secure connection partner" },
 ];
 
+// Controls in place today, mapped to the SOC 2 Trust Services Criteria. No certification is claimed.
+const SOC2 = [
+  {
+    criterion: "Security",
+    controls: "Row level security on every tenant table, role checks on every change, an explicit tool allowlist per agent and a policy engine evaluated in code before every write.",
+  },
+  { criterion: "Availability", controls: "Agent runs survive restarts and resume where they stopped; an emergency stop pauses every agent at once." },
+  { criterion: "Processing integrity", controls: "Idempotency keys on every write, simulated writes in every test run and versioned agent configurations that cannot be changed once written." },
+  {
+    criterion: "Confidentiality",
+    controls: "Data stays in the workspace region, sign-in tokens stay with the connection partner, secrets are server-only and models receive only the text a task needs.",
+  },
+  { criterion: "Privacy", controls: "Documented retention periods, a published subprocessor list and an append-only audit log of every action." },
+];
+
 export default function SecurityPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
@@ -101,8 +116,32 @@ export default function SecurityPage() {
         <h2 id="subprocessors">Subprocessors</h2>
         <SubprocessorTable />
 
-        <h2 id="certifications">Certifications</h2>
-        <p>AutonomOS does not hold security certifications today. SOC 2 is on the roadmap.</p>
+        <h2 id="compliance">Compliance and SOC 2</h2>
+        <p>
+          AutonomOS controls are designed against the AICPA SOC 2 Trust Services Criteria. An independent SOC 2 Type II audit is planned. When the report is issued, its scope and audit period will be
+          listed here and the report shared with customers under NDA.
+        </p>
+        <div className="not-prose my-4 overflow-hidden rounded-lg border border-border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/60 text-xs text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 font-medium">Criterion</th>
+                <th className="px-4 py-2 font-medium">How AutonomOS meets it</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SOC2.map((c) => (
+                <tr key={c.criterion} className="border-t border-border align-top">
+                  <td className="px-4 py-3 font-medium whitespace-nowrap">{c.criterion}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.controls}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          For a security review, questionnaires or the data processing agreement, email <a href={`mailto:${SECURITY_EMAIL}`}>{SECURITY_EMAIL}</a>.
+        </p>
 
         <h2 id="disclosure">Responsible disclosure</h2>
         <p>

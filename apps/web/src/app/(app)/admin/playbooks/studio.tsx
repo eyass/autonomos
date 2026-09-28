@@ -11,19 +11,17 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { draftMissingAction } from "./actions";
+import { draftStarterLibraryAction } from "./actions";
 
-type Toolkit = { key: string; name: string; playbooks: number };
-
-// Drafting one playbook: pick the tool, optionally say what it should do.
-export function DraftForm({ toolkits }: { toolkits: Toolkit[] }) {
-  const [toolkit, setToolkit] = useState(toolkits.find((t) => !t.playbooks)?.key ?? toolkits[0]?.key ?? "");
+// Drafting one playbook: optionally a department and what it should do.
+export function DraftForm({ departments }: { departments: readonly string[] }) {
+  const [department, setDepartment] = useState("");
   const [goal, setGoal] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
   const submit = () =>
     start(async () => {
-      const r = await requestJob("playbook", { toolkit, ...(goal.trim() ? { goal: goal.trim() } : {}) });
+      const r = await requestJob("playbook", { ...(department ? { department } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) });
       if (!r.ok) return void toast.error(r.error);
       toast.success("Drafting. It appears in the library when it is ready.");
       setGoal("");
@@ -32,22 +30,20 @@ export function DraftForm({ toolkits }: { toolkits: Toolkit[] }) {
   return (
     <Card className="gap-4 px-4 py-4 sm:gap-4 sm:py-4">
       <div className="space-y-1.5">
-        <Label htmlFor="pb-tool">Tool</Label>
-        <NativeSelect id="pb-tool" value={toolkit} onChange={(e) => setToolkit(e.target.value)}>
-          {toolkits.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.name}
-              {t.playbooks ? ` (${t.playbooks})` : ""}
-            </option>
+        <Label htmlFor="pb-department">Department</Label>
+        <NativeSelect id="pb-department" value={department} onChange={(e) => setDepartment(e.target.value)}>
+          <option value="">Any</option>
+          {departments.map((d) => (
+            <option key={d}>{d}</option>
           ))}
         </NativeSelect>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="pb-goal">What it should do (optional)</Label>
-        <Textarea id="pb-goal" value={goal} onChange={(e) => setGoal(e.target.value)} rows={3} maxLength={500} placeholder="For example: chase unpaid invoices after 14 days" />
-        <p className="text-xs text-muted-foreground">Leave it empty and AI picks the most valuable job this tool does that has no playbook yet.</p>
+        <Textarea id="pb-goal" value={goal} onChange={(e) => setGoal(e.target.value)} rows={3} maxLength={500} placeholder="For example: handle refund requests against the refund policy" />
+        <p className="text-xs text-muted-foreground">Leave it empty and AI picks valuable common work that has no playbook yet.</p>
       </div>
-      <Button onClick={submit} disabled={pending || !toolkit}>
+      <Button onClick={submit} disabled={pending}>
         {pending ? <Spinner /> : <Sparkles />}
         Draft with AI
       </Button>
@@ -55,36 +51,37 @@ export function DraftForm({ toolkits }: { toolkits: Toolkit[] }) {
   );
 }
 
-export function DraftMissing({ count }: { count: number }) {
+export function DraftStarter({ count }: { count: number }) {
   const [pending, start] = useTransition();
   const router = useRouter();
-  if (!count) return null;
   return (
     <Button
       variant="outline"
       disabled={pending}
       onClick={() =>
         start(async () => {
-          const r = await draftMissingAction();
+          const r = await draftStarterLibraryAction();
           if (!r.ok) return void toast.error(r.error);
-          toast.success(r.data.started ? `Drafting ${r.data.started} playbooks.` : "Every popular tool has a playbook.");
+          toast.success(`Drafting ${r.data.started} playbooks.`);
           router.refresh();
         })
       }
     >
       {pending ? <Spinner /> : <Sparkles />}
-      Draft for tools without one ({count})
+      Draft a starter library ({count})
     </Button>
   );
 }
 
-type Job = { id: string; toolkit: string; name: string; goal: string | null; status: string; error: string | null };
+type Job = { id: string; label: string; status: string; error: string | null };
 
 // Drafts under way. Reading each job also restarts one whose server stopped.
 export function DraftQueue({ jobs }: { jobs: Job[] }) {
   const router = useRouter();
-  const running = jobs.filter((j) => j.status !== "failed");
-  const ids = running.map((j) => j.id).join(",");
+  const ids = jobs
+    .filter((j) => j.status !== "failed")
+    .map((j) => j.id)
+    .join(",");
   useEffect(() => {
     if (!ids) return;
     const timer = setInterval(async () => {
@@ -107,8 +104,7 @@ export function DraftQueue({ jobs }: { jobs: Job[] }) {
           {j.status === "failed" ? <Badge variant="danger">Failed</Badge> : <Spinner className="text-muted-foreground" />}
           <div className="min-w-0 flex-1">
             <div className="truncate">
-              {j.status === "failed" ? "Could not draft" : "Drafting"} a playbook for {j.name}
-              {j.goal ? `: ${j.goal}` : ""}
+              {j.status === "failed" ? "Could not draft" : "Drafting"}: {j.label}
             </div>
             {j.error ? <div className="truncate text-xs text-muted-foreground">{j.error}</div> : null}
           </div>

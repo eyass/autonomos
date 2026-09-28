@@ -55,7 +55,7 @@ function safeAuthConfigs(): Record<string, string> {
 }
 
 // Adds a directory toolkit to the catalogue (once), then starts its sign-in.
-export async function connectFromDirectory(session: Session, slug: string, appUrl: string) {
+export async function connectFromDirectory(session: Session, slug: string, appUrl: string, returnTo?: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
   if (!composioConfigured()) throw new HttpError(400, "Connecting live systems is not available in this workspace yet.");
   const toolkit = await getToolkit(slug);
@@ -80,7 +80,7 @@ export async function connectFromDirectory(session: Session, slug: string, appUr
     },
     { onConflict: "key", ignoreDuplicates: true },
   );
-  return startOAuthConnection(session, key, appUrl);
+  return startOAuthConnection(session, key, appUrl, returnTo);
 }
 
 async function permissionsFor(key: string) {
@@ -128,11 +128,15 @@ export async function connectSandbox(session: Session, key: string) {
   await afterConnect(session, key, "sandbox");
 }
 
-export async function startOAuthConnection(session: Session, key: string, appUrl: string) {
+// Only paths inside the app are allowed as a place to come back to after signing in.
+export const safeReturnTo = (path?: string | null) => (path && /^\/[A-Za-z0-9/_-]*$/.test(path) && !path.startsWith("//") ? path : null);
+
+export async function startOAuthConnection(session: Session, key: string, appUrl: string, returnTo?: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");
   if (!canUseComposio()) throw new HttpError(400, "Connecting a live account is not available for this system yet.");
   await permissionsFor(key);
-  const callback = `${appUrl}/api/integrations/callback?integration=${encodeURIComponent(key)}`;
+  const next = safeReturnTo(returnTo);
+  const callback = `${appUrl}/api/integrations/callback?integration=${encodeURIComponent(key)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
   const { redirectUrl } = await startComposioConnection(session.org.id, key, callback);
   if (!redirectUrl) throw new HttpError(502, "The sign-in page could not be opened. Try again in a minute.");
   return redirectUrl;

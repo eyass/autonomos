@@ -21,14 +21,30 @@ export function SystemLogo({ src, name, className = "size-8" }: { src: string | 
 
 // "Add systems": the 20 most common systems first, and search across the whole Composio
 // directory (about 1,500 systems). Connecting opens the system's own sign-in.
-export function AddSystems({ canManage, variant = "default" }: { canManage: boolean; variant?: "default" | "outline" }) {
+export function AddSystems({
+  canManage,
+  variant = "default",
+  size,
+  label = "Add systems",
+  initialGroup = null,
+  returnTo,
+}: {
+  canManage: boolean;
+  variant?: "default" | "outline" | "ghost";
+  size?: "sm" | "default";
+  label?: string;
+  // Opens on this directory group (DIRECTORY_GROUPS key).
+  initialGroup?: string | null;
+  // Where to come back to after signing in to the system.
+  returnTo?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DirectoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [group, setGroup] = useState<string | null>(null);
+  const [group, setGroup] = useState<string | null>(initialGroup);
   const [groups, setGroups] = useState<Array<{ key: string; label: string; count: number }>>([]);
   const [, start] = useTransition();
   const seq = useRef(0);
@@ -60,7 +76,7 @@ export function AddSystems({ canManage, variant = "default" }: { canManage: bool
     start(async () => {
       setConnecting(slug);
       setError(null);
-      const r = await connectDirectoryAction(slug);
+      const r = await connectDirectoryAction(slug, returnTo);
       setConnecting(null);
       if (r && !r.ok) setError(r.error);
     });
@@ -68,9 +84,9 @@ export function AddSystems({ canManage, variant = "default" }: { canManage: bool
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant={variant} disabled={!canManage}>
+        <Button variant={variant} size={size} disabled={!canManage}>
           <Plus />
-          Add systems
+          {label}
         </Button>
       </SheetTrigger>
       <SheetContent className="flex w-full flex-col gap-0 sm:max-w-lg">
