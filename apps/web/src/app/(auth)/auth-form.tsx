@@ -124,6 +124,8 @@ export function AuthForm({ mode, providers = ["google"] }: { mode: "login" | "si
       }
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      // Route handlers (finishing a connection) need a full page load, not a client navigation.
+      if (next.startsWith("/api/")) return window.location.assign(next);
       router.push(next);
       router.refresh();
     } catch (e) {
