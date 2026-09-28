@@ -1,5 +1,5 @@
 import { logger, schedules, tasks } from "@trigger.dev/sdk";
-import { createServiceClient, createRun, snapshotMetrics } from "@autonomos/db";
+import { createServiceClient, createRun, RunNotAllowedError, snapshotMetrics } from "@autonomos/db";
 import type { agentRunTask } from "./agent-run";
 
 // Expire approvals that nobody resolved, and resume their runs so they close cleanly.
@@ -45,13 +45,23 @@ export const agentScheduleTask = schedules.task({
       logger.info("skipping schedule for inactive agent", { agentId: payload.externalId });
       return;
     }
-    const { runId } = await createRun(db, {
-      organizationId: agent.organization_id,
-      agentId: agent.id,
-      mode: "production",
-      trigger: { type: "schedule", scheduleId: payload.scheduleId, timestamp: payload.timestamp.toISOString() },
-      input: { scheduled_for: payload.timestamp.toISOString() },
-    });
+    let runId: string;
+    try {
+      ({ runId } = await createRun(db, {
+        organizationId: agent.organization_id,
+        agentId: agent.id,
+        mode: "production",
+        trigger: { type: "schedule", scheduleId: payload.scheduleId, timestamp: payload.timestamp.toISOString() },
+        input: { scheduled_for: payload.timestamp.toISOString() },
+      }));
+    } catch (e) {
+      // Not allowed to run now (plan allowance used up, agents paused): skip this slot, no retry.
+      if (e instanceof RunNotAllowedError) {
+        logger.info("skipping scheduled run", { agentId: agent.id, reason: e.message });
+        return;
+      }
+      throw e;
+    }
     await tasks.trigger<typeof agentRunTask>("agent-run", { runId }, { idempotencyKey: `run-${runId}` });
   },
 });

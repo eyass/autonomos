@@ -1,7 +1,7 @@
 import { executeRun, refundPolicy } from "@autonomos/agents";
 import { buildSandboxTicket, SAMPLE_TICKETS, sandboxSeed } from "@autonomos/integrations";
 import { beforeAll, describe, expect, it } from "vitest";
-import { createRun, SupabaseRunStore, sandboxStore } from "../src";
+import { createRun, RunNotAllowedError, SupabaseRunStore, sandboxStore } from "../src";
 import { service, signUp, uniqueEmail } from "./helpers";
 
 // End-to-end run engine against the real schema: approval stop, resume, idempotent refund.
@@ -20,8 +20,16 @@ describe("SupabaseRunStore with the run engine", () => {
     }
     const sandbox = sandboxStore(db, orgId);
     for (const { system, kind, record } of sandboxSeed()) await sandbox.put(system, kind, record);
-    const { data: proc } = await db.from("processes").insert({ organization_id: orgId, title: "Refund request handling", estimated_minutes_per_occurrence: 8, status: "reviewed" }).select("id").single();
-    const { data: agent } = await db.from("agents").insert({ organization_id: orgId, process_id: proc!.id, name: "Refund handling", objective: "Resolve refunds", autonomy_level: 3, status: "active" }).select("id").single();
+    const { data: proc } = await db
+      .from("processes")
+      .insert({ organization_id: orgId, title: "Refund request handling", estimated_minutes_per_occurrence: 8, status: "reviewed" })
+      .select("id")
+      .single();
+    const { data: agent } = await db
+      .from("agents")
+      .insert({ organization_id: orgId, process_id: proc!.id, name: "Refund handling", objective: "Resolve refunds", autonomy_level: 3, status: "active" })
+      .select("id")
+      .single();
     agentId = agent!.id;
     const { data: version } = await db
       .from("agent_versions")
@@ -86,5 +94,27 @@ describe("SupabaseRunStore with the run engine", () => {
     await db.from("organizations").update({ agents_paused: true }).eq("id", orgId);
     await expect(createRun(db, { organizationId: orgId, agentId, mode: "production", trigger: {}, input: {} })).rejects.toThrow(/paused/);
     await db.from("organizations").update({ agents_paused: false }).eq("id", orgId);
+  });
+
+  it("stops production runs at the free plan's monthly allowance, never test runs", async () => {
+    const { data: agent } = await db.from("agents").select("active_version_id, process_id").eq("id", agentId).single();
+    const { count } = await db.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("mode", "production");
+    const fill = Array.from({ length: Math.max(0, 250 - (count ?? 0)) }, () => ({
+      organization_id: orgId,
+      agent_id: agentId,
+      agent_version_id: agent!.active_version_id!,
+      process_id: agent!.process_id,
+      mode: "production" as const,
+      trigger: { type: "manual" },
+      input: {},
+    }));
+    if (fill.length) await db.from("agent_runs").insert(fill);
+    const production = { organizationId: orgId, agentId, mode: "production" as const, trigger: { type: "manual" }, input: {} };
+    await expect(createRun(db, production)).rejects.toBeInstanceOf(RunNotAllowedError);
+    await expect(createRun(db, production)).rejects.toThrow(/250 production runs/);
+    await expect(createRun(db, { ...production, mode: "test" })).resolves.toHaveProperty("runId");
+    // Paid plans keep running above the allowance (billed as overage).
+    await db.from("organizations").update({ plan: "starter" }).eq("id", orgId);
+    await expect(createRun(db, production)).resolves.toHaveProperty("runId");
   });
 });

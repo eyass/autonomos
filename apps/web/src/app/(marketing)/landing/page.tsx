@@ -251,7 +251,7 @@ export default function LandingPage() {
       <section id="pricing" className="scroll-mt-16 border-b border-border bg-card">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <SectionHeading eyebrow="Pricing" title="Priced by work done, not seats">
-            Start free, no card needed.
+            Start free, no card needed: {PLANS.design_partner.activeAgents} live agent and {num(PLANS.design_partner.runsPerMonth)} runs a month, with unlimited test runs.
           </SectionHeading>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {(["starter", "growth"] as const).map((key) => {

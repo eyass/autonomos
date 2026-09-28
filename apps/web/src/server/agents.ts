@@ -279,7 +279,17 @@ export async function dispatchIntegrationEvent(organizationId: string, event: st
   });
   const runIds: string[] = [];
   for (const a of listening) {
-    const { runId } = await createRun(db, { organizationId, agentId: a.id, mode: "production", trigger: { type: "integration_event", event }, input: payload });
+    let runId: string;
+    try {
+      ({ runId } = await createRun(db, { organizationId, agentId: a.id, mode: "production", trigger: { type: "integration_event", event }, input: payload }));
+    } catch (e) {
+      // A run that may not start (plan allowance used up, agents paused) skips this agent only.
+      if (e instanceof RunNotAllowedError) {
+        console.warn("event run not started", a.id, e.message);
+        continue;
+      }
+      throw e;
+    }
     await enqueueOrFail(organizationId, runId);
     runIds.push(runId);
   }
