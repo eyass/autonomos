@@ -1,3 +1,4 @@
+import { DEPARTMENTS } from "@autonomos/schemas";
 import { z } from "zod";
 import { handle } from "@/lib/actions";
 import { rateLimit } from "@/lib/rate-limit";
@@ -19,7 +20,7 @@ const Body = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("build_agent"), input: z.object({ opportunityId: z.string().uuid() }) }),
   z.object({ kind: z.literal("sample_workspace"), input: z.object({}).default({}) }),
-  z.object({ kind: z.literal("playbook"), input: z.object({ toolkit: z.string().trim().min(1).max(80), goal: z.string().trim().max(500).optional() }) }),
+  z.object({ kind: z.literal("playbook"), input: z.object({ department: z.enum(DEPARTMENTS).optional(), goal: z.string().trim().max(500).optional() }) }),
 ]);
 
 // POST /api/jobs — starts a background job (or returns the one already under way for the
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       case "playbook":
         requirePlatformAdmin(session);
         rateLimit(`ai:${session.user.id}`, 30, 60_000);
-        return startJob({ ...base, subject: `${body.input.toolkit}:${body.input.goal ?? ""}`.slice(0, 300), input: body.input });
+        return startJob({ ...base, subject: `${body.input.department ?? ""}:${body.input.goal ?? ""}`.slice(0, 300), input: body.input });
     }
   });
 }

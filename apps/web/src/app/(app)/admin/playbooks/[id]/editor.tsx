@@ -1,4 +1,5 @@
 "use client";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -13,20 +14,19 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { deletePlaybookAction, savePlaybookAction, setPlaybookStatusAction } from "../actions";
 
+type Step = { title: string; detail: string; capability: string | null; access: "read" | "write" | "none" };
 type Initial = {
   title: string;
   summary: string;
   department: string;
   trigger: string;
-  steps: string;
+  steps: Step[];
   estimatedMinutes: string;
   objective: string;
   rules: string;
   escalations: string;
-  tools: string[];
   autonomyLevel: number;
 };
-type Tool = { key: string; label: string; integration: string; system: string; access: "read" | "write" };
 
 const LEVELS = [
   { value: 2, label: "2 · Drafts the work for a person to send" },
@@ -34,19 +34,26 @@ const LEVELS = [
   { value: 4, label: "4 · Acts on routine cases, asks on the rest" },
 ];
 
-export function PlaybookEditor({ id, initial, tools, departments }: { id: string; initial: Initial; tools: Tool[]; departments: string[] }) {
+export function PlaybookEditor({ id, initial, departments, capabilities }: { id: string; initial: Initial; departments: readonly string[]; capabilities: Array<{ key: string; label: string }> }) {
   const [pending, start] = useTransition();
-  const [chosen, setChosen] = useState(new Set(initial.tools));
+  const [steps, setSteps] = useState<Step[]>(initial.steps);
   const router = useRouter();
-  const systems = [...new Set(tools.map((t) => t.system))];
+  const set = (i: number, patch: Partial<Step>) => setSteps((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const move = (i: number, by: number) =>
+    setSteps((s) => {
+      const next = [...s];
+      const [x] = next.splice(i, 1);
+      next.splice(Math.max(0, Math.min(next.length, i + by)), 0, x!);
+      return next;
+    });
   const save = (form: FormData) =>
     start(async () => {
-      const r = await savePlaybookAction(id, form);
+      const r = await savePlaybookAction(id, { ...Object.fromEntries(form), steps });
       if (!r.ok) return void toast.error(r.error);
       toast.success("Saved");
       router.refresh();
     });
-  const field = (name: keyof Initial, label: string, hint?: string, rows?: number) => (
+  const field = (name: Exclude<keyof Initial, "steps">, label: string, hint?: string, rows?: number) => (
     <div className="space-y-1.5">
       <Label htmlFor={`pb-${name}`}>{label}</Label>
       {rows ? <Textarea id={`pb-${name}`} name={name} defaultValue={String(initial[name])} rows={rows} /> : <Input id={`pb-${name}`} name={name} defaultValue={String(initial[name])} />}
@@ -54,96 +61,112 @@ export function PlaybookEditor({ id, initial, tools, departments }: { id: string
     </div>
   );
   return (
-    <form action={save} className="grid gap-6 lg:grid-cols-2">
-      <Card className="gap-4 px-4 py-4 sm:gap-4 sm:py-4 sm:px-6">
-        <h2 className="text-sm font-semibold">The process</h2>
-        {field("title", "Title")}
-        {field("summary", "Summary", "One sentence on what it does and why it is worth it.", 2)}
-        <div className="grid gap-4 sm:grid-cols-2">
+    <form action={save} className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="gap-4 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
+          <h2 className="text-sm font-semibold">The process</h2>
+          {field("title", "Title")}
+          {field("summary", "Summary", "One sentence on what it does and why it is worth it.", 2)}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="pb-department">Department</Label>
+              <NativeSelect id="pb-department" name="department" defaultValue={initial.department}>
+                {departments.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            {field("estimatedMinutes", "Minutes each time", "What a person typically spends.")}
+          </div>
+          {field("trigger", "What starts it")}
+        </Card>
+        <Card className="gap-4 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
+          <h2 className="text-sm font-semibold">The agent</h2>
+          {field("objective", "Objective", undefined, 3)}
+          {field("rules", "Rules", "One per line. Never name a product.", 4)}
+          {field("escalations", "Hand to a person when", "One per line.", 3)}
           <div className="space-y-1.5">
-            <Label htmlFor="pb-department">Department</Label>
-            <NativeSelect id="pb-department" name="department" defaultValue={initial.department}>
-              {departments.map((d) => (
-                <option key={d}>{d}</option>
+            <Label htmlFor="pb-level">Autonomy</Label>
+            <NativeSelect id="pb-level" name="autonomyLevel" defaultValue={String(initial.autonomyLevel)}>
+              {LEVELS.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
               ))}
             </NativeSelect>
           </div>
-          {field("estimatedMinutes", "Minutes each time", "What a person spends today.")}
-        </div>
-        {field("trigger", "What starts it")}
-        {field("steps", "Steps", "One per line, as a person does it today.", 6)}
-      </Card>
-      <Card className="gap-4 px-4 py-4 sm:gap-4 sm:py-4 sm:px-6">
-        <h2 className="text-sm font-semibold">The agent</h2>
-        {field("objective", "Objective", undefined, 3)}
-        {field("rules", "Rules", "One per line.", 4)}
-        {field("escalations", "Hand to a person when", "One per line.", 3)}
-        <div className="space-y-1.5">
-          <Label htmlFor="pb-level">Autonomy</Label>
-          <NativeSelect id="pb-level" name="autonomyLevel" defaultValue={String(initial.autonomyLevel)}>
-            {LEVELS.map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-medium">Actions ({chosen.size})</legend>
-          {systems.map((s) => (
-            <div key={s} className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">{s}</div>
-              <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
-                {tools
-                  .filter((t) => t.system === s)
-                  .map((t) => (
-                    <label key={t.key} className="flex items-start gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="tools"
-                        value={t.key}
-                        checked={chosen.has(t.key)}
-                        onChange={(e) => {
-                          const next = new Set(chosen);
-                          if (e.target.checked) next.add(t.key);
-                          else next.delete(t.key);
-                          setChosen(next);
-                        }}
-                        className="mt-0.5 size-4 accent-[var(--brand)]"
-                      />
-                      <span className="min-w-0">
-                        {t.label} <span className="text-xs text-muted-foreground">{t.access === "read" ? "reads" : "acts"}</span>
-                      </span>
-                    </label>
-                  ))}
-              </div>
-            </div>
-          ))}
-        </fieldset>
-      </Card>
-      <div className="lg:col-span-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? <Spinner /> : null}
-          Save changes
-        </Button>
+        </Card>
       </div>
+      <Card className="gap-3 px-4 py-4 sm:gap-3 sm:px-6 sm:py-5">
+        <div>
+          <h2 className="text-sm font-semibold">Steps</h2>
+          <p className="text-xs text-muted-foreground">Each step names the kind of system it works in. Customers connect their own tool to it.</p>
+        </div>
+        <ol className="space-y-3" aria-label="Steps">
+          {steps.map((s, i) => (
+            <li key={i} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1.5rem_minmax(0,1fr)_11rem_8rem_auto] sm:items-start" data-testid="step-row">
+              <span className="pt-2 text-xs font-medium text-muted-foreground tabular-nums">{i + 1}</span>
+              <div className="space-y-2">
+                <Input aria-label={`Step ${i + 1} title`} value={s.title} onChange={(e) => set(i, { title: e.target.value })} />
+                <Input aria-label={`Step ${i + 1} detail`} value={s.detail} placeholder="What to look at or do" onChange={(e) => set(i, { detail: e.target.value })} className="text-xs" />
+              </div>
+              <NativeSelect
+                aria-label={`Step ${i + 1} system`}
+                value={s.capability ?? ""}
+                onChange={(e) => set(i, { capability: e.target.value || null, access: e.target.value ? (s.access === "none" ? "read" : s.access) : "none" })}
+              >
+                <option value="">No system</option>
+                {capabilities.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </NativeSelect>
+              <NativeSelect aria-label={`Step ${i + 1} access`} value={s.access} disabled={!s.capability} onChange={(e) => set(i, { access: e.target.value as Step["access"] })}>
+                {s.capability ? null : <option value="none">Decides</option>}
+                <option value="read">Looks up</option>
+                <option value="write">Changes</option>
+              </NativeSelect>
+              <div className="flex gap-1">
+                <Button type="button" variant="ghost" size="icon" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}>
+                  <ArrowUp />
+                </Button>
+                <Button type="button" variant="ghost" size="icon" aria-label="Move down" disabled={i === steps.length - 1} onClick={() => move(i, 1)}>
+                  <ArrowDown />
+                </Button>
+                <Button type="button" variant="ghost" size="icon" aria-label="Remove step" onClick={() => setSteps((x) => x.filter((_, j) => j !== i))}>
+                  <Trash2 />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setSteps((x) => [...x, { title: "", detail: "", capability: null, access: "none" }])}>
+          <Plus />
+          Add step
+        </Button>
+      </Card>
+      <Button type="submit" disabled={pending}>
+        {pending ? <Spinner /> : null}
+        Save changes
+      </Button>
     </form>
   );
 }
 
-export function PlaybookStatus({ id, status, firstToolkit }: { id: string; status: "draft" | "published"; firstToolkit: string }) {
+export function PlaybookStatus({ id, status, department }: { id: string; status: "draft" | "published"; department: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
     <>
       <Button
         variant="outline"
-        disabled={pending || !firstToolkit}
+        disabled={pending}
         onClick={() =>
           start(async () => {
-            const r = await requestJob("playbook", { toolkit: firstToolkit });
+            const r = await requestJob("playbook", { department });
             if (!r.ok) return void toast.error(r.error);
-            toast.success("Drafting another for this tool.");
+            toast.success(`Drafting another for ${department}.`);
             router.push("/admin/playbooks");
           })
         }

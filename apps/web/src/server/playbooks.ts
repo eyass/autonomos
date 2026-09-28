@@ -1,28 +1,18 @@
 import "server-only";
-import { generatePlaybook } from "@autonomos/ai";
-import { AgentConfigSchema, DEPARTMENTS, type AgentConfig, type PlaybookDraft } from "@autonomos/schemas";
-import { policyForTools, sensitiveAreas } from "@autonomos/agents";
-import {
-  BUILTIN_INTEGRATIONS,
-  composioToolsFor,
-  getTool,
-  getToolkit,
-  integrationKeyFor,
-  POPULAR_TOOLKITS,
-  registerSnapshots,
-  snapshotOf,
-  toolkitFor,
-  toolsForIntegrations,
-  type ToolDefinition,
-  type ToolSnapshot,
-} from "@autonomos/integrations";
+import { choosePlaybookTools, generatePlaybook } from "@autonomos/ai";
+import { AgentConfigSchema, DEPARTMENTS, PlaybookStepSchema, type AgentConfig, type Department, type PlaybookDraft, type PlaybookStep } from "@autonomos/schemas";
+import { policyFieldsFor, policyForTools, sensitiveAreas } from "@autonomos/agents";
+import { CAPABILITIES, capabilitiesOf, capabilityInfo, getTool, getToolkit, integrationKeyFor, isCapability, toolkitFor, type Capability, type ToolDefinition } from "@autonomos/integrations";
 import { audit, activity, recordUsage } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
-import { confirmProcess, saveDiscoveredProcesses, setProcessStatus } from "@/server/processes";
+import { SANDBOX_INTEGRATIONS } from "@/server/integrations";
+import { confirmProcess, saveDiscoveredProcesses, setComplianceOwner, setPolicyThresholds, setProcessStatus } from "@/server/processes";
+import { availableTools, registerWorkspaceTools } from "@/server/tool-catalog";
 
-// Ready-made playbooks: templates the site's administrators draft with AI for a tool, review and
-// publish, and every workspace can start from. Only site administrators (PLATFORM_ADMIN_EMAILS)
-// write them; the server checks it on every change.
+// Ready-made playbooks: templates the site's administrators draft with AI, review and publish.
+// A playbook never names a product. Each step names the kind of system it needs (a help desk,
+// a payment system); a workspace connects its own tool to each, and AI picks that tool's
+// actions for the step. Only site administrators (PLATFORM_ADMIN_EMAILS) write playbooks.
 
 export function isPlatformAdmin(session: Pick<Session, "user">): boolean {
   const list = (process.env.PLATFORM_ADMIN_EMAILS ?? "")
@@ -43,11 +33,10 @@ export type PlaybookRow = {
   title: string;
   summary: string;
   department: string;
-  toolkits: string[];
+  capabilities: Capability[];
   trigger: string | null;
-  steps: PlaybookDraft["steps"];
+  steps: PlaybookStep[];
   agent: PlaybookAgent;
-  tool_snapshots: ToolSnapshot[];
   estimated_minutes_per_occurrence: number | null;
   status: "draft" | "published";
   created_at: string;
@@ -55,13 +44,15 @@ export type PlaybookRow = {
 };
 
 const asRow = (r: Record<string, unknown>) =>
-  ({ ...r, estimated_minutes_per_occurrence: r.estimated_minutes_per_occurrence === null ? null : Number(r.estimated_minutes_per_occurrence) }) as unknown as PlaybookRow;
+  ({
+    ...r,
+    steps: ((r.steps as unknown[]) ?? []).map((s) => PlaybookStepSchema.parse(s)),
+    capabilities: ((r.capabilities as string[]) ?? []).filter(isCapability),
+    estimated_minutes_per_occurrence: r.estimated_minutes_per_occurrence === null ? null : Number(r.estimated_minutes_per_occurrence),
+  }) as unknown as PlaybookRow;
 
-// The tools a playbook for this system may use: its built-in tools, or its Composio actions.
-async function toolsForToolkit(key: string): Promise<ToolDefinition[]> {
-  const own = BUILTIN_INTEGRATIONS.has(key) ? toolsForIntegrations([key]).filter((t) => t.integration === key) : await composioToolsFor(key);
-  return [...own, ...toolsForIntegrations([]).filter((t) => t.integration === "knowledge")];
-}
+// The capabilities a playbook's steps need, in step order.
+export const neededCapabilities = (steps: PlaybookStep[]): Capability[] => [...new Set(steps.map((s) => s.capability).filter((c): c is Capability => Boolean(c) && isCapability(c!)))];
 
 const slugify = (s: string) =>
   s
@@ -70,36 +61,32 @@ const slugify = (s: string) =>
     .replace(/^-|-$/g, "")
     .slice(0, 60);
 
-// Drafts one playbook for a tool with AI, from the tool's real actions. Saved as a draft.
-export async function generatePlaybookFor(session: Session, toolkitKey: string, goal?: string): Promise<string> {
+// Drafts one playbook with AI, for a department and/or a goal. Saved as a draft.
+export async function generatePlaybookFor(session: Session, input: { department?: string; goal?: string }): Promise<string> {
   requirePlatformAdmin(session);
-  const key = integrationKeyFor(toolkitFor(toolkitKey));
-  const [toolkit, tools, names] = await Promise.all([getToolkit(toolkitFor(key)).catch(() => null), toolsForToolkit(key), toolkitInfo([key])]);
-  const name = toolkit?.name ?? names.get(key)?.name ?? key;
-  if (!tools.some((t) => t.integration === key)) throw new HttpError(409, `No actions are available for ${name} yet`);
+  const department = input.department && (DEPARTMENTS as readonly string[]).includes(input.department) ? input.department : undefined;
   const db = adminDb();
-  const { data: existing } = await db.from("playbooks").select("title").contains("toolkits", [key]);
+  const { data: existing } = await db.from("playbooks").select("title");
   const draft = await generatePlaybook({
-    tool: { key, name, description: toolkit?.description ?? "" },
-    goal: goal?.trim() || undefined,
-    availableTools: tools.map((t) => ({ key: t.key, label: t.label, description: t.description, access: t.access })),
+    department,
+    goal: input.goal?.trim() || undefined,
+    capabilities: CAPABILITIES.map((c) => ({ key: c.key, label: c.label, hint: c.hint })),
     existingTitles: (existing ?? []).map((e) => e.title),
     onUsage: (u) => recordUsage(session.org.id, u),
   });
-  if (!draft.agent.tools.length) throw new HttpError(422, "The draft used none of the tool's actions. Try again, or give it a goal.");
-  const snapshots = draft.agent.tools.map((t) => snapshotOf(getTool(t))).filter((s): s is ToolSnapshot => Boolean(s));
+  const capabilities = neededCapabilities(draft.steps);
+  if (!capabilities.length) throw new HttpError(422, "The draft did not say which systems it works in. Try again, or give it a goal.");
   const { data, error } = await db
     .from("playbooks")
     .insert({
-      slug: `${slugify(draft.title) || key}-${Math.random().toString(36).slice(2, 7)}`,
+      slug: `${slugify(draft.title) || "playbook"}-${Math.random().toString(36).slice(2, 7)}`,
       title: draft.title,
       summary: draft.summary,
       department: draft.department,
-      toolkits: [...new Set([key, ...draft.agent.tools.map((t) => getTool(t)?.integration).filter((i): i is string => Boolean(i) && i !== "knowledge")])],
+      capabilities,
       trigger: draft.trigger,
       steps: draft.steps as never,
       agent: draft.agent as never,
-      tool_snapshots: snapshots as never,
       estimated_minutes_per_occurrence: draft.estimatedMinutesPerOccurrence,
       status: "draft",
       created_by: session.user.id,
@@ -107,16 +94,23 @@ export async function generatePlaybookFor(session: Session, toolkitKey: string, 
     .select("id")
     .single();
   if (error || !data) throw new Error(`playbook: ${error?.message}`);
-  await audit(session, { action: "playbook.generated", input: { toolkit: key, goal: goal ?? null }, output: { id: data.id } });
+  await audit(session, { action: "playbook.generated", input: { department: department ?? null, goal: input.goal ?? null }, output: { id: data.id } });
   return data.id;
 }
 
-// The popular tools that have no playbook yet, for a batch run.
-export async function toolkitsWithoutPlaybooks(): Promise<string[]> {
-  const { data } = await adminDb().from("playbooks").select("toolkits");
-  const covered = new Set((data ?? []).flatMap((r) => r.toolkits));
-  return POPULAR_TOOLKITS.map((t) => integrationKeyFor(t)).filter((k) => !covered.has(k));
-}
+// A first library: common recurring work across departments, drafted in one go.
+export const STARTER_PLAYBOOKS: Array<{ department: Department; goal: string }> = [
+  { department: "Customer Support", goal: "Handle refund requests against the refund policy" },
+  { department: "Customer Support", goal: "Answer where-is-my-order questions with the order status" },
+  { department: "Finance", goal: "Chase unpaid invoices after the due date" },
+  { department: "Finance", goal: "Match incoming payments to open invoices" },
+  { department: "Sales", goal: "Qualify new inbound leads and route them to the right owner" },
+  { department: "Sales", goal: "Follow up on deals with no activity for a week" },
+  { department: "Operations", goal: "Flag orders that cannot ship because of low stock" },
+  { department: "Marketing", goal: "Welcome new subscribers and tag them by interest" },
+  { department: "HR", goal: "Prepare the first week for a new employee" },
+  { department: "HR", goal: "Handle leave requests against the leave balance" },
+];
 
 export async function listPlaybooks(opts: { status?: "published" } = {}): Promise<PlaybookRow[]> {
   let q = adminDb().from("playbooks").select("*").order("department").order("title");
@@ -139,33 +133,37 @@ export type PlaybookEdit = {
   summary: string;
   department: string;
   trigger: string;
-  steps: string[];
+  steps: PlaybookStep[];
   estimatedMinutes: number | null;
   objective: string;
   rules: string[];
   escalations: string[];
-  tools: string[];
   autonomyLevel: number;
 };
+
+// Steps as stored: a capability always has read or write access, a judgement step has none.
+export function tidySteps(steps: PlaybookStep[]): PlaybookStep[] {
+  return steps
+    .map((s) => ({ ...s, title: s.title.trim(), detail: (s.detail ?? "").trim() }))
+    .filter((s) => s.title)
+    .map((s) => {
+      const capability = s.capability && isCapability(s.capability) ? s.capability : null;
+      return { ...s, capability, access: capability ? (s.access === "none" ? "read" : s.access) : "none" };
+    });
+}
 
 export async function updatePlaybook(session: Session, id: string, edit: PlaybookEdit) {
   requirePlatformAdmin(session);
   const current = await getPlaybook(id);
+  const steps = tidySteps(edit.steps);
   if (edit.title.trim().length < 3) throw new HttpError(400, "Give the playbook a title");
-  if (edit.steps.filter(Boolean).length < 2) throw new HttpError(400, "A playbook needs at least two steps");
-  if (!edit.tools.length) throw new HttpError(400, "Give the agent at least one tool");
+  if (steps.length < 2) throw new HttpError(400, "A playbook needs at least two steps");
+  if (!neededCapabilities(steps).length) throw new HttpError(400, "At least one step needs a system to work in");
   if (!(DEPARTMENTS as readonly string[]).includes(edit.department)) throw new HttpError(400, "Pick a department");
-  // The tools stay within what the playbook's tools offer (or already had).
-  registerSnapshots(current.tool_snapshots);
-  const offered = new Set([...(await Promise.all(current.toolkits.map(toolsForToolkit))).flat().map((t) => t.key), ...current.agent.tools]);
-  const unknown = edit.tools.filter((t) => !offered.has(t));
-  if (unknown.length) throw new HttpError(400, `Unknown tool ${unknown[0]}`);
-  const oldSteps = new Map(current.steps.map((s) => [s.title, s]));
   const agent: PlaybookAgent = {
     ...current.agent,
     name: edit.title.trim(),
     autonomyLevel: Math.min(4, Math.max(2, Math.round(edit.autonomyLevel))),
-    tools: edit.tools,
     instructions: {
       ...current.agent.instructions,
       objective: edit.objective.trim() || current.agent.instructions.objective,
@@ -180,10 +178,10 @@ export async function updatePlaybook(session: Session, id: string, edit: Playboo
       summary: edit.summary.trim(),
       department: edit.department,
       trigger: edit.trigger.trim() || null,
-      steps: edit.steps.filter(Boolean).map((t) => oldSteps.get(t) ?? { title: t }) as never,
+      steps: steps as never,
+      capabilities: neededCapabilities(steps),
       estimated_minutes_per_occurrence: edit.estimatedMinutes,
       agent: agent as never,
-      tool_snapshots: edit.tools.map((t) => snapshotOf(getTool(t))).filter(Boolean) as never,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -205,16 +203,148 @@ export async function deletePlaybook(session: Session, id: string) {
   await audit(session, { action: "playbook.deleted", input: { id } });
 }
 
-// Starts a workspace on a published playbook: the process (with the workspace's own volume and
-// time) and an automation idea whose agent is the playbook's. Building the agent then goes
-// through the usual gates: connected tools, compliance owner and policy numbers where needed,
-// and a test before it can go live.
-export async function startFromPlaybook(session: Session, id: string, input: { occurrencesPerMonth: number; minutesPerOccurrence: number | null }): Promise<string> {
+// ---------------------------------------------------------------------------
+// In a workspace: which connected tool fills each capability
+// ---------------------------------------------------------------------------
+
+export type WorkspaceTool = { key: string; name: string; logo: string | null; capabilities: Capability[] };
+
+export async function workspaceTools(session: Session): Promise<WorkspaceTool[]> {
+  const { data } = await adminDb().from("integration_connections").select("integration_key, integrations(name, logo, category)").eq("organization_id", session.org.id).eq("status", "connected");
+  return (data ?? []).map((c) => {
+    const i = c.integrations as unknown as { name: string; logo: string | null; category: string | null } | null;
+    return { key: c.integration_key, name: i?.name ?? c.integration_key, logo: i?.logo ?? null, capabilities: capabilitiesOf(c.integration_key, i?.category) };
+  });
+}
+
+export type Suggestion = { slug: string; key: string; name: string; logo: string | null; sandbox: boolean };
+
+// Names and logos for tools a workspace has not connected: the catalog first, then the directory.
+async function suggestionsFor(capability: Capability, connected: Set<string>): Promise<Suggestion[]> {
+  const info = capabilityInfo(capability)!;
+  const slugs = info.toolkits.filter((t) => !connected.has(integrationKeyFor(t))).slice(0, 4);
+  const keys = slugs.map((s) => integrationKeyFor(s));
+  const { data } = await adminDb().from("integrations").select("key, name, logo").in("key", keys);
+  const known = new Map((data ?? []).map((r) => [r.key, r]));
+  return Promise.all(
+    slugs.map(async (slug) => {
+      const key = integrationKeyFor(slug);
+      const row = known.get(key);
+      const t = row ? null : await getToolkit(toolkitFor(key)).catch(() => null);
+      return { slug, key, name: row?.name ?? t?.name ?? key.charAt(0).toUpperCase() + key.slice(1), logo: row?.logo ?? t?.logo ?? null, sandbox: SANDBOX_INTEGRATIONS.includes(key) };
+    }),
+  );
+}
+
+export type Slot = {
+  capability: Capability;
+  label: string;
+  hint: string;
+  group: string;
+  // Connected tools that fill it, most likely first.
+  options: Array<{ key: string; name: string; logo: string | null }>;
+  suggestions: Suggestion[];
+};
+
+// Each capability a playbook needs, with the workspace's tools that can fill it.
+export async function playbookSlots(session: Session, p: PlaybookRow, tools?: WorkspaceTool[]): Promise<Slot[]> {
+  const mine = tools ?? (await workspaceTools(session));
+  const connected = new Set(mine.map((t) => t.key));
+  return Promise.all(
+    p.capabilities.map(async (capability) => {
+      const info = capabilityInfo(capability)!;
+      const options = mine.filter((t) => t.capabilities.includes(capability)).map(({ key, name, logo }) => ({ key, name, logo }));
+      return { capability, label: info.label, hint: info.hint, group: info.group, options, suggestions: options.length ? [] : await suggestionsFor(capability, connected) };
+    }),
+  );
+}
+
+export type GalleryPlaybook = {
+  id: string;
+  title: string;
+  summary: string;
+  department: string;
+  capabilities: Array<{ key: Capability; label: string; covered: boolean }>;
+  steps: number;
+  minutes: number | null;
+  ready: boolean;
+};
+
+// Published playbooks for a workspace: the ones its connected tools already cover first.
+export async function playbookGallery(session: Session): Promise<GalleryPlaybook[]> {
+  const [rows, mine] = await Promise.all([listPlaybooks({ status: "published" }), workspaceTools(session)]);
+  const covered = new Set(mine.flatMap((t) => t.capabilities));
+  return rows
+    .map((p) => {
+      const capabilities = p.capabilities.map((c) => ({ key: c, label: capabilityInfo(c)!.label, covered: covered.has(c) }));
+      return {
+        id: p.id,
+        title: p.title,
+        summary: p.summary,
+        department: p.department,
+        capabilities,
+        steps: p.steps.length,
+        minutes: p.estimated_minutes_per_occurrence,
+        ready: capabilities.every((c) => c.covered),
+      };
+    })
+    .sort((a, b) => Number(b.ready) - Number(a.ready) || b.capabilities.filter((c) => c.covered).length - a.capabilities.filter((c) => c.covered).length || a.title.localeCompare(b.title));
+}
+
+// The agent's actions for each step, from the tool the workspace connected for it.
+async function toolsForSteps(session: Session, p: PlaybookRow, bindings: Partial<Record<Capability, string>>): Promise<string[][]> {
+  const bound = [...new Set(Object.values(bindings).filter((k): k is string => Boolean(k)))];
+  const all = await availableTools(session, bound);
+  const summary = (t: ToolDefinition) => ({ key: t.key, label: t.label, description: t.description, access: t.access, integration: t.integration });
+  const toolsByStep = p.steps.map((s) => (s.capability && bindings[s.capability as Capability] ? all.filter((t) => t.integration === bindings[s.capability as Capability]).map(summary) : []));
+  return choosePlaybookTools({ steps: p.steps, toolsByStep, onUsage: (u) => recordUsage(session.org.id, u) });
+}
+
+// The regulated areas a playbook touches (money, personal data...), which need a named person
+// signing off on compliance before its agent is built.
+export const playbookPolicyFields = (p: Pick<PlaybookRow, "title" | "summary" | "steps">) => policyFieldsFor(playbookSensitive(p));
+export const playbookSensitive = (p: Pick<PlaybookRow, "title" | "summary" | "steps">) => sensitiveAreas(`${p.title} ${p.summary} ${p.steps.map((s) => `${s.title} ${s.detail}`).join(" ")}`);
+
+// Starts a workspace on a published playbook with its own tools: the process (with its own
+// volume and time) and an automation idea whose agent is the playbook's, using the actions
+// of the tools connected for each step. Building it then goes through the usual gates.
+export async function startFromPlaybook(
+  session: Session,
+  id: string,
+  input: { occurrencesPerMonth: number; minutesPerOccurrence: number | null; bindings: Record<string, string>; complianceOwner?: string; policy?: Record<string, string> },
+): Promise<string> {
   const p = await getPlaybook(id, { publishedOnly: true });
-  const names = await toolkitInfo(p.toolkits);
   const minutes = input.minutesPerOccurrence ?? p.estimated_minutes_per_occurrence ?? null;
   if (!(input.occurrencesPerMonth > 0)) throw new HttpError(400, "Say roughly how often this happens each month");
   if (!minutes || minutes <= 0) throw new HttpError(400, "Say roughly how many minutes it takes each time");
+  const sensitive = playbookSensitive(p);
+  const owner = input.complianceOwner?.trim() ?? "";
+  if (sensitive.length && owner.length < 2) throw new HttpError(409, `This work involves ${sensitive.join(" and ")}. Name who signs off on compliance.`);
+  const unset = policyFieldsFor(sensitive).filter((f) => !(input.policy?.[f.key] ?? "").trim());
+  if (unset.length) throw new HttpError(409, `Set your policy first: ${unset.map((f) => f.label.toLowerCase()).join("; ")}.`);
+  const mine = await workspaceTools(session);
+  const byKey = new Map(mine.map((t) => [t.key, t]));
+  const bindings: Partial<Record<Capability, string>> = {};
+  for (const c of p.capabilities) {
+    const key = input.bindings[c];
+    const label = capabilityInfo(c)!.label.toLowerCase();
+    if (!key) throw new HttpError(409, `Connect a ${label} tool first`);
+    if (!byKey.has(key)) throw new HttpError(409, `That ${label} tool is not connected`);
+    bindings[c] = key;
+  }
+  const stepTools = await toolsForSteps(session, p, bindings);
+  const missing = p.steps.findIndex((s, i) => s.access !== "none" && !stepTools[i]!.length);
+  if (missing >= 0) {
+    const s = p.steps[missing]!;
+    throw new HttpError(
+      409,
+      `${byKey.get(bindings[s.capability as Capability]!)?.name ?? "That tool"} has no action to ${s.access === "read" ? "look up" : "do"} "${s.title}". Pick another tool for this step.`,
+    );
+  }
+  const tools = [...new Set([...stepTools.flat(), "knowledge.search_documents"])];
+  const nameOf = (c: string | null) => (c ? (byKey.get(bindings[c as Capability] ?? "")?.name ?? undefined) : undefined);
+  const systems = [...new Set(Object.values(bindings).map((k) => byKey.get(k!)?.name ?? k!))];
+  const risky = sensitive.length > 0;
   const db = adminDb();
   const [processId] = await saveDiscoveredProcesses(
     session,
@@ -222,14 +352,14 @@ export async function startFromPlaybook(session: Session, id: string, input: { o
       {
         title: p.title,
         description: p.summary,
-        department: (DEPARTMENTS as readonly string[]).includes(p.department) ? (p.department as (typeof DEPARTMENTS)[number]) : "Other",
+        department: (DEPARTMENTS as readonly string[]).includes(p.department) ? (p.department as Department) : "Other",
         trigger: p.trigger ?? undefined,
         frequency: "ad_hoc",
         estimatedOccurrencesPerMonth: input.occurrencesPerMonth,
         estimatedMinutesPerOccurrence: minutes,
-        systems: p.toolkits.map((k) => names.get(k)?.name ?? k),
+        systems,
         roles: [],
-        steps: p.steps,
+        steps: p.steps.map((s) => ({ title: s.title, description: s.detail || undefined, system: nameOf(s.capability), requiresJudgement: s.access === "none" || undefined })),
         inputs: [],
         outputs: [],
         decisionPoints: [],
@@ -238,7 +368,7 @@ export async function startFromPlaybook(session: Session, id: string, input: { o
         potentialAutonomyLevel: Math.min(5, p.agent.autonomyLevel + 1),
         businessValue: 3,
         automationDifficulty: 2,
-        riskLevel: sensitiveAreas(`${p.title} ${p.summary}`).length ? 3 : 2,
+        riskLevel: risky ? 3 : 2,
         missingInformation: [],
         confidence: 1,
       },
@@ -257,11 +387,14 @@ export async function startFromPlaybook(session: Session, id: string, input: { o
     await confirmProcess(session, pid);
     await setProcessStatus(session, pid, "reviewed").catch(() => undefined);
   }
+  if (sensitive.length) {
+    await setComplianceOwner(session, pid, owner);
+    await setPolicyThresholds(session, pid, input.policy ?? {});
+  }
   // The share of today's time the agent takes over grows with how much it does on its own.
   const share = p.agent.autonomyLevel >= 4 ? 0.75 : p.agent.autonomyLevel === 3 ? 0.6 : 0.4;
   const hours = Math.round(((input.occurrencesPerMonth * minutes) / 60) * share * 10) / 10;
-  registerSnapshots(p.tool_snapshots);
-  const writes = p.agent.tools.map((t) => getTool(t)).filter((t): t is ToolDefinition => t?.access === "write");
+  const writes = tools.map((t) => getTool(t)).filter((t): t is ToolDefinition => t?.access === "write");
   const { data: o, error } = await db
     .from("automation_opportunities")
     .insert({
@@ -274,40 +407,45 @@ export async function startFromPlaybook(session: Session, id: string, input: { o
       target_autonomy_level: p.agent.autonomyLevel,
       business_value_score: 3,
       automation_difficulty_score: 2,
-      risk_score: sensitiveAreas(`${p.title} ${p.summary}`).length ? 3 : 2,
+      risk_score: risky ? 3 : 2,
       estimated_hours_saved_monthly: hours,
       estimated_cost_saved_monthly: Math.round(hours * session.org.defaultHourlyCost),
       estimated_build_complexity: "Low",
-      required_integrations: p.toolkits.map((k) => names.get(k)?.name ?? k),
-      required_tools: p.agent.tools,
-      future_state_steps: futureSteps(p) as never,
+      required_integrations: systems,
+      required_tools: tools,
+      future_state_steps: futureSteps(p, nameOf) as never,
       human_involvement: p.agent.instructions.escalationConditions,
       required_approvals: p.agent.autonomyLevel <= 3 ? writes.map((t) => t.label) : writes.filter((t) => t.riskTags.length).map((t) => t.label),
       rationale: `From the ready-made playbook "${p.title}".`,
       recommended_next_step: "Build and test the agent",
       playbook_id: p.id,
+      playbook_bindings: bindings as never,
       created_by: session.user.id,
     })
     .select("id")
     .single();
   if (error || !o) throw new Error(`opportunity: ${error?.message}`);
-  await audit(session, { action: "playbook.used", input: { playbook: p.id }, output: { process: pid, opportunity: o.id } });
+  await audit(session, { action: "playbook.used", input: { playbook: p.id, bindings }, output: { process: pid, opportunity: o.id } });
   await activity(session, { actionType: "playbook_used", title: `Started from the playbook ${p.title}`, processId: pid });
   return o.id;
 }
 
-// How the work runs with the agent: its steps, with a person approving where the level asks for it.
-function futureSteps(p: PlaybookRow): Array<{ title: string; actor: "agent" | "human"; approval?: boolean }> {
-  const steps = p.agent.instructions.steps.length ? p.agent.instructions.steps : p.steps.map((s) => s.title);
-  const out: Array<{ title: string; actor: "agent" | "human"; approval?: boolean }> = steps.map((title) => ({ title, actor: "agent" }));
-  if (p.agent.autonomyLevel <= 3 && out.length) out[out.length - 1] = { ...out[out.length - 1]!, approval: true };
+// How the work runs with the agent: each step in the connected tool, with a person approving
+// changes where the level asks for it.
+function futureSteps(p: PlaybookRow, nameOf: (c: string | null) => string | undefined): Array<{ title: string; actor: "agent" | "human"; approval?: boolean }> {
+  const out: Array<{ title: string; actor: "agent" | "human"; approval?: boolean }> = p.steps.map((s) => ({
+    title: nameOf(s.capability) ? `${s.title} (${nameOf(s.capability)})` : s.title,
+    actor: "agent",
+    ...(s.access === "write" && p.agent.autonomyLevel <= 3 ? { approval: true } : {}),
+  }));
   if (p.agent.autonomyLevel === 2) out.push({ title: "A person reviews and sends the draft", actor: "human" });
   return out;
 }
 
-// The agent a playbook describes, as the configuration to build (used instead of drafting one).
-export function playbookAgentConfig(p: PlaybookRow): AgentConfig {
-  registerSnapshots(p.tool_snapshots);
+// The agent a playbook describes, with the actions chosen for the workspace's tools.
+export async function playbookAgentConfig(session: Session, p: PlaybookRow, tools: string[]): Promise<AgentConfig> {
+  // Registers the Composio actions of the workspace's tools, so policy and the version snapshot see them.
+  await Promise.all([registerWorkspaceTools(session.org.id), availableTools(session)]);
   const level = Math.min(4, Math.max(2, p.agent.autonomyLevel)) as AgentConfig["autonomyLevel"];
   return AgentConfigSchema.parse({
     name: p.agent.name,
@@ -315,56 +453,15 @@ export function playbookAgentConfig(p: PlaybookRow): AgentConfig {
     autonomyLevel: level,
     instructions: p.agent.instructions,
     trigger: { type: "manual" },
-    tools: p.agent.tools,
-    policy: policyForTools(p.agent.tools, level),
+    tools,
+    policy: policyForTools(tools, level),
     successCriteria: p.agent.successCriteria,
     modelConfig: { modelClass: "AGENT_MODEL" },
   });
 }
 
-// Names and logos for the tools playbooks use: the workspace catalog first, then the directory.
-export async function toolkitInfo(keys: string[]): Promise<Map<string, { name: string; logo: string | null }>> {
-  const unique = [...new Set(keys)];
-  const out = new Map<string, { name: string; logo: string | null }>();
-  if (!unique.length) return out;
-  const { data } = await adminDb().from("integrations").select("key, name, logo").in("key", unique);
-  for (const r of data ?? []) out.set(r.key, { name: r.name, logo: r.logo ?? null });
-  await Promise.all(
-    unique
-      .filter((k) => !out.has(k))
-      .map(async (k) => {
-        const t = await getToolkit(toolkitFor(k)).catch(() => null);
-        out.set(k, { name: t?.name ?? k.charAt(0).toUpperCase() + k.slice(1).replaceAll("_", " "), logo: t?.logo ?? null });
-      }),
-  );
-  return out;
-}
-
-// The tools an administrator can draft playbooks for: the built-in ones and the most used
-// directory tools, each with whether it has a playbook already.
-export async function studioToolkits(): Promise<Array<{ key: string; name: string; logo: string | null; playbooks: number }>> {
-  const keys = [...new Set([...BUILTIN_INTEGRATIONS, ...POPULAR_TOOLKITS.map((t) => integrationKeyFor(t))])].filter((k) => k !== "knowledge");
-  const [info, { data }] = await Promise.all([toolkitInfo(keys), adminDb().from("playbooks").select("toolkits")]);
-  const counts = new Map<string, number>();
-  for (const r of data ?? []) for (const k of r.toolkits) counts.set(k, (counts.get(k) ?? 0) + 1);
-  return keys.map((k) => ({ key: k, name: info.get(k)?.name ?? k, logo: info.get(k)?.logo ?? null, playbooks: counts.get(k) ?? 0 })).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// The actions an administrator can give a playbook's agent: its tools' actions plus the ones
-// it already has.
-export async function offeredTools(p: PlaybookRow): Promise<Array<{ key: string; label: string; integration: string; access: "read" | "write" }>> {
-  registerSnapshots(p.tool_snapshots);
-  const all = [
-    ...(await Promise.all(p.toolkits.map((k) => toolsForToolkit(k).catch(() => [] as ToolDefinition[])))).flat(),
-    ...p.agent.tools.map((t) => getTool(t)).filter((t): t is ToolDefinition => Boolean(t)),
-  ];
-  const seen = new Map<string, { key: string; label: string; integration: string; access: "read" | "write" }>();
-  for (const t of all) if (!seen.has(t.key)) seen.set(t.key, { key: t.key, label: t.label, integration: t.integration, access: t.access });
-  return [...seen.values()];
-}
-
 // Drafts an administrator has under way, and the ones that failed in the last hour.
-export async function draftJobs(userId: string): Promise<Array<{ id: string; toolkit: string; goal: string | null; status: string; error: string | null }>> {
+export async function draftJobs(userId: string): Promise<Array<{ id: string; label: string; status: string; error: string | null }>> {
   const since = new Date(Date.now() - 3_600_000).toISOString();
   const { data } = await adminDb()
     .from("background_jobs")
@@ -376,40 +473,7 @@ export async function draftJobs(userId: string): Promise<Array<{ id: string; too
     .order("created_at", { ascending: false })
     .limit(30);
   return (data ?? []).map((j) => {
-    const input = (j.input ?? {}) as { toolkit?: string; goal?: string };
-    return { id: j.id, toolkit: input.toolkit ?? "", goal: input.goal ?? null, status: j.status, error: j.error };
+    const input = (j.input ?? {}) as { department?: string; goal?: string };
+    return { id: j.id, label: input.goal ?? (input.department ? `${input.department} work` : "the most valuable common work"), status: j.status, error: j.error };
   });
-}
-
-export type GalleryPlaybook = {
-  id: string;
-  title: string;
-  summary: string;
-  department: string;
-  tools: Array<{ key: string; name: string; logo: string | null; connected: boolean }>;
-  steps: number;
-  minutes: number | null;
-  ready: boolean;
-};
-
-// Published playbooks for a workspace: the ones whose tools are all connected first.
-export async function playbookGallery(connected: string[]): Promise<GalleryPlaybook[]> {
-  const rows = await listPlaybooks({ status: "published" });
-  const info = await toolkitInfo(rows.flatMap((p) => p.toolkits));
-  const have = new Set(connected);
-  return rows
-    .map((p) => {
-      const tools = p.toolkits.map((k) => ({ key: k, name: info.get(k)?.name ?? k, logo: info.get(k)?.logo ?? null, connected: have.has(k) }));
-      return {
-        id: p.id,
-        title: p.title,
-        summary: p.summary,
-        department: p.department,
-        tools,
-        steps: p.steps.length,
-        minutes: p.estimated_minutes_per_occurrence,
-        ready: tools.every((t) => t.connected),
-      };
-    })
-    .sort((a, b) => Number(b.ready) - Number(a.ready) || b.tools.filter((t) => t.connected).length - a.tools.filter((t) => t.connected).length || a.title.localeCompare(b.title));
 }

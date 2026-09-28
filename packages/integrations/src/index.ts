@@ -7,3 +7,4 @@ export * from "./scan";
 export * from "./directory";
 export * from "./inventory";
 export * from "./composio-tools";
+export * from "./capabilities";

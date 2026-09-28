@@ -98,10 +98,10 @@ export const HANDLERS: Record<JobKind, (ctx: Context) => Promise<Result>> = {
     return { ...r, href: `/api/workspaces/switch?to=${r.organizationId}` };
   },
 
-  // A site administrator drafting a ready-made playbook for a tool. Each run adds a new draft.
+  // A site administrator drafting a ready-made playbook. Each run adds a new draft.
   playbook: async (ctx) => {
-    const { toolkit, goal } = z.object({ toolkit: z.string().min(1), goal: z.string().max(500).optional() }).parse(ctx.input);
-    const id = await generatePlaybookFor(needSession(ctx), toolkit, goal);
+    const { department, goal } = z.object({ department: z.string().max(60).optional(), goal: z.string().max(500).optional() }).parse(ctx.input);
+    const id = await generatePlaybookFor(needSession(ctx), { department, goal });
     return { id, href: `/admin/playbooks/${id}?drafted=1` };
   },
 };

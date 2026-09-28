@@ -38,6 +38,7 @@ export const InterventionType = z.enum(["approval", "exception", "correction", "
 export const MemberRole = z.enum(["owner", "admin", "member"]);
 
 export const DEPARTMENTS = ["Customer Support", "Sales", "Finance", "Marketing", "Operations", "Product", "Engineering", "HR", "Other"] as const;
+export type Department = (typeof DEPARTMENTS)[number];
 
 export const EMPLOYEE_COUNTS = ["1–19", "20–49", "50–99", "100–249", "250–499", "500+"] as const;
 
@@ -454,23 +455,37 @@ export const SystemDiscoverySchema = z.object({
 export type SystemDiscovery = z.infer<typeof SystemDiscoverySchema>;
 
 // ---------------------------------------------------------------------------
-// Playbooks: ready-made templates for a tool, drafted by AI for the site's administrators
+// Playbooks: ready-made templates that name what each step needs (a help desk, a payment
+// system), not a product. Each workspace connects its own tool to every step.
 // ---------------------------------------------------------------------------
+
+export const PlaybookStepSchema = z.object({
+  title: z.string().min(1).describe("Short, tool-neutral, for example: Check the incoming refund request"),
+  detail: z.string().default("").describe("What to look at or do in this step, one sentence"),
+  capability: z.string().nullable().describe("The kind of system this step works in (a key from capabilities), or null for a step that is only judgement"),
+  access: z.enum(["read", "write", "none"]).describe("read to look something up, write to change or send something, none for judgement"),
+});
+export type PlaybookStep = z.infer<typeof PlaybookStepSchema>;
 
 export const PlaybookDraftSchema = z.object({
   title: z.string().describe(TITLE_HINT),
   summary: z.string().describe("One sentence on what the playbook does and why it is worth it"),
   department: z.enum(DEPARTMENTS),
-  trigger: z.string().describe("What starts the work, for example: a new ticket arrives"),
-  steps: z.array(DiscoveredStepSchema).describe("The process as a person does it today, 3 to 8 steps"),
-  estimatedMinutesPerOccurrence: z.number().nonnegative().describe("Minutes a person spends each time"),
+  trigger: z.string().describe("What starts the work, for example: a customer asks for a refund"),
+  steps: z.array(PlaybookStepSchema).describe("3 to 8 steps, in order"),
+  estimatedMinutesPerOccurrence: z.number().nonnegative().describe("Minutes a person typically spends each time"),
   agent: z.object({
     name: z.string().describe("Named after the work, never with Agent, Bot or AI"),
     description: z.string(),
     autonomyLevel: z.number().int().min(2).max(4).describe("2 drafts, 3 proposes for approval, 4 acts on routine cases"),
-    instructions: InstructionsSchema,
-    tools: z.array(z.string()).describe("Tool keys from availableTools, the smallest set that does the job"),
+    instructions: InstructionsSchema.describe("Operating procedure written without naming any product"),
     successCriteria: z.array(z.string()),
   }),
 });
 export type PlaybookDraft = z.infer<typeof PlaybookDraftSchema>;
+
+// Which of a workspace's tools the agent uses for each step of a playbook.
+export const PlaybookToolChoiceSchema = z.object({
+  steps: z.array(z.object({ step: z.number().int().describe("Index of the step, from 0"), tools: z.array(z.string()).describe("Tool keys from availableTools for this step, one or two") })),
+});
+export type PlaybookToolChoice = z.infer<typeof PlaybookToolChoiceSchema>;

@@ -1,5 +1,5 @@
 import "server-only";
-import { availableTools, registerWorkspaceTools } from "./tool-catalog";
+import { availableTools } from "./tool-catalog";
 import { getPlaybook, playbookAgentConfig } from "./playbooks";
 import { policyForTools } from "@autonomos/agents";
 import type { AgentConfig } from "@autonomos/schemas";
@@ -173,9 +173,9 @@ export async function defaultAgentConfig(session: Session, opportunityId: string
   const { data: fromPlaybook } = await adminDb().from("automation_opportunities").select("*").eq("organization_id", session.org.id).eq("id", opportunityId).maybeSingle();
   if (fromPlaybook?.playbook_id) {
     const playbook = await getPlaybook(fromPlaybook.playbook_id).catch(() => null);
-    if (playbook) {
-      await registerWorkspaceTools(session.org.id);
-      return { opportunity: fromPlaybook, config: playbookAgentConfig(playbook), connected: await connectedIntegrationKeys(session) };
+    if (playbook && fromPlaybook.required_tools.length) {
+      const config = await playbookAgentConfig(session, playbook, fromPlaybook.required_tools);
+      return { opportunity: fromPlaybook, config, connected: await connectedIntegrationKeys(session) };
     }
   }
   const { opportunity: o, draft, connected } = await draftAgentForOpportunity(session, opportunityId);

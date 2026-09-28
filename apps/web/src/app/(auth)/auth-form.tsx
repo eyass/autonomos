@@ -13,6 +13,44 @@ import { Input } from "@/components/ui/input";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+type Provider = "google" | "azure" | "github";
+
+// Sign-in providers: the name people know them by and their mark.
+const PROVIDERS: Record<Provider, { label: string; icon: React.ReactNode; scopes?: string }> = {
+  google: {
+    label: "Google",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7z" />
+        <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.4 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z" />
+        <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z" />
+        <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z" />
+      </svg>
+    ),
+  },
+  // Supabase calls Microsoft sign-in (Entra ID) "azure"; it needs the email scope to return an address.
+  azure: {
+    label: "Microsoft",
+    scopes: "email",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#F25022" d="M1 1h10.5v10.5H1z" />
+        <path fill="#7FBA00" d="M12.5 1H23v10.5H12.5z" />
+        <path fill="#00A4EF" d="M1 12.5h10.5V23H1z" />
+        <path fill="#FFB900" d="M12.5 12.5H23V23H12.5z" />
+      </svg>
+    ),
+  },
+  github: {
+    label: "GitHub",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.5 18.3 4.8 18.3 4.8c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" />
+      </svg>
+    ),
+  },
+};
+
 // Turns Supabase auth errors into messages a person can act on.
 function friendly(message: string) {
   const m = message.toLowerCase();
@@ -32,7 +70,7 @@ function namesFromEmail(email: string) {
   return parts.length >= 2 ? { first: cap(parts[0]), last: cap(parts.slice(1).join(" ")) } : { first: cap(parts[0]), last: "" };
 }
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({ mode, providers = ["google"] }: { mode: "login" | "signup"; providers?: Provider[] }) {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") ?? "/";
@@ -95,9 +133,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     }
   }
 
-  async function google() {
+  async function oauth(provider: Provider) {
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback() } });
+    const scopes = PROVIDERS[provider].scopes;
+    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: callback(), ...(scopes ? { scopes } : {}) } });
     if (error) setError(error.message);
   }
 
@@ -105,17 +144,24 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-xl">{mode === "signup" ? "Create your account" : "Welcome back"}</CardTitle>
-        <CardDescription>{mode === "signup" ? "Start mapping what your company can automate" : "Sign in with Google or your work email"}</CardDescription>
+        <CardDescription>{mode === "signup" ? "Start mapping what your company can automate" : "Sign in to your workspace"}</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={submit} noValidate>
           <FieldGroup>
-            <Field>
-              <Button type="button" variant="outline" className="w-full" onClick={google}>
-                Continue with Google
-              </Button>
-            </Field>
-            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">Or continue with email</FieldSeparator>
+            {providers.length ? (
+              <>
+                <Field className="gap-2">
+                  {providers.map((p) => (
+                    <Button key={p} type="button" variant="outline" className="w-full [&_svg]:size-4" onClick={() => oauth(p)}>
+                      {PROVIDERS[p].icon}
+                      Continue with {PROVIDERS[p].label}
+                    </Button>
+                  ))}
+                </Field>
+                <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">Or continue with email</FieldSeparator>
+              </>
+            ) : null}
             <FormField label="Work email" htmlFor="email">
               <Input
                 id="email"
