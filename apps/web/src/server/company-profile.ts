@@ -1,19 +1,18 @@
 import "server-only";
 import { profileCompany } from "@autonomos/ai";
-import { crawlWebsite, websiteFromEmail, WebsiteError, type DetectedTool } from "@autonomos/integrations/website";
+import { crawlWebsite, websiteFromEmail, WebsiteError } from "@autonomos/integrations/website";
 import { CompanyProfileSchema, type CompanyProfile } from "@autonomos/schemas";
 import { z } from "zod";
 import { audit, recordUsage } from "@/lib/audit";
 import { adminDb, HttpError, requireRole, type Session } from "@/lib/session";
 
-const INTEGRATION_KEYS = ["gmail", "outlook", "slack", "hubspot", "salesforce", "zendesk", "intercom", "stripe", "google_drive", "notion"] as const;
-
 export const WebsiteAnalysisSchema = z.object({
   website: z.string().url(),
   profile: CompanyProfileSchema,
-  pagesRead: z.array(z.object({ url: z.string(), kind: z.string(), title: z.string() })).max(10),
-  detectedTools: z.array(z.object({ key: z.enum(INTEGRATION_KEYS), name: z.string(), evidence: z.string() })).max(12),
-  otherTechnology: z.array(z.string()).max(20),
+  pagesRead: z.array(z.object({ url: z.string(), kind: z.string(), title: z.string() })).max(30),
+  // Any system the site shows it uses, keyed like the integrations catalog / Composio toolkit.
+  detectedTools: z.array(z.object({ key: z.string().regex(/^[a-z0-9_]{2,60}$/), name: z.string().max(80), evidence: z.string().max(200) })).max(40),
+  otherTechnology: z.array(z.string().max(60)).max(40),
 });
 export type WebsiteAnalysis = z.infer<typeof WebsiteAnalysisSchema>;
 
@@ -42,9 +41,9 @@ export async function analyseWebsite(input: { website: string; email: string; or
   return {
     website: snapshot.url,
     profile,
-    pagesRead: snapshot.pages.map((p) => ({ url: p.url, kind: p.kind, title: p.title })),
-    detectedTools: snapshot.detectedTools.filter((t): t is DetectedTool & { key: (typeof INTEGRATION_KEYS)[number] } => (INTEGRATION_KEYS as readonly string[]).includes(t.key)),
-    otherTechnology: snapshot.otherTechnology,
+    pagesRead: snapshot.pages.slice(0, 30).map((p) => ({ url: p.url, kind: p.kind, title: p.title })),
+    detectedTools: snapshot.detectedTools.filter((t) => /^[a-z0-9_]{2,60}$/.test(t.key)).slice(0, 40),
+    otherTechnology: snapshot.otherTechnology.slice(0, 40),
   };
 }
 

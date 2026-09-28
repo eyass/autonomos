@@ -10,13 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 
-export function SystemLogo({ src, name, className = "size-8" }: { src: string | null; name: string; className?: string }) {
+export function SystemLogo({ src, name, className = "size-8", eager = false }: { src: string | null; name: string; className?: string; eager?: boolean }) {
   if (!src) {
     return <span className={`${className} flex shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground`}>{name.slice(0, 1)}</span>;
   }
   // Composio serves one logo per toolkit; next/image would need every host allow-listed.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" className={`${className} shrink-0 rounded-md bg-white object-contain p-0.5`} loading="lazy" />;
+  return <img src={src} alt="" className={`${className} shrink-0 rounded-md bg-white object-contain p-0.5`} loading={eager ? "eager" : "lazy"} />;
 }
 
 // "Add systems": the 20 most common systems first, and search across the whole Composio

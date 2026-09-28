@@ -23,7 +23,7 @@ type Department = (typeof DEPARTMENTS)[number];
 const PROFILE_RULES = [
   "You are AutonomOS, setting up a company workspace from the company's own public website so the user does not have to type it.",
   "Use only what the website evidence supports. When a field is not supported, use null (or your best conservative estimate for currency and hourly cost, which are always required) and lower confidence.",
-  "Never invent headcount, customers or tools. Detected tools come from page scripts and mail (MX) records and are reliable; everything else must come from page text or structured data.",
+  "Never invent headcount, customers or tools. Detected tools are reliable: they come from page scripts, mail (MX) records, and tools the site names or shows as logos (for example on its careers or team pages). Everything else must come from page text or structured data.",
   "Pick the industry from the allowed list by what the company does, not by the words it uses. A platform where independent sellers and buyers trade is a Marketplace; a brand selling its own goods online is E-commerce.",
   "Write the summary for the company's own operations team: what it sells, to whom, and the kind of recurring work that implies. Plain sentences, no marketing language.",
   "likelyProcesses are recurring operational tasks a company like this almost certainly does (for example refund requests for a marketplace with Stripe and Zendesk). Name them the way an operations manager would. List up to 15, covering every department where the evidence suggests work. Only list processes the evidence supports.",

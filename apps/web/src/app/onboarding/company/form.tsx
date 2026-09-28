@@ -233,9 +233,11 @@ function ReviewForm({ analysis, website, onRestart }: { analysis: WebsiteAnalysi
               {pending ? <Spinner /> : null}
               Create company
             </Button>
-            <Button type="button" variant="ghost" onClick={onRestart} disabled={pending}>
-              {analysis ? "Read a different website" : "Back"}
-            </Button>
+            {analysis ? null : (
+              <Button type="button" variant="ghost" onClick={onRestart} disabled={pending}>
+                Back
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
