@@ -355,7 +355,9 @@ export async function startComposioConnection(organizationId: string, integratio
   const authConfigId = await resolveAuthConfigId(toolkit, integration);
   // connectedAccounts.link is the supported flow; the legacy initiate endpoint (which
   // toolkits.authorize still uses) is retired for Composio-managed OAuth.
-  const request = await composio.connectedAccounts.link(organizationId, authConfigId, { callbackUrl });
+  // A workspace can connect again (a retry, another account): the new account replaces the
+  // old one when the sign-in completes.
+  const request = await composio.connectedAccounts.link(organizationId, authConfigId, { callbackUrl, allowMultiple: true });
   return { redirectUrl: (request as { redirectUrl?: string | null }).redirectUrl ?? null, connectionId: (request as { id: string }).id };
 }
 

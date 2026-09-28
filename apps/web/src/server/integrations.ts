@@ -165,6 +165,12 @@ export async function completeOAuthConnection(session: Session, key: string, con
   if (account.status && account.status.toUpperCase() !== "ACTIVE") throw new HttpError(409, `Connection is ${account.status.toLowerCase()}, try again`);
   const integration = await permissionsFor(key);
   const db = adminDb();
+  const { data: before } = await db
+    .from("integration_connections")
+    .select("provider, external_account_id")
+    .eq("organization_id", session.org.id)
+    .eq("integration_key", key)
+    .maybeSingle();
   const { data, error } = await db
     .from("integration_connections")
     .upsert(
@@ -190,6 +196,12 @@ export async function completeOAuthConnection(session: Session, key: string, con
     .single();
   if (error || !data) throw new Error(`connect: ${error?.message}`);
   await db.from("integration_secrets").upsert({ connection_id: data.id, organization_id: session.org.id }, { onConflict: "connection_id", ignoreDuplicates: true });
+  // Connecting again replaces the account connected before.
+  if (before?.provider === "composio" && before.external_account_id && before.external_account_id !== account.id) {
+    await getComposio()
+      .connectedAccounts.delete(before.external_account_id)
+      .catch((e: unknown) => console.error("composio replace failed", e));
+  }
   await afterConnect(session, key, "composio");
 }
 
