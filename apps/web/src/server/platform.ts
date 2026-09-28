@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { planFor } from "@autonomos/schemas";
+import { planFor, runAllowance } from "@autonomos/schemas";
+import { monthStart } from "@autonomos/db";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { generateApiKey } from "@/lib/api-auth";
@@ -75,20 +76,20 @@ export async function setApprovalLimit(session: Session, userId: string, limit: 
 
 export async function planUsage(session: Session) {
   const db = adminDb();
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
   const [{ count: runs }, { count: activeAgents }] = await Promise.all([
-    db.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("mode", "production").gte("queued_at", monthStart),
+    db.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("mode", "production").gte("queued_at", monthStart()),
     db.from("agents").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "active"),
   ]);
   const plan = planFor(session.org.plan);
-  const overageRuns = Math.max(0, (runs ?? 0) - plan.runsPerMonth);
-  return { plan, runs: runs ?? 0, activeAgents: activeAgents ?? 0, overageRuns, overageCost: overageRuns * plan.overagePerRun };
+  const overageRuns = plan.overagePerRun === null ? 0 : Math.max(0, (runs ?? 0) - plan.runsPerMonth);
+  const allowance = runAllowance(plan, runs ?? 0);
+  return { plan, runs: runs ?? 0, activeAgents: activeAgents ?? 0, overageRuns, overageCost: overageRuns * (plan.overagePerRun ?? 0), capped: !allowance.allowed };
 }
 
 export async function assertAgentAllowance(session: Session) {
   const usage = await planUsage(session);
   if (usage.activeAgents >= usage.plan.activeAgents) {
-    throw new HttpError(409, `Your ${usage.plan.name} plan allows ${usage.plan.activeAgents} live agents. Pause one first or change plan in Settings → Billing.`);
+    throw new HttpError(409, `Your ${usage.plan.name} plan allows ${usage.plan.activeAgents} live agent${usage.plan.activeAgents === 1 ? "" : "s"}. Pause one first or upgrade in Settings → Billing.`);
   }
 }
 

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { listWorkspaces } from "@/server/platform";
+import { listWorkspaces, planUsage } from "@/server/platform";
 import { signOutAction, markNotificationsRead, switchWorkspaceAction } from "./shell-actions";
 import { Logo } from "@/components/brand/logo";
 import { isPlatformAdmin } from "@/server/playbooks";
@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Which world agents act in: sample data only, real accounts, or both.
   const providers = new Set((connections ?? []).map((c) => c.provider));
   const mode = !providers.size ? null : providers.size === 1 && providers.has("sandbox") ? "sandbox" : providers.has("sandbox") ? "mixed" : "live";
-  const workspaces = await listWorkspaces(session);
+  const [workspaces, usage] = await Promise.all([listWorkspaces(session), planUsage(session)]);
   const defaultOpen = (await cookies()).get("sidebar_state")?.value !== "false";
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
@@ -60,6 +60,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </header>
         {session.org.isDemo ? (
           <div className="border-b border-info/30 bg-info-soft px-4 py-2 text-sm text-info sm:px-6">Sample workspace. The company and its customers are fictional, and nothing real changes.</div>
+        ) : null}
+        {usage.capped ? (
+          <div className="border-b border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning sm:px-6" data-testid="plan-capped">
+            This month&apos;s {usage.plan.runsPerMonth.toLocaleString("en")} production runs on the {usage.plan.name} plan are used. Live agents start again on the 1st, or right away on a paid plan (
+            <Link className="underline" href="/settings#billing">
+              Billing
+            </Link>
+            ). Test runs keep working.
+          </div>
         ) : null}
         {session.org.agentsPaused ? (
           <div className="border-b border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning sm:px-6">

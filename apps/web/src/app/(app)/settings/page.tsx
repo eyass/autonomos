@@ -338,7 +338,7 @@ export default async function SettingsPage() {
           <SettingsSection
             id="billing"
             title="Billing and usage"
-            description={`${plan.name} plan${plan.price ? `, ${plan.price} ${session.org.currency} a month` : ", invoiced manually"}. Usage this month:`}
+            description={`${plan.name} plan${plan.price ? `, ${plan.price} ${session.org.currency} a month` : ", no card needed"}. Usage this month:`}
           >
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -362,9 +362,13 @@ export default async function SettingsPage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                {usageVsPlan.overageRuns
-                  ? `${num(usageVsPlan.overageRuns)} runs over the allowance, billed at ${plan.overagePerRun} ${session.org.currency} each (${usageVsPlan.overageCost.toFixed(2)} ${session.org.currency} so far).`
-                  : `Runs above the allowance keep working and are billed at ${plan.overagePerRun} ${session.org.currency} each. Test runs are free. A new agent cannot go live once the live-agent limit is reached.`}
+                {plan.overagePerRun === null
+                  ? usageVsPlan.capped
+                    ? `This month's ${num(plan.runsPerMonth)} production runs are used. Live agents start again on the 1st, or right away on a paid plan. Test runs are always free.`
+                    : `The ${plan.name} plan includes ${num(plan.runsPerMonth)} production runs a month; live agents stop when they are used, until the 1st. Test runs are always free.`
+                  : usageVsPlan.overageRuns
+                    ? `${num(usageVsPlan.overageRuns)} runs over the allowance, billed at ${plan.overagePerRun} ${session.org.currency} each (${usageVsPlan.overageCost.toFixed(2)} ${session.org.currency} so far).`
+                    : `Runs above the allowance keep working and are billed at ${plan.overagePerRun} ${session.org.currency} each. Test runs are free. A new agent cannot go live once the live-agent limit is reached.`}
               </p>
               <DefinitionList
                 className="lg:grid-cols-4"
@@ -397,7 +401,8 @@ export default async function SettingsPage() {
                       </div>
                       <div className="mt-1 text-muted-foreground">{p.price ? `${p.price} ${session.org.currency} / month` : "Free"}</div>
                       <div className="mt-1 text-muted-foreground">
-                        {p.activeAgents} live agents · {num(p.runsPerMonth)} runs · then {p.overagePerRun} per run
+                        {p.activeAgents} live agent{p.activeAgents === 1 ? "" : "s"} · {num(p.runsPerMonth)} runs ·{" "}
+                        {p.overagePerRun === null ? "stops at the limit" : `then ${p.overagePerRun} per run`}
                       </div>
                     </div>
                   ))}

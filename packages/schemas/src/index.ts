@@ -416,17 +416,27 @@ export const ANALYTICS_EVENTS = [
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
 
-// Plan limits. Runs above the monthly allowance keep working and are billed as overage;
-// active agents above the limit cannot be activated until one is paused or the plan changes.
+// Plan limits. On paid plans, runs above the monthly allowance keep working and are billed as
+// overage. The free plan has no card on file, so its allowance is a hard cap: production runs
+// stop until the next month or an upgrade (test runs are always free). Active agents above the
+// limit cannot be activated until one is paused or the plan changes.
 export const PLANS = {
   // Key kept for existing workspaces; shown as the free plan every workspace starts on.
-  design_partner: { name: "Free", activeAgents: 5, runsPerMonth: 2000, overagePerRun: 0.05, price: null },
+  design_partner: { name: "Free", activeAgents: 1, runsPerMonth: 250, overagePerRun: null, price: 0 },
   starter: { name: "Starter", activeAgents: 3, runsPerMonth: 1000, overagePerRun: 0.08, price: 490 },
   growth: { name: "Growth", activeAgents: 15, runsPerMonth: 10000, overagePerRun: 0.05, price: 1900 },
-} as const;
+} as const satisfies Record<string, { name: string; activeAgents: number; runsPerMonth: number; overagePerRun: number | null; price: number }>;
 export type PlanKey = keyof typeof PLANS;
-export function planFor(key: string | null | undefined) {
+export type Plan = { name: string; activeAgents: number; runsPerMonth: number; overagePerRun: number | null; price: number };
+export function planFor(key: string | null | undefined): Plan {
   return PLANS[(key ?? "design_partner") as PlanKey] ?? PLANS.design_partner;
+}
+
+// Production runs used this month against a plan: whether one more may start.
+export function runAllowance(plan: Plan, runsThisMonth: number): { allowed: boolean; remaining: number | null } {
+  if (plan.overagePerRun !== null) return { allowed: true, remaining: null };
+  const remaining = Math.max(0, plan.runsPerMonth - runsThisMonth);
+  return { allowed: remaining > 0, remaining };
 }
 
 // Processes proposed from what discovery read in connected systems, each with its evidence.

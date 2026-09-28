@@ -1,5 +1,5 @@
 import { agentStats, autonomyScore, departmentAutonomy, type ProcessForMetrics } from "@autonomos/agents";
-import { fromUsd, type AutonomyLevel } from "@autonomos/schemas";
+import { fromUsd, planFor, runAllowance, type AutonomyLevel } from "@autonomos/schemas";
 import type { DbClient } from "./index";
 
 // ---------------------------------------------------------------------------
@@ -16,6 +16,11 @@ export class RunNotAllowedError extends Error {
 // The emergency stop can be time-boxed: a pause with a passed "until" is no longer in force.
 export function isPaused(org: { agents_paused: boolean; agents_paused_until?: string | null }, now = new Date()) {
   return org.agents_paused && (!org.agents_paused_until || new Date(org.agents_paused_until) > now);
+}
+
+// The first moment of the current calendar month (UTC), where monthly allowances reset.
+export function monthStart(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }
 
 export async function createRun(
@@ -37,10 +42,18 @@ export async function createRun(
     .single();
   if (error || !agent) throw new RunNotAllowedError("Agent not found");
 
-  const { data: org } = await db.from("organizations").select("agents_paused, agents_paused_until").eq("id", input.organizationId).single();
+  const { data: org } = await db.from("organizations").select("agents_paused, agents_paused_until, plan").eq("id", input.organizationId).single();
   if (input.mode === "production") {
     if (org && isPaused(org)) throw new RunNotAllowedError("All agents are paused for this organisation");
     if (agent.status !== "active") throw new RunNotAllowedError(`Only active agents run in production (this agent is ${agent.status})`);
+    // A plan without overage (the free plan) stops at its monthly allowance.
+    const plan = planFor(org?.plan);
+    if (plan.overagePerRun === null) {
+      const { count } = await db.from("agent_runs").select("id", { count: "exact", head: true }).eq("organization_id", input.organizationId).eq("mode", "production").gte("queued_at", monthStart());
+      if (!runAllowance(plan, count ?? 0).allowed) {
+        throw new RunNotAllowedError(`The ${plan.name} plan includes ${plan.runsPerMonth} production runs a month and they are used up. Upgrade in Settings, or runs start again on the 1st.`);
+      }
+    }
   }
   if (agent.autonomy_level === 1) throw new RunNotAllowedError("L1 is human only; raise autonomy to L2 or higher to run the agent");
 
