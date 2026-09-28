@@ -5,7 +5,7 @@ import { CONTACT_EMAIL, DraftNotice, PageIntro, Prose } from "@/components/marke
 const description = "The terms that apply when you use AutonomOS.";
 
 export const metadata: Metadata = {
-  // Draft until counsel signs off: readable by design partners, kept out of search results.
+  // Draft until counsel signs off: readable by customers, kept out of search results.
   robots: { index: false, follow: true },
   title: "Terms of service",
   description,
@@ -28,7 +28,7 @@ export default function TermsPage() {
         <h2>2. The service</h2>
         <p>
           AutonomOS helps you map recurring work, choose what to automate, and run AI agents that act in your connected systems under the autonomy levels, policies, approvals and limits you configure.
-          The service is in active development and offered to design partners. Features may change.
+          We improve the service continuously, so features may change.
         </p>
 
         <h2>3. Your responsibilities</h2>
@@ -58,14 +58,14 @@ export default function TermsPage() {
         <p>The service depends on providers such as hosting, database, model and integration providers. Your use of connected third-party systems is also governed by their own terms.</p>
 
         <h2>7. Fees</h2>
-        <p>The service is free during the design partner programme. We will agree any fees with you in writing before they apply.</p>
+        <p>Fees are those of your plan, shown on the pricing page and in Settings. We tell you before any change to them applies.</p>
 
         <h2>8. Suspension and ending</h2>
         <p>You can stop using the service at any time and ask us to delete your workspace. We may suspend access if you breach these terms or if needed to protect the service or other customers.</p>
 
         <h2>9. Disclaimers and liability</h2>
         <p>
-          The service is provided as is during the design partner programme, without warranties beyond those the law requires. To the extent the law allows, we are not liable for indirect or
+          The service is provided as is, without warranties beyond those the law requires. To the extent the law allows, we are not liable for indirect or
           consequential losses. Nothing in these terms limits liability that cannot be limited by law.
         </p>
 

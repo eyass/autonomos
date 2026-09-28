@@ -213,7 +213,7 @@ function Faq() {
     [
       "What does it cost?",
       <>
-        AutonomOS is free for design partners. See <Link href="/#pricing">Pricing</Link>.
+        You can start free. See <Link href="/#pricing">Pricing</Link>.
       </>,
     ],
   ];

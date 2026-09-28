@@ -9,6 +9,7 @@ import { Logo as BrandLogo } from "@/components/brand/logo";
 export { CONTACT_EMAIL, SECURITY_EMAIL, SITE_URL } from "./config";
 
 const NAV = [
+  { href: "/solutions", label: "Solutions" },
   { href: "/#how-it-works", label: "How it works" },
   { href: "/security", label: "Security" },
   { href: "/docs", label: "Docs" },
@@ -66,6 +67,7 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   const links = [
+    { href: "/solutions", label: "Solutions" },
     { href: "/security", label: "Security" },
     { href: "/docs", label: "Docs" },
     { href: "/terms", label: "Terms" },

@@ -418,7 +418,8 @@ export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
 // Plan limits. Runs above the monthly allowance keep working and are billed as overage;
 // active agents above the limit cannot be activated until one is paused or the plan changes.
 export const PLANS = {
-  design_partner: { name: "Design partner", activeAgents: 5, runsPerMonth: 2000, overagePerRun: 0.05, price: null },
+  // Key kept for existing workspaces; shown as the free plan every workspace starts on.
+  design_partner: { name: "Free", activeAgents: 5, runsPerMonth: 2000, overagePerRun: 0.05, price: null },
   starter: { name: "Starter", activeAgents: 3, runsPerMonth: 1000, overagePerRun: 0.08, price: 490 },
   growth: { name: "Growth", activeAgents: 15, runsPerMonth: 10000, overagePerRun: 0.05, price: 1900 },
 } as const;

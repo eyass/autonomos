@@ -5,10 +5,10 @@ import { TOOLS, ToolLogo, type ToolSlug } from "./tools";
 
 // How agents chain tools: each example is one trigger and the tool calls that follow, with the
 // steps a person approves marked. Illustrative workflows, not customers.
-type Step = { tool: ToolSlug | "policy"; action: string; gate?: string };
-type Flow = { title: string; level: number; steps: Step[] };
+export type Step = { tool: ToolSlug | "policy"; action: string; gate?: string };
+export type Flow = { title: string; level: number; steps: Step[] };
 
-const FLOWS: Flow[] = [
+export const LANDING_FLOWS: Flow[] = [
   {
     title: "Refund request",
     level: 3,
@@ -74,10 +74,10 @@ function Node({ step }: { step: Step }) {
   );
 }
 
-export function WorkflowChains() {
+export function WorkflowChains({ flows = LANDING_FLOWS }: { flows?: Flow[] }) {
   return (
     <div className="grid gap-4">
-      {FLOWS.map((f) => (
+      {flows.map((f) => (
         <figure key={f.title} className="rounded-2xl border border-border bg-background p-4 sm:p-5" aria-label={`${f.title}: ${f.steps.map((s) => s.action).join(", then ")}`}>
           <figcaption className="mb-3 flex items-center justify-between gap-3">
             <span className="text-sm font-semibold">{f.title}</span>

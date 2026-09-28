@@ -22,6 +22,20 @@ export const TOOLS = {
   mailchimp: "Mailchimp",
   docusign: "DocuSign",
   linear: "Linear",
+  linkedin: "LinkedIn",
+  meta: "Meta Ads",
+  calendly: "Calendly",
+  typeform: "Typeform",
+  bamboohr: "BambooHR",
+  personio: "Personio",
+  zoom: "Zoom",
+  pipedrive: "Pipedrive",
+  freshdesk: "Freshdesk",
+  dropbox: "Dropbox",
+  monday: "monday.com",
+  netsuite: "NetSuite",
+  ramp: "Ramp",
+  gorgias: "Gorgias",
 } as const;
 
 export type ToolSlug = keyof typeof TOOLS;

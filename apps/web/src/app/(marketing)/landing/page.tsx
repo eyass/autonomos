@@ -2,7 +2,11 @@ import { OG_IMAGES } from "@/components/marketing/config";
 import { ArrowRight, Bot, Check, FileSearch, ListChecks, Lock, OctagonX, ScrollText, ShieldCheck, Target, Wallet } from "lucide-react";
 import { TOOLS, ToolLogo, type ToolSlug } from "@/components/marketing/tools";
 import { WorkflowChains } from "@/components/marketing/workflows";
+import { DepartmentCards } from "@/components/marketing/solutions";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { PLANS } from "@autonomos/schemas";
+import { num } from "@/lib/format";
 import { CONTACT_EMAIL } from "@/components/marketing/site";
 import { HeroRun } from "@/components/marketing/hero-run";
 import { AgentVisual, HoursByLevel, InventoryVisual, OpportunityVisual, PolicyFlow, SetupFlow, TOOL_COUNT } from "@/components/marketing/visuals";
@@ -73,10 +77,10 @@ export default function LandingPage() {
         <div aria-hidden className="pointer-events-none absolute -right-40 -top-40 size-[36rem] rounded-full bg-highlight/20 blur-3xl" />
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
           <div>
-            <span className="eyebrow inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-white/80">
+            <Link href="/solutions" className="eyebrow inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-white/80 hover:text-white">
               <span aria-hidden className="signal-pulse size-1.5 rounded-full bg-highlight" />
-              Now accepting design partners
-            </span>
+              Agents for every team <ArrowRight size={12} />
+            </Link>
             <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.03em] sm:text-6xl sm:leading-[1.02]">
               Automate the recurring work. <span className="text-highlight">Safely.</span>
             </h1>
@@ -128,6 +132,16 @@ export default function LandingPage() {
           </SectionHeading>
           <div className="mt-10">
             <WorkflowChains />
+          </div>
+        </div>
+      </section>
+
+      {/* By team */}
+      <section id="teams" className="scroll-mt-16 border-b border-border bg-card">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <SectionHeading eyebrow="By team" title="Agents for every team" />
+          <div className="mt-10">
+            <DepartmentCards />
           </div>
         </div>
       </section>
@@ -233,27 +247,55 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing: the same plans and limits the app bills on (PLANS). */}
       <section id="pricing" className="scroll-mt-16 border-b border-border bg-card">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHeading eyebrow="Pricing" title="Free for design partners" />
-          <Card className="mt-10 max-w-xl p-6">
-            <ul className="space-y-2.5 text-sm">
-              {["The full product, free during the programme", "A direct line to the team", "Your processes shape the roadmap"].map((t) => (
-                <li key={t} className="flex gap-2">
-                  <Check size={16} className="mt-0.5 shrink-0 text-primary" />
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
-            <a
-              href={`mailto:${CONTACT_EMAIL}?subject=Design%20partner`}
-              className="mt-6 inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:w-auto"
-            >
-              Apply to be a design partner
-            </a>
-            <p className="mt-4 text-xs text-muted-foreground">Afterwards: usage-based, no per-seat fees, agreed with you first.</p>
-          </Card>
+          <SectionHeading eyebrow="Pricing" title="Priced by work done, not seats">
+            Start free, no card needed.
+          </SectionHeading>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {(["starter", "growth"] as const).map((key) => {
+              const p = PLANS[key];
+              return (
+                <Card key={key} className={`gap-0 p-6 sm:gap-0 ${key === "growth" ? "border-primary ring-1 ring-primary/30" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold">{p.name}</h3>
+                    {key === "growth" ? <span className="rounded bg-brand-soft px-1.5 py-0.5 text-xs font-medium text-brand-strong">Most teams</span> : null}
+                  </div>
+                  <p className="mt-3 font-display text-3xl font-semibold tracking-tight">
+                    €{num(p.price)}
+                    <span className="text-sm font-normal text-muted-foreground"> / month</span>
+                  </p>
+                  <ul className="mt-4 space-y-2 text-sm">
+                    {[`${p.activeAgents} live agents`, `${num(p.runsPerMonth)} runs a month`, `Then €${p.overagePerRun} per run`, "Free test runs, no seat fees"].map((t) => (
+                      <li key={t} className="flex gap-2">
+                        <Check size={16} className="mt-0.5 shrink-0 text-primary" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <ButtonLink href="/signup" className="mt-6" variant={key === "growth" ? "default" : "outline"}>
+                    Start free
+                  </ButtonLink>
+                </Card>
+              );
+            })}
+            <Card className="gap-0 p-6 sm:gap-0">
+              <h3 className="text-base font-semibold">Larger teams</h3>
+              <p className="mt-3 font-display text-3xl font-semibold tracking-tight">Custom</p>
+              <ul className="mt-4 space-y-2 text-sm">
+                {["Limits sized to your volume", "A data processing agreement", "A named contact"].map((t) => (
+                  <li key={t} className="flex gap-2">
+                    <Check size={16} className="mt-0.5 shrink-0 text-primary" />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href={`mailto:${CONTACT_EMAIL}?subject=Pricing`} className="mt-6 inline-flex h-9 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted">
+                Talk to us
+              </a>
+            </Card>
+          </div>
         </div>
       </section>
 

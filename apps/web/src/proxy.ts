@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // that has no Supabase configuration.
 const SITE_PATHS = [
   "/landing",
+  "/solutions",
   "/security",
   "/docs",
   "/terms",
