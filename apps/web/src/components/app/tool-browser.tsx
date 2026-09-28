@@ -158,7 +158,7 @@ function ToolCard({ tool: t, canManage, returnTo, onConnected }: { tool: BrowseT
             {t.live ? (
               <Button size="sm" onClick={live} disabled={pending}>
                 {pending ? <Spinner /> : null}
-                Sign in to {t.name}
+                {t.usesKey ? "Use your API key" : `Sign in to ${t.name}`}
               </Button>
             ) : null}
             {t.sandbox ? (
@@ -172,10 +172,17 @@ function ToolCard({ tool: t, canManage, returnTo, onConnected }: { tool: BrowseT
             </Button>
           </>
         ) : (
-          <Button size="sm" variant="outline" onClick={() => (t.sandbox ? setChoosing(true) : live())} disabled={pending}>
-            {pending ? <Spinner /> : null}
-            Connect
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={() => (t.sandbox ? setChoosing(true) : live())} disabled={pending}>
+              {pending ? <Spinner /> : null}
+              Connect
+            </Button>
+            {t.usesKey ? (
+              <span className="text-xs text-muted-foreground" title={`You paste an API key or login from your ${t.name} account on a secure page.`}>
+                With your API key
+              </span>
+            ) : null}
+          </>
         )}
       </div>
     </li>

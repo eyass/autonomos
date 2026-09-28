@@ -31,8 +31,10 @@ export type BrowseTool = {
   detected: boolean;
   // Can be tried on sample data held in AutonomOS.
   sandbox: boolean;
-  // Can be signed in to a real account.
+  // Can be connected to a real account.
   live: boolean;
+  // Connecting asks for the customer's own API key or login instead of a sign-in.
+  usesKey: boolean;
 };
 
 export type BrowseCategory = { key: string; label: string; count: number | null };
@@ -95,7 +97,8 @@ function fromDirectory(t: DirectoryToolkit, ctx: Ctx): BrowseTool {
     provider: ctx.connected.get(key) ?? null,
     detected: ctx.detected.has(key),
     sandbox: SANDBOX_INTEGRATIONS.includes(key),
-    live: ctx.live && t.managedAuth,
+    live: ctx.live && t.connect !== "setup",
+    usesKey: t.connect === "key",
   };
 }
 
@@ -112,6 +115,7 @@ function fromCatalog(r: CatalogRow, ctx: Ctx): BrowseTool {
     detected: ctx.detected.has(r.key),
     sandbox: SANDBOX_INTEGRATIONS.includes(r.key),
     live: ctx.live,
+    usesKey: false,
   };
 }
 
@@ -132,6 +136,7 @@ function named(key: string, ctx: Ctx): BrowseTool {
     detected: true,
     sandbox: false,
     live: false,
+    usesKey: false,
   };
 }
 

@@ -1,5 +1,6 @@
 import { Composio } from "@composio/core";
 import { ToolError, classifyHttpStatus } from "./errors";
+import { authPlan } from "./directory";
 import { getTool, type ToolDefinition } from "./tools";
 
 export type SandboxRecord = Record<string, unknown> & { id: string };
@@ -359,7 +360,9 @@ export async function startComposioConnection(organizationId: string, integratio
 }
 
 // The auth config to connect through: an explicit one from COMPOSIO_AUTH_CONFIGS, else the
-// account's Composio-managed config for the toolkit, created on first use.
+// account's Composio-managed config for the toolkit, else a config for a scheme the customer
+// completes themselves on Composio's hosted page (their own API key, login or dynamic sign-in).
+// Each is created on first use.
 const authConfigCache = new Map<string, string>();
 async function resolveAuthConfigId(toolkit: string, integration: string): Promise<string> {
   const explicit = (safeJson<Record<string, string>>(process.env.COMPOSIO_AUTH_CONFIGS) ?? {})[integration];
@@ -367,10 +370,28 @@ async function resolveAuthConfigId(toolkit: string, integration: string): Promis
   const cached = authConfigCache.get(toolkit);
   if (cached) return cached;
   const composio = getComposio();
-  const existing = await composio.authConfigs.list({ toolkit, isComposioManaged: true });
-  const id = existing.items[0]?.id ?? (await composio.authConfigs.create(toolkit, { type: "use_composio_managed_auth" })).id;
+  const plan = await authPlan(toolkit);
+  if (!plan) throw new NeedsSetupError(toolkit);
+  let id: string;
+  if (plan.managed) {
+    const existing = await composio.authConfigs.list({ toolkit, isComposioManaged: true });
+    id = existing.items[0]?.id ?? (await composio.authConfigs.create(toolkit, { type: "use_composio_managed_auth" })).id;
+  } else {
+    const existing = await composio.authConfigs.list({ toolkit, isComposioManaged: false });
+    id =
+      existing.items.find((a) => a.authScheme === plan.scheme && a.status === "ENABLED")?.id ??
+      (await composio.authConfigs.create(toolkit, { type: "use_custom_auth", authScheme: plan.scheme, credentials: {}, name: `${toolkit} (customer credentials)` })).id;
+  }
   authConfigCache.set(toolkit, id);
   return id;
+}
+
+// The toolkit only signs in through an app registered with the vendor, which we have not set up.
+export class NeedsSetupError extends Error {
+  constructor(readonly toolkit: string) {
+    super(`${toolkit} needs an app registered with the vendor before it can be connected`);
+    this.name = "NeedsSetupError";
+  }
 }
 
 function safeJson<T>(raw: string | undefined): T | null {
