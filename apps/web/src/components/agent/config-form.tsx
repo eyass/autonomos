@@ -1,5 +1,6 @@
 "use client";
 import { AUTONOMY_LEVELS, INTEGRATION_EVENTS, type AgentConfig, type ConditionRule } from "@autonomos/schemas";
+import { Check } from "lucide-react";
 import { useState, useTransition } from "react";
 import { AutonomyLadder } from "@/components/domain";
 import { cn } from "@/lib/utils";
@@ -100,8 +101,24 @@ export function AgentConfigForm({
       <ol className="hidden space-y-1 text-sm lg:block">
         {STEPS.map((s, i) => (
           <li key={s}>
-            <Button type="button" variant="ghost" onClick={() => setStep(i)} className={cn("w-full justify-start", i === step ? "bg-accent font-medium text-primary" : "text-muted-foreground")}>
-              {i + 1}. {s}
+            <Button
+              type="button"
+              variant="ghost"
+              aria-current={i === step ? "step" : undefined}
+              onClick={() => setStep(i)}
+              className={cn("h-auto w-full justify-start gap-2.5 py-2 whitespace-normal text-left", i === step ? "bg-brand-soft font-semibold text-brand-strong hover:bg-brand-soft" : "text-muted-foreground")}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold",
+                  i < step ? "bg-primary text-primary-foreground" : i === step ? "bg-highlight text-white" : "border border-border bg-card",
+                )}
+              >
+                {i < step ? <Check className="size-3" /> : i + 1}
+              </span>
+              <span className="sr-only">{i + 1}. </span>
+              {s}
             </Button>
           </li>
         ))}

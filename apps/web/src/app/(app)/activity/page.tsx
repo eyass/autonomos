@@ -1,4 +1,4 @@
-import { Activity } from "lucide-react";
+import { Activity, Bot, Cog } from "lucide-react";
 import Link from "next/link";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { FilterBar } from "@/components/filter-bar";
@@ -148,8 +148,8 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
       ) : (
         <div className="space-y-4">
           {[...byDay.entries()].map(([day, list]) => (
-            <Card key={day}>
-              <div className="border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
+            <Card key={day} className="gap-0 overflow-hidden py-0 sm:gap-0 sm:py-0">
+              <div className="eyebrow border-b border-border bg-muted/40 px-4 py-2 text-[10px] text-muted-foreground sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
               <ul>
                 {grouped(list).map(({ first: e, rest, status }) => {
                   const who =
@@ -162,13 +162,11 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                           })()
                         : "System";
                   const inner = (
-                    <div className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-muted/50 sm:gap-4 sm:px-5">
-                      <span className="w-11 shrink-0 tabular-nums text-muted-foreground">{time(e.occurred_at)}</span>
+                    <div className="flex items-start gap-3 px-4 py-3.5 text-sm transition-colors hover:bg-muted/50 sm:gap-4 sm:px-5">
+                      <span className="w-11 shrink-0 pt-1.5 text-xs tabular-nums text-muted-foreground">{time(e.occurred_at)}</span>
+                      <ActorAvatar type={e.actor_type} name={who ?? ""} />
                       <div className="min-w-0 flex-1">
-                        <div className={`flex items-center gap-1.5 text-xs font-medium ${e.actor_type === "agent" ? "text-highlight-strong" : "text-muted-foreground"}`}>
-                          {e.actor_type === "agent" ? <span aria-hidden className="size-1.5 rounded-full bg-highlight" /> : null}
-                          {who}
-                        </div>
+                        <div className={`text-xs font-medium ${e.actor_type === "agent" ? "text-highlight-strong" : "text-muted-foreground"}`}>{who}</div>
                         <div>{e.title}</div>
                         {rest.length ? (
                           <details className="mt-1 text-xs text-muted-foreground">
@@ -209,5 +207,34 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         </div>
       )}
     </>
+  );
+}
+
+// Who did it, at a glance: agents in the signal colour, people by initials, the system as a cog.
+function ActorAvatar({ type, name }: { type: string; name: string }) {
+  if (type === "agent") {
+    return (
+      <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-highlight-soft text-highlight-strong">
+        <Bot className="size-4" />
+      </span>
+    );
+  }
+  if (type === "user") {
+    const initials = name
+      .split(/\s+/)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+    return (
+      <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-soft font-mono text-[11px] font-semibold text-brand-strong">
+        {initials || "?"}
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+      <Cog className="size-4" />
+    </span>
   );
 }

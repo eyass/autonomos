@@ -1,7 +1,7 @@
 import { getTool } from "@autonomos/integrations";
 import { registerWorkspaceTools } from "@/server/tool-catalog";
 import { reconcileStuckRuns } from "@/server/run-health";
-import { ChevronDown } from "lucide-react";
+import { Activity, ChevronDown, CircleCheck, CircleDot, CircleSlash, Hand, Play, ShieldCheck, Sparkles, TriangleAlert, UserRound, Wrench, Zap, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
@@ -19,7 +19,31 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const STEP_TONE: Record<string, string> = { succeeded: "bg-success", failed: "bg-destructive", waiting: "bg-warning", simulated: "bg-info", skipped: "bg-muted-foreground" };
+const STEP_TONE: Record<string, string> = {
+  succeeded: "bg-success-soft text-success",
+  failed: "bg-destructive-soft text-destructive",
+  waiting: "bg-warning-soft text-warning",
+  simulated: "bg-info-soft text-info",
+  skipped: "bg-muted text-muted-foreground",
+};
+
+// What kind of step it was, so the timeline reads at a glance. Reasoning is the agent's own
+// work and carries the signal colour; everything else takes the tone of its outcome.
+const STEP_KIND: Record<string, { label: string; icon: LucideIcon }> = {
+  trigger: { label: "Trigger", icon: Zap },
+  decision: { label: "Reasoning", icon: Sparkles },
+  tool: { label: "Tool", icon: Wrench },
+  action: { label: "Action", icon: Play },
+  policy: { label: "Policy", icon: ShieldCheck },
+  approval_requested: { label: "Approval", icon: Hand },
+  approval: { label: "Approval", icon: Hand },
+  escalated: { label: "Handed off", icon: UserRound },
+  manual_completion: { label: "Person", icon: UserRound },
+  completed: { label: "Finished", icon: CircleCheck },
+  exception: { label: "Error", icon: TriangleAlert },
+  failed: { label: "Error", icon: TriangleAlert },
+  cancelled: { label: "Cancelled", icon: CircleSlash },
+};
 
 export default async function RunPage({ params, searchParams }: { params: Promise<{ runId: string }>; searchParams: Promise<{ built?: string }> }) {
   const { runId } = await params;
@@ -58,6 +82,8 @@ export default async function RunPage({ params, searchParams }: { params: Promis
       <LiveRefresh active={active} />
       <PageHeader
         back={{ href: "/activity", label: "Activity" }}
+        icon={Activity}
+        tone={active || pending ? "agent" : "brand"}
         title={`${agent.name}${run.mode === "test" ? " · test run" : ""}`}
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -141,13 +167,24 @@ export default async function RunPage({ params, searchParams }: { params: Promis
             <CardDescription>Every material step, in order.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ol className="relative ml-1 space-y-4 border-l border-border pl-5">
+            <ol className="relative space-y-4 before:absolute before:top-3 before:bottom-3 before:left-[13px] before:w-px before:bg-border">
               {(steps ?? []).map((s) => {
                 const decision = s.type === "decision" ? (s.output as { reasoningSummary?: string; confidence?: number; proposedTool?: string }) : null;
+                const kind = STEP_KIND[s.type] ?? { label: s.type.replaceAll("_", " "), icon: CircleDot };
                 return (
-                  <li key={s.id} className="relative">
-                    <span className={cn("absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full", STEP_TONE[s.status] ?? "bg-muted-foreground")} />
+                  <li key={s.id} className="relative flex gap-3">
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "relative z-10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ring-4 ring-card",
+                        s.type === "decision" ? "bg-highlight-soft text-highlight-strong" : (STEP_TONE[s.status] ?? "bg-muted text-muted-foreground"),
+                      )}
+                    >
+                      <kind.icon className="size-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex flex-wrap items-baseline gap-2 text-sm">
+                      <span className="eyebrow text-[10px] text-muted-foreground">{kind.label}</span>
                       <span className="tabular-nums text-xs text-muted-foreground">{time(s.created_at)}</span>
                       <span className="min-w-0 font-medium break-words">{s.description}</span>
                       {s.tool && (getTool(s.tool)?.label ?? s.tool) !== s.description ? <Badge variant="secondary">{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
@@ -180,10 +217,18 @@ export default async function RunPage({ params, searchParams }: { params: Promis
                         </CollapsibleContent>
                       </Collapsible>
                     ) : null}
+                    </div>
                   </li>
                 );
               })}
-              {active ? <li className="text-sm text-muted-foreground">Working…</li> : null}
+              {active ? (
+                <li className="relative flex items-center gap-3 text-sm text-muted-foreground">
+                  <span aria-hidden className="relative z-10 flex size-7 items-center justify-center rounded-full bg-highlight-soft ring-4 ring-card">
+                    <span className="signal-pulse size-2 rounded-full bg-highlight" />
+                  </span>
+                  Working…
+                </li>
+              ) : null}
             </ol>
           </CardContent>
         </Card>
