@@ -159,15 +159,15 @@ export function Prose({ className, children }: { className?: string; children: R
 
 export function PageIntro({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: React.ReactNode }) {
   return (
-    <div className="mb-8">
+    <div className="mb-10 border-b border-border pb-8">
       {eyebrow ? (
         <p className="eyebrow flex items-center gap-2 text-highlight-strong">
           <span aria-hidden className="h-3 w-1 rounded-full bg-highlight" />
           {eyebrow}
         </p>
       ) : null}
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-      {children ? <div className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">{children}</div> : null}
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] sm:text-[2.75rem] sm:leading-[1.08]">{title}</h1>
+      {children ? <div className="mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">{children}</div> : null}
     </div>
   );
 }
