@@ -5,7 +5,7 @@ import { reconcileStuckRuns } from "@/server/run-health";
 import { computeOrgMetrics } from "@autonomos/db";
 import { getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
 import { INTEGRATION_EVENTS } from "@autonomos/schemas";
-import { ChevronDown } from "lucide-react";
+import { Bot, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
@@ -121,6 +121,8 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
     <>
       <PageHeader
         back={{ href: "/agents", label: "Agents" }}
+        icon={Bot}
+        tone={agent.status === "active" ? "agent" : "brand"}
         title={agent.name}
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

@@ -1,4 +1,4 @@
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
@@ -85,6 +85,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
     <>
       <PageHeader
         back={{ href: "/opportunities", label: "Automation ideas" }}
+        icon={Target}
         title={o.title}
         description={
           <span className="flex flex-wrap items-center gap-2">

@@ -95,10 +95,10 @@ export default async function SettingsPage() {
           aria-label="Settings sections"
           className="sticky top-14 z-10 -mx-4 mb-4 overflow-x-auto bg-background/95 px-4 py-2 backdrop-blur sm:mx-0 sm:px-0 lg:top-18 lg:mb-0 lg:self-start lg:overflow-visible lg:bg-transparent lg:py-0 lg:backdrop-blur-none"
         >
-          <ul className="flex gap-2 pb-1 lg:flex-col lg:gap-0.5">
+          <ul className="flex gap-2 pb-1 lg:flex-col lg:gap-0.5 lg:border-l lg:border-border lg:pl-2">
             {sections.map(([id, label]) => (
               <li key={id} className="shrink-0">
-                <Button asChild size="sm" variant="outline" className={cn("rounded-full lg:w-full lg:justify-start lg:rounded-md lg:border-0 lg:shadow-none", id === "danger" && "text-destructive")}>
+                <Button asChild size="sm" variant="outline" className={cn("rounded-full lg:w-full lg:justify-start lg:rounded-md lg:border-0 lg:bg-transparent lg:font-normal lg:text-muted-foreground lg:shadow-none lg:hover:bg-muted lg:hover:text-foreground", id === "danger" && "text-destructive lg:text-destructive")}>
                   <Link href={`#${id}`}>{label}</Link>
                 </Button>
               </li>

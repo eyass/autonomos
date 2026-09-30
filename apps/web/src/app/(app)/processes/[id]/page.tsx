@@ -1,3 +1,4 @@
+import { Workflow } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
@@ -95,6 +96,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
     <>
       <PageHeader
         back={{ href: "/processes", label: "Work" }}
+        icon={Workflow}
         title={p.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
