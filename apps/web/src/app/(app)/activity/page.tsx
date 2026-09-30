@@ -1,3 +1,4 @@
+import { Activity } from "lucide-react";
 import Link from "next/link";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { FilterBar } from "@/components/filter-bar";
@@ -142,7 +143,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         view === "attention" ? (
           <EmptyState title="Nothing needs attention." description="Warnings, errors and runs waiting on a person show here." />
         ) : (
-          <EmptyState title="No activity yet." description="Agent runs, approvals and changes appear here as they happen." />
+          <EmptyState icon={Activity} title="No activity yet." description="Agent runs, approvals and changes appear here as they happen." />
         )
       ) : (
         <div className="space-y-4">

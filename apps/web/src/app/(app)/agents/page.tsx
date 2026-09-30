@@ -1,3 +1,4 @@
+import { Bot } from "lucide-react";
 import { computeOrgMetrics } from "@autonomos/db";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
@@ -27,7 +28,19 @@ export default async function AgentsPage() {
     return (
       <>
         <PageHeader title="Agents" description="Agents that run your processes, with what they can do and how they perform." />
-        <EmptyState title="You haven't deployed any agents." description="Agents are built from automation ideas." action={<ButtonLink href="/opportunities">See automation ideas</ButtonLink>} />
+        <EmptyState
+          icon={Bot}
+          title="You haven't deployed any agents."
+          description="Agents are built from automation ideas, or from a ready-made playbook."
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <ButtonLink href="/opportunities">See automation ideas</ButtonLink>
+              <ButtonLink href="/playbooks" variant="outline">
+                Browse playbooks
+              </ButtonLink>
+            </div>
+          }
+        />
       </>
     );
   }

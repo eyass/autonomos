@@ -106,6 +106,11 @@ export default async function OverviewPage() {
         <CardDescription>
           {playbook.filter((p) => p.done).length} of {playbook.length} done. Next: {next.title.toLowerCase()}.
         </CardDescription>
+        <div aria-hidden className="mt-2 flex max-w-xs gap-1">
+          {playbook.map((p) => (
+            <span key={p.title} className={`h-1.5 flex-1 rounded-full ${p.done ? "bg-brand" : p === next ? "bg-highlight" : "bg-muted"}`} />
+          ))}
+        </div>
         <CardAction>
           <ButtonLink href={next.href} size="sm">
             {next.cta}
@@ -116,15 +121,25 @@ export default async function OverviewPage() {
         <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {playbook.map((p, i) => (
             <li key={p.title}>
-              <Link href={p.href} className={`flex items-start gap-3 rounded-lg border p-3 text-sm hover:bg-accent ${p === next ? "border-primary/50 bg-primary/5" : ""}`}>
+              <Link
+                href={p.href}
+                className={`flex h-full items-start gap-3 rounded-xl border p-3.5 text-sm transition-colors hover:bg-accent ${p === next ? "border-primary/40 bg-brand-soft/60 ring-1 ring-primary/20" : p.done ? "bg-muted/40" : "bg-card"}`}
+              >
                 {p.done ? (
                   <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
                 ) : (
-                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border text-[10px] tabular-nums">{i + 1}</span>
+                  <span
+                    className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold tabular-nums ${p === next ? "bg-primary text-primary-foreground" : "border"}`}
+                  >
+                    {i + 1}
+                  </span>
                 )}
-                <span>
-                  <span className={`block font-medium ${p.done ? "text-muted-foreground line-through" : ""}`}>{p.title}</span>
-                  {!p.done ? <span className="block text-xs text-muted-foreground">{p.detail}</span> : null}
+                <span className="min-w-0">
+                  <span className={`flex items-center gap-2 font-medium ${p.done ? "text-muted-foreground" : ""}`}>
+                    {p.title}
+                    {p === next ? <span className="eyebrow rounded bg-highlight-soft px-1.5 py-0.5 text-[9px] text-highlight-strong">Next</span> : null}
+                  </span>
+                  {!p.done ? <span className="mt-0.5 block text-xs text-muted-foreground">{p.detail}</span> : null}
                 </span>
               </Link>
             </li>

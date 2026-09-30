@@ -1,3 +1,4 @@
+import { Inbox } from "lucide-react";
 import { StatusBadge } from "@/components/domain";
 import { dateTime } from "@/lib/format";
 import { requireSession } from "@/lib/session";
@@ -116,6 +117,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         </div>
       ) : !liveHandoffs.length ? (
         <EmptyState
+          icon={Inbox}
           title={testHandoffs.length ? "Nothing live needs a person." : "Nothing needs a person right now."}
           description={
             testHandoffs.length
