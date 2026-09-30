@@ -39,7 +39,7 @@ const STEP_KIND: Record<string, { label: string; icon: LucideIcon }> = {
   approval: { label: "Approval", icon: Hand },
   escalated: { label: "Handed off", icon: UserRound },
   manual_completion: { label: "Person", icon: UserRound },
-  completed: { label: "Done", icon: CircleCheck },
+  completed: { label: "Finished", icon: CircleCheck },
   exception: { label: "Error", icon: TriangleAlert },
   failed: { label: "Error", icon: TriangleAlert },
   cancelled: { label: "Cancelled", icon: CircleSlash },
