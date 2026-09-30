@@ -270,7 +270,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                     <LevelChange from={effective(p)} to={p.potential_autonomy_level} />
                   </TableCell>
                   <TableCell className="hidden @4xl:table-cell">
-                    {held ? <span className="text-xs text-muted-foreground">Not scored yet</span> : <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />}
+                    {held ? <span className="text-xs text-muted-foreground">Not scored yet</span> : <Scores dense value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} />}
                   </TableCell>
                   <TableCell className="text-right @lg:text-left">
                     <StatusBadge status={p.status} />

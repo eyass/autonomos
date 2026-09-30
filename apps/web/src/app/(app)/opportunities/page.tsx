@@ -94,7 +94,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                         <div className="text-xs text-muted-foreground">{money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}</div>
                       </TableCell>
                       <TableCell className="hidden @4xl:table-cell">
-                        <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} />
+                        <Scores dense value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} />
                       </TableCell>
                       <TableCell className="hidden @2xl:table-cell">
                         <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />

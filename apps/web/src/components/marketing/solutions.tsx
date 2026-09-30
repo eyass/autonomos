@@ -11,13 +11,13 @@ export function DepartmentCards({ exclude }: { exclude?: string }) {
     <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {DEPARTMENTS.filter((d) => d.slug !== exclude).map((d) => (
         <li key={d.slug}>
-          <Link href={`/solutions/${d.slug}`} className="group flex h-full flex-col rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-brand-soft/40">
+          <Link href={`/solutions/${d.slug}`} className="group flex h-full flex-col rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-brand/10">
             <span className="flex items-center justify-between gap-2">
-              <span className="text-base font-semibold">{d.name}</span>
+              <span className="font-display text-lg font-semibold">{d.name}</span>
               <ArrowRight size={16} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
             </span>
             <span className="mt-1 text-sm text-muted-foreground">{d.headline}</span>
-            <span className="mt-4 flex flex-wrap gap-1.5" aria-hidden>
+            <span className="mt-auto flex flex-wrap gap-1.5 pt-5" aria-hidden>
               {d.tools.slice(0, 6).map((t) => (
                 <ToolLogo key={t} tool={t} size={26} label={false} className="border border-border" />
               ))}
@@ -33,6 +33,7 @@ export function DepartmentPage({ d }: { d: Department }) {
   return (
     <>
       <section className="relative overflow-hidden border-b border-border bg-ink text-ink-foreground">
+        <div aria-hidden className="bg-ink-glow pointer-events-none absolute inset-0" />
         <div aria-hidden className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_70%_30%,black,transparent_75%)]" />
         <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
           <Link href="/solutions" className="eyebrow text-white/60 hover:text-white">
