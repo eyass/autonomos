@@ -49,7 +49,7 @@ function isActive(path: string, item: NavItem) {
 type Usage = { planName: string; runs: number; runsPerMonth: number; activeAgents: number; agentLimit: number };
 
 // Plan usage at a glance, as the billing page counts it. Hidden when the sidebar is icons only.
-function PlanUsage({ planName, runs, runsPerMonth, activeAgents, agentLimit }: Usage) {
+function PlanUsage({ planName, runs, runsPerMonth, activeAgents, agentLimit, onNavigate }: Usage & { onNavigate: () => void }) {
   const rows = [
     { label: "Runs this month", used: runs, limit: runsPerMonth },
     { label: "Live agents", used: activeAgents, limit: agentLimit },
@@ -57,6 +57,8 @@ function PlanUsage({ planName, runs, runsPerMonth, activeAgents, agentLimit }: U
   return (
     <Link
       href="/settings#billing"
+      onClick={onNavigate}
+      aria-label={`${planName} plan usage: ${runs.toLocaleString("en")} of ${runsPerMonth.toLocaleString("en")} runs this month. Open billing.`}
       className="mx-2 mb-1 block rounded-xl border border-sidebar-border bg-card p-3 text-xs shadow-[0_1px_2px_rgb(18_24_22/0.04)] transition-colors hover:border-primary/30 group-data-[collapsible=icon]:hidden"
     >
       <span className="flex items-center justify-between gap-2">
@@ -174,7 +176,7 @@ export function AppSidebar({
       <SidebarContent>
         {group(MAIN, "Workspace")}
         <div className="mt-auto">
-          {usage ? <PlanUsage {...usage} /> : null}
+          {usage ? <PlanUsage {...usage} onNavigate={() => setOpenMobile(false)} /> : null}
           {group(platformAdmin ? [{ href: "/admin/playbooks", label: "Playbook studio", icon: Sparkles }, ...ADMIN] : ADMIN)}
         </div>
       </SidebarContent>
