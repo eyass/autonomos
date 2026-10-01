@@ -303,9 +303,26 @@ export function getComposio(): Composio {
   if (!process.env.COMPOSIO_API_KEY) throw new ToolError("not_connected", "COMPOSIO_API_KEY is not configured");
   if (!composioClient) {
     const toolkitVersions = { ...COMPOSIO_TOOLKIT_VERSIONS, ...(safeJson<Record<string, string>>(process.env.COMPOSIO_TOOLKIT_VERSIONS) ?? {}) };
-    composioClient = new Composio({ apiKey: process.env.COMPOSIO_API_KEY, toolkitVersions });
+    composioClient = guardToolkitVersions(new Composio({ apiKey: process.env.COMPOSIO_API_KEY, toolkitVersions }));
   }
   return composioClient;
+}
+
+type ExecuteBody = { version?: string; dangerouslySkipVersionCheck?: boolean } & Record<string, unknown>;
+
+// Composio refuses to run a tool by hand ("Toolkit version not specified") when no version is
+// passed and none is pinned for its toolkit. Every execution through this client gets a version:
+// the one passed, else the toolkit's pinned one, else the current one. The skip flag only applies
+// when the version would resolve to "latest", so pinned toolkits keep their pinned version.
+export function withToolkitVersion<B extends ExecuteBody>(body: B): B {
+  return body.version ? body : { ...body, dangerouslySkipVersionCheck: true };
+}
+
+function guardToolkitVersions(client: Composio): Composio {
+  const execute = client.tools.execute.bind(client.tools);
+  client.tools.execute = ((slug: string, body: ExecuteBody, ...rest: unknown[]) =>
+    (execute as (...a: unknown[]) => ReturnType<typeof execute>)(slug, withToolkitVersion(body ?? {}), ...rest)) as typeof client.tools.execute;
+  return client;
 }
 
 // Composio's catalogue reports this placeholder for tools listed before toolkits were versioned.

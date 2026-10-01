@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { definitionFromSnapshot, registerSnapshots, snapshotFromComposio, snapshotOf } from "./composio-tools";
-import { composioVersionOption, LEGACY_TOOLKIT_VERSION } from "./providers";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { composioVersionOption, LEGACY_TOOLKIT_VERSION, withToolkitVersion } from "./providers";
 import { getTool, isHighRisk } from "./tools";
 
 const invoice = {
@@ -66,5 +68,27 @@ describe("toolkit versions", () => {
     // Snapshots stored before versions were kept, or legacy listings: run the current version.
     expect(composioVersionOption("freshdesk", undefined)).toEqual({ dangerouslySkipVersionCheck: true });
     expect(composioVersionOption("freshdesk", LEGACY_TOOLKIT_VERSION)).toEqual({ dangerouslySkipVersionCheck: true });
+  });
+});
+
+describe("every Composio execution has a toolkit version", () => {
+  it("adds the skip flag only when no version is given", () => {
+    expect(withToolkitVersion({ userId: "o", arguments: {} })).toEqual({ userId: "o", arguments: {}, dangerouslySkipVersionCheck: true });
+    expect(withToolkitVersion({ userId: "o", version: "20260920_01" })).toEqual({ userId: "o", version: "20260920_01" });
+  });
+
+  it("creates the Composio client in one place only, so the guard covers every call", () => {
+    const root = join(__dirname, "../../..");
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        if (["node_modules", ".next", ".turbo", "dist", ".git", ".trigger"].includes(name)) continue;
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (/\.(ts|tsx)$/.test(name) && !/\.test\.ts$/.test(name) && /new Composio\(/.test(readFileSync(path, "utf8"))) hits.push(path.slice(root.length + 1));
+      }
+    };
+    for (const dir of ["apps", "packages"]) walk(join(root, dir));
+    expect(hits).toEqual(["packages/integrations/src/providers.ts"]);
   });
 });
