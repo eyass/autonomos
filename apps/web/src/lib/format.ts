@@ -57,3 +57,9 @@ export const FREQUENCY_LABEL: Record<string, string> = {
   monthly: "Monthly",
   event_driven: "When it happens",
 };
+
+// A connected system's key as people read it: "google_drive" → "Google drive".
+export function systemName(key: string) {
+  const s = key.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

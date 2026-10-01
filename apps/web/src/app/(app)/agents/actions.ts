@@ -14,7 +14,9 @@ import {
   simulateSandboxTicket,
   startProductionRun,
   startTestRun,
+  startRealTest,
   startTestRunWithSample,
+  testRecordsFor,
   updateAgentConfig,
 } from "@/server/agents";
 
@@ -47,6 +49,24 @@ export async function testRunAction(agentId: string, input: Record<string, unkno
 
 export async function testRunSampleAction(agentId: string, sampleKey: string) {
   const result = await runAction(async () => startTestRunWithSample(await requireSessionOrThrow(), agentId, sampleKey));
+  if (!result.ok) return result;
+  redirect(`/activity/${result.data}`);
+}
+
+// The latest records of the agent's system, to test on a real one.
+export async function testRecordsAction(agentId: string) {
+  return runAction(async () => testRecordsFor(await requireSessionOrThrow(), z.string().uuid().parse(agentId)));
+}
+
+export async function testRunRecordAction(agentId: string, recordId: string) {
+  const result = await runAction(async () => startRealTest(await requireSessionOrThrow(), z.string().uuid().parse(agentId), z.string().min(1).max(200).parse(recordId)));
+  if (!result.ok) return result;
+  redirect(`/activity/${result.data}`);
+}
+
+// A test on the workspace's own data with nothing to pick: a scheduled agent's last week.
+export async function testRealAction(agentId: string) {
+  const result = await runAction(async () => startRealTest(await requireSessionOrThrow(), z.string().uuid().parse(agentId)));
   if (!result.ok) return result;
   redirect(`/activity/${result.data}`);
 }

@@ -1,5 +1,5 @@
 import { logger, schedules, tasks } from "@trigger.dev/sdk";
-import { createServiceClient, createRun, RunNotAllowedError, snapshotMetrics } from "@autonomos/db";
+import { checkRecordWatches, createServiceClient, createRun, RunNotAllowedError, snapshotMetrics } from "@autonomos/db";
 import type { agentRunTask } from "./agent-run";
 
 // Expire approvals that nobody resolved, and resume their runs so they close cleanly.
@@ -63,5 +63,19 @@ export const agentScheduleTask = schedules.task({
       throw e;
     }
     await tasks.trigger<typeof agentRunTask>("agent-run", { runId }, { idempotencyKey: `run-${runId}` });
+  },
+});
+
+// "New record" triggers: start a run for each new ticket, email or other record in a watched system.
+export const recordWatchTask = schedules.task({
+  id: "record-watch",
+  cron: "*/5 * * * *",
+  run: async () => {
+    const results = await checkRecordWatches(createServiceClient());
+    for (const r of results) {
+      for (const runId of r.started) await tasks.trigger<typeof agentRunTask>("agent-run", { runId }, { idempotencyKey: `run-${runId}` });
+      if (r.error) logger.warn("record watch failed", { agentId: r.agentId, integration: r.integration, error: r.error });
+    }
+    logger.info("record watches checked", { agents: results.length, runs: results.reduce((n, r) => n + r.started.length, 0), seeded: results.reduce((n, r) => n + r.seeded, 0) });
   },
 });

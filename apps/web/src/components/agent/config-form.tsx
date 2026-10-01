@@ -3,6 +3,7 @@ import { AUTONOMY_LEVELS, INTEGRATION_EVENTS, modeOf, type AgentConfig, type Con
 import { Check } from "lucide-react";
 import { useState, useTransition } from "react";
 import { AutonomyLadder } from "@/components/domain";
+import { systemName } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldTitle } from "@/components/ui/field";
@@ -20,6 +21,13 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 
 export type ToolOption = { key: string; label: string; description: string; access: "read" | "write"; integration: string; highRisk: boolean };
+
+const TRIGGER_CHOICES = {
+  new_record: { title: "Each new record", description: "A new ticket, email or deal in a connected system" },
+  manual: { title: "Manual", description: "Run it yourself" },
+  schedule: { title: "Schedule", description: "For example every weekday at 09:00" },
+  integration_event: { title: "Webhook event", description: "An event your own systems send" },
+} as const;
 
 const STEPS = ["Objective", "Trigger", "Instructions", "What the agent can do", "Autonomy and controls", "Review"] as const;
 
@@ -48,6 +56,7 @@ function ListField({ label, hint, value, onChange }: { label: string; hint?: str
 function triggerLabel(t: AgentConfig["trigger"]) {
   if (t.type === "manual") return "run manually";
   if (t.type === "schedule") return `on a schedule (${t.cron}, ${t.timezone})`;
+  if (t.type === "new_record") return `for each new record in ${systemName(t.integration)}`;
   return `when ${INTEGRATION_EVENTS.find((e) => e.key === t.event)?.label ?? t.event}`;
 }
 
@@ -77,6 +86,8 @@ export function AgentConfigForm({
   const setInstr = <K extends keyof AgentConfig["instructions"]>(k: K, v: AgentConfig["instructions"][K]) => setC((s) => ({ ...s, instructions: { ...s.instructions, [k]: v } }));
   const setPolicy = <K extends keyof AgentConfig["policy"]>(k: K, v: AgentConfig["policy"][K]) => setC((s) => ({ ...s, policy: { ...s.policy, [k]: v } }));
   const selectedTools = tools.filter((t) => c.tools.includes(t.key));
+  // Systems a "new record" trigger can watch: the connected ones the agent's tools come from first.
+  const systems = [...new Set([...selectedTools, ...tools].map((t) => t.integration).filter((i) => i !== "knowledge"))];
   const moneyTools = selectedTools.filter((t) => t.key === "stripe.create_refund");
 
   const submit = () =>
@@ -142,7 +153,7 @@ export function AgentConfigForm({
           {step === 1 ? (
             <>
               <RadioGroup
-                className="grid gap-2 sm:grid-cols-3"
+                className="grid gap-2 sm:grid-cols-2"
                 value={c.trigger.type}
                 onValueChange={(t) =>
                   set(
@@ -151,16 +162,18 @@ export function AgentConfigForm({
                       ? { type: "manual" }
                       : t === "schedule"
                         ? { type: "schedule", cron: "0 9 * * 1-5", timezone: "Europe/Amsterdam" }
-                        : { type: "integration_event", event: "zendesk.ticket.created" },
+                        : t === "new_record"
+                          ? { type: "new_record", integration: systems[0] ?? "zendesk" }
+                          : { type: "integration_event", event: "zendesk.ticket.created" },
                   )
                 }
               >
-                {(["manual", "schedule", "integration_event"] as const).map((t) => (
+                {(["new_record", "manual", "schedule", "integration_event"] as const).map((t) => (
                   <FieldLabel key={t} htmlFor={`trigger-${t}`}>
                     <Field orientation="horizontal">
                       <FieldContent>
-                        <FieldTitle>{t === "manual" ? "Manual" : t === "schedule" ? "Schedule" : "When something happens"}</FieldTitle>
-                        <FieldDescription>{t === "manual" ? "Run it yourself" : t === "schedule" ? "For example every weekday at 09:00" : "An event in a connected system"}</FieldDescription>
+                        <FieldTitle>{TRIGGER_CHOICES[t].title}</FieldTitle>
+                        <FieldDescription>{TRIGGER_CHOICES[t].description}</FieldDescription>
                       </FieldContent>
                       <RadioGroupItem value={t} id={`trigger-${t}`} />
                     </Field>
@@ -176,6 +189,17 @@ export function AgentConfigForm({
                     <Input value={c.trigger.timezone} onChange={(e) => set("trigger", { ...c.trigger, type: "schedule", timezone: e.target.value } as AgentConfig["trigger"])} />
                   </FormField>
                 </div>
+              ) : null}
+              {c.trigger.type === "new_record" ? (
+                <FormField label="System" hint="Every new ticket, email or record there starts one run. Records already there when the agent goes live are skipped.">
+                  <NativeSelect value={c.trigger.integration} onChange={(e) => set("trigger", { type: "new_record", integration: e.target.value })}>
+                    {[...new Set([c.trigger.integration, ...systems])].map((s) => (
+                      <NativeSelectOption key={s} value={s}>
+                        {systemName(s)}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </FormField>
               ) : null}
               {c.trigger.type === "integration_event" ? (
                 <FormField label="Event">

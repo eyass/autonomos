@@ -14,3 +14,4 @@ export function createServiceClient(): DbClient {
   return createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 export * from "./services";
+export { checkRecordWatches, connectionContext, recentRecordsFor, type WatchResult } from "./record-watch";

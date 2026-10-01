@@ -290,6 +290,12 @@ export const TriggerConfigSchema = z.discriminatedUnion("type", [
     type: z.literal("integration_event"),
     event: IntegrationEventKey,
   }),
+  // Each new record (ticket, email, deal...) in a connected system starts one run. AutonomOS
+  // checks the system every few minutes; records that existed before the agent listened are skipped.
+  z.object({
+    type: z.literal("new_record"),
+    integration: z.string().min(1),
+  }),
 ]);
 export type TriggerConfig = z.infer<typeof TriggerConfigSchema>;
 

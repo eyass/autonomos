@@ -568,6 +568,10 @@ function describeTrigger(ctx: RunContext) {
   const t = ctx.version.trigger;
   if (t.type === "integration_event") return `Received ${t.event.replaceAll(".", " ")}`;
   if (t.type === "schedule") return "Scheduled run started";
+  if (t.type === "new_record") {
+    const kind = typeof ctx.run.input.record_kind === "string" ? ctx.run.input.record_kind : "record";
+    return ctx.run.mode === "test" ? `Test run started on ${kind} ${String(ctx.run.input.record_id ?? "")}`.trim() : `New ${kind} ${String(ctx.run.input.record_id ?? "")} in ${t.integration}`.trim();
+  }
   return ctx.run.mode === "test" ? "Test run started" : "Started manually";
 }
 
