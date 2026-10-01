@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { definitionFromSnapshot, registerSnapshots, snapshotFromComposio, snapshotOf } from "./composio-tools";
+import { composioVersionOption, LEGACY_TOOLKIT_VERSION } from "./providers";
 import { getTool, isHighRisk } from "./tools";
 
 const invoice = {
@@ -44,5 +45,26 @@ describe("Composio tools", () => {
     expect(def).toMatchObject({ access: "write", integration: "salesforce", source: "composio" });
     expect(snapshotOf(def)).toBeNull();
     expect(getTool("nope.tool")).toBeUndefined();
+  });
+});
+
+describe("toolkit versions", () => {
+  it("keeps the version a tool was listed with through the stored snapshot", () => {
+    const snap = snapshotFromComposio({ ...invoice, version: "20260920_01" }, "xero");
+    expect(snap.version).toBe("20260920_01");
+    const def = definitionFromSnapshot(snap);
+    expect(def.version).toBe("20260920_01");
+    expect(snapshotOf(def)?.version).toBe("20260920_01");
+    expect(snapshotFromComposio({ ...invoice, version: LEGACY_TOOLKIT_VERSION }, "xero").version).toBeUndefined();
+  });
+
+  it("always gives Composio a version to run a tool with", () => {
+    // Pinned in the client: the client's version applies.
+    expect(composioVersionOption("zendesk", "20260101_00")).toEqual({});
+    // Listed with a version: run that version.
+    expect(composioVersionOption("freshdesk", "20260920_01")).toEqual({ version: "20260920_01" });
+    // Snapshots stored before versions were kept, or legacy listings: run the current version.
+    expect(composioVersionOption("freshdesk", undefined)).toEqual({ dangerouslySkipVersionCheck: true });
+    expect(composioVersionOption("freshdesk", LEGACY_TOOLKIT_VERSION)).toEqual({ dangerouslySkipVersionCheck: true });
   });
 });

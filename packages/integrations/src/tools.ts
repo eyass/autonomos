@@ -24,6 +24,8 @@ export type ToolDefinition<I extends z.ZodType = z.ZodType> = {
   // Tools loaded from Composio carry the toolkit's own JSON schema, shown to the model as is.
   source?: "builtin" | "composio";
   jsonSchema?: Record<string, unknown>;
+  // The Composio toolkit version the tool was listed with, so runs use the schema the agent was built on.
+  version?: string;
 };
 
 function tool<I extends z.ZodType>(def: ToolDefinition<I>): ToolDefinition<I> {

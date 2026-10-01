@@ -1,7 +1,7 @@
 import { ToolError } from "./errors";
 import { readOnlyTools, toolkitFor, type ToolMeta } from "./directory";
 import type { InventoryReader, SystemInventory } from "./inventory";
-import { getComposio, type ConnectionInfo, type SandboxRecord, type SandboxStore } from "./providers";
+import { composioVersionOption, getComposio, LEGACY_TOOLKIT_VERSION, type ConnectionInfo, type SandboxRecord, type SandboxStore } from "./providers";
 
 // Reads a recent sample of real data from a connected system so discovery can propose the
 // work it shows. Only what is needed to recognise recurring work is kept: subjects, short
@@ -276,11 +276,7 @@ async function scanSandbox(integration: string, s: SandboxStore, limit: ScanLimi
   return paymentsScan("sandbox", payments, refunds, limit, now);
 }
 
-const LEGACY_VERSION = "00000000_00";
-
-// Toolkits whose versions are pinned in the Composio client; others are read with the
-// version the tool catalogue reports (reads only, so a newer version is safe).
-const PINNED = new Set(["zendesk", "stripe", "slack", "gmail"]);
+const LEGACY_VERSION = LEGACY_TOOLKIT_VERSION;
 
 export async function exec(ctx: Pick<ScanContext, "organizationId" | "connection">, slug: string, args: Record<string, unknown>, version?: string | null): Promise<Record<string, unknown>> {
   if (!ctx.connection.externalAccountId) throw new ToolError("not_connected", "No connected account");
@@ -289,7 +285,7 @@ export async function exec(ctx: Pick<ScanContext, "organizationId" | "connection
     userId: ctx.organizationId,
     connectedAccountId: ctx.connection.externalAccountId,
     arguments: args,
-    ...(PINNED.has(toolkit) ? {} : version && version !== LEGACY_VERSION ? { version } : { dangerouslySkipVersionCheck: true }),
+    ...composioVersionOption(toolkit, version),
   })) as {
     successful?: boolean;
     error?: string | null;

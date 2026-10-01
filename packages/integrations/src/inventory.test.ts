@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const calls: Array<{ slug: string; args: Record<string, unknown> }> = [];
 let respond: (slug: string, args: Record<string, unknown>) => unknown = () => ({});
 let catalogue: Array<{ slug: string; version: string | null; properties: Record<string, { type?: string }>; required: string[]; tags: string[] }> = [];
-vi.mock("./providers", () => ({
+vi.mock("./providers", async (orig) => ({
+  ...(await orig<typeof import("./providers")>()),
   getComposio: () => ({
     tools: {
       execute: async (slug: string, o: { arguments: Record<string, unknown> }) => {

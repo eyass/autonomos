@@ -1,6 +1,6 @@
 import { Composio } from "@composio/core";
 import { ToolError, classifyHttpStatus } from "./errors";
-import { authPlan } from "./directory";
+import { authPlan, toolkitFor } from "./directory";
 import { getTool, type ToolDefinition } from "./tools";
 
 export type SandboxRecord = Record<string, unknown> & { id: string };
@@ -308,6 +308,18 @@ export function getComposio(): Composio {
   return composioClient;
 }
 
+// Composio's catalogue reports this placeholder for tools listed before toolkits were versioned.
+export const LEGACY_TOOLKIT_VERSION = "00000000_00";
+
+// The version option for running a Composio action by hand, which Composio requires. Toolkits
+// pinned in the client run their pinned version. Others run the version the tool was listed
+// with (stored in the agent version's tool snapshot), or the current one when none was stored.
+export function composioVersionOption(toolkit: string, version?: string | null): { version: string } | { dangerouslySkipVersionCheck: true } | Record<string, never> {
+  const pinned = { ...COMPOSIO_TOOLKIT_VERSIONS, ...(safeJson<Record<string, string>>(process.env.COMPOSIO_TOOLKIT_VERSIONS) ?? {}) };
+  if (pinned[toolkit]) return {};
+  return version && version !== LEGACY_TOOLKIT_VERSION ? { version } : { dangerouslySkipVersionCheck: true };
+}
+
 async function runComposio(def: ToolDefinition, args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<unknown> {
   // Composio tools are the action itself; built-in tools map onto one.
   const mapping: ComposioMapping | undefined = def.source === "composio" ? { slug: def.key.slice("composio:".length), toArgs: ({ __idempotency_key: _, ...a }) => a } : COMPOSIO_MAPPINGS[def.key];
@@ -318,6 +330,7 @@ async function runComposio(def: ToolDefinition, args: Record<string, unknown>, c
       userId: ctx.organizationId,
       connectedAccountId: ctx.connection.externalAccountId,
       arguments: stripUndefined(mapping.toArgs({ ...args, __idempotency_key: ctx.idempotencyKey })),
+      ...composioVersionOption(toolkitFor(def.integration), def.version),
     });
     const r = response as { successful?: boolean; error?: string | null; data?: unknown };
     if (r.successful === false) throw new ToolError("invalid_data", r.error ?? `${mapping.slug} failed`);
