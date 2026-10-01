@@ -64,8 +64,10 @@ test("reset password without a recovery session says the link expired", async ({
 test("public pages fit a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ["/", ...PAGES.map((p) => p.path), "/login", "/signup", "/forgot-password"]) {
-    await page.goto(path);
-    await page.waitForLoadState("networkidle");
+    // Layout is what is measured, so wait for the load event and web fonts, not network idle:
+    // a background request (prefetch, analytics) can keep the network busy for minutes on CI.
+    await page.goto(path, { waitUntil: "load" });
+    await page.evaluate(() => document.fonts.ready);
     await expectNoHorizontalOverflow(page, path);
   }
 });
