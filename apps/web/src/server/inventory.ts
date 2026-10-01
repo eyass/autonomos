@@ -1,6 +1,6 @@
 import "server-only";
-import { sandboxStore, sendNotification, type TablesUpdate } from "@autonomos/db";
-import { inventorySystem, isInventory, type SystemInventory } from "@autonomos/integrations";
+import { INVENTORY_STALE_MS, sendNotification, takeInventory as takeSharedInventory } from "@autonomos/db";
+import { isInventory, type SystemInventory } from "@autonomos/integrations";
 import { after } from "next/server";
 import { adminDb } from "@/lib/session";
 
@@ -8,40 +8,26 @@ import { adminDb } from "@/lib/session";
 // taken once in the background when it is connected and stored on the connection. Readers
 // and discovery use the stored copy; people can take it again from the Integrations page.
 
-const TIMEOUT_MS = 4 * 60_000;
 // A "running" inventory older than this was cut off and can be taken again.
-export const INVENTORY_STALE_MS = 6 * 60_000;
+export { INVENTORY_STALE_MS } from "@autonomos/db";
 
-export async function takeInventory(organizationId: string, key: string, timeoutMs = TIMEOUT_MS): Promise<SystemInventory | null> {
+export async function takeInventory(organizationId: string, key: string, timeoutMs?: number): Promise<SystemInventory | null> {
   const db = adminDb();
-  const { data: c } = await db.from("integration_connections").select("provider, external_account_id, status").eq("organization_id", organizationId).eq("integration_key", key).maybeSingle();
-  if (!c || c.status !== "connected") return null;
-  const save = (fields: TablesUpdate<"integration_connections">) => db.from("integration_connections").update(fields).eq("organization_id", organizationId).eq("integration_key", key);
-  await save({ inventory_status: "running", inventory_error: null, inventoried_at: new Date().toISOString() });
-  try {
-    const inventory = await Promise.race([
-      inventorySystem(key, {
-        organizationId,
-        connection: { integration: key, provider: c.provider as "sandbox" | "composio", externalAccountId: c.external_account_id },
-        sandbox: sandboxStore(db, organizationId),
-      }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Listing took too long")), timeoutMs)),
-    ]);
-    await save({ inventory: inventory as never, inventory_status: "ready", inventoried_at: inventory.takenAt, inventory_error: null });
-    return inventory;
-  } catch (e) {
-    console.error("inventory failed", key, e);
-    await save({ inventory_status: "failed", inventory_error: e instanceof Error ? e.message.slice(0, 300) : "failed" });
-    await sendNotification(db, organizationId, {
-      kind: "integration_error",
-      title: `Could not map ${key}`,
-      body: "AutonomOS could not list what this system holds. Check the connection, then choose Map again.",
-      link: "/integrations",
-      // Once per system per day, however often the listing is retried.
-      key: `inventory_failed:${key}:${new Date().toISOString().slice(0, 10)}`,
-    }).catch((err) => console.error("notification failed", err));
-    return null;
+  const inventory = await takeSharedInventory(db, organizationId, key, timeoutMs);
+  if (!inventory) {
+    const { data } = await db.from("integration_connections").select("inventory_status").eq("organization_id", organizationId).eq("integration_key", key).maybeSingle();
+    if (data?.inventory_status === "failed") {
+      await sendNotification(db, organizationId, {
+        kind: "integration_error",
+        title: `Could not map ${key}`,
+        body: "AutonomOS could not list what this system holds. It tries again by itself within the hour.",
+        link: "/integrations",
+        // Once per system per day, however often the listing is retried.
+        key: `inventory_failed:${key}:${new Date().toISOString().slice(0, 10)}`,
+      }).catch((err) => console.error("notification failed", err));
+    }
   }
+  return inventory;
 }
 
 // After the response, so connecting returns straight away.

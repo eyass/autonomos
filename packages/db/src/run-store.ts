@@ -107,10 +107,13 @@ export class SupabaseRunStore implements RunStore {
     if (patch.humanMinutes !== undefined) update.human_minutes = patch.humanMinutes;
     if (patch.baselineMinutes !== undefined) update.baseline_minutes = patch.baselineMinutes;
     if (patch.estimatedMinutesSaved !== undefined) update.estimated_minutes_saved = patch.estimatedMinutesSaved;
+    // Every save is a sign of life the healer reads (see heal.ts).
+    update.heartbeat_at = new Date().toISOString();
     check(await this.db.from("agent_runs").update(update).eq("organization_id", ctx.run.organizationId).eq("id", ctx.run.id), "save run");
   }
 
   async appendStep(ctx: RunContext, sequence: number, step: StepRecord) {
+    void this.db.from("agent_runs").update({ heartbeat_at: new Date().toISOString() }).eq("id", ctx.run.id).then(() => undefined);
     // upsert on (run, sequence) keeps step writes idempotent across retries.
     check(
       await this.db.from("agent_run_steps").upsert(

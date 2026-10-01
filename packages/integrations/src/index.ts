@@ -10,3 +10,4 @@ export * from "./composio-tools";
 export * from "./capabilities";
 export * from "./playbook-library";
 export * from "./records";
+export * from "./heal";

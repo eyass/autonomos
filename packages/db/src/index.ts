@@ -15,3 +15,4 @@ export function createServiceClient(): DbClient {
 }
 export * from "./services";
 export { checkRecordWatches, connectionContext, recentRecordsFor, type WatchResult } from "./record-watch";
+export { healConnections, healInventories, healRuns, healSchedules, takeInventory, INVENTORY_STALE_MS, type Enqueue, type HealReport, type ScheduleOps } from "./heal";

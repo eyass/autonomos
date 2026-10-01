@@ -1,4 +1,5 @@
 import "server-only";
+import { isTransient, withRetry } from "@autonomos/integrations";
 import { sendNotification, type Json } from "@autonomos/db";
 import { after } from "next/server";
 import { adminDb, HttpError, sessionFor, type Session } from "@/lib/session";
@@ -127,7 +128,13 @@ export async function runJob(id: string) {
     const { data: user } = await db.from("users").select("email").eq("id", claimed.user_id).maybeSingle();
     const handler = await handlerFor(claimed.kind as JobKind);
     const result = await Promise.race([
-      handler({ userId: claimed.user_id, email: user?.email ?? "", session, input: (claimed.input as Record<string, unknown>) ?? {}, attempt: claimed.attempts }),
+      // A temporary failure (a busy model, a dropped connection) is retried before the job fails.
+      withRetry(() => handler({ userId: claimed.user_id, email: user?.email ?? "", session, input: (claimed.input as Record<string, unknown>) ?? {}, attempt: claimed.attempts }), {
+        attempts: 3,
+        baseMs: 2000,
+        // Our own refusals (a missing connection, a limit) are answers, not glitches.
+        when: (e) => !(e instanceof HttpError) && isTransient(e),
+      }),
       new Promise<never>((_, reject) => setTimeout(() => reject(new HttpError(504, "This took longer than five minutes, so it was stopped. Try again.")), BUDGET_MS)),
     ]);
     const { data: done } = await db
