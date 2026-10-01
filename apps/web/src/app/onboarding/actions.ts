@@ -4,6 +4,7 @@ import { runAction } from "@/lib/actions";
 import { requireSessionOrThrow } from "@/lib/session";
 import { saveWebsiteProfile, WebsiteAnalysisSchema } from "@/server/company-profile";
 import { AboutSchema, completeOnboarding, CreateOrgSchema, createOrganization, saveAbout } from "@/server/org";
+import { onboardingPath } from "./steps";
 
 export async function createCompanyAction(_: unknown, form: FormData) {
   const result = await runAction(async () => {
@@ -30,11 +31,20 @@ export async function createCompanyAction(_: unknown, form: FormData) {
     return org;
   });
   if (!result.ok) return result;
-  redirect(result.data.complete ? "/onboarding/connect" : "/onboarding/about");
+  redirect(result.data.complete ? "/onboarding/knowledge" : "/onboarding/about");
 }
 
 export async function saveAboutAction(_: unknown, form: FormData) {
   const result = await runAction(async () => saveAbout(await requireSessionOrThrow(), AboutSchema.parse({ summary: form.get("summary"), areas: form.getAll("areas") })));
+  if (!result.ok) return result;
+  redirect(onboardingPath(result.data));
+}
+
+export async function finishKnowledgeAction() {
+  const result = await runAction(async () => {
+    const { completeKnowledgeStep } = await import("@/server/knowledge");
+    await completeKnowledgeStep(await requireSessionOrThrow());
+  });
   if (!result.ok) return result;
   redirect("/onboarding/connect");
 }

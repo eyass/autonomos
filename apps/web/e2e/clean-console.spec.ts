@@ -1,3 +1,4 @@
+import { addKnowledge } from "./knowledge-step";
 import { expect, test, type Page } from "@playwright/test";
 
 // A production build, walked like a person would: every main page, on a desktop and a phone
@@ -14,6 +15,7 @@ async function signUp(page: Page) {
   await page.getByRole("button", { name: "Read my website" }).click();
   await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");
   await page.getByRole("button", { name: "Create company" }).click();
+  await addKnowledge(page);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Work" })).toBeVisible();
 }

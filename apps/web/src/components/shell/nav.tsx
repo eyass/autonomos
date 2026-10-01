@@ -1,5 +1,5 @@
 "use client";
-import { Activity, BookOpen, Bot, Building2, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Plug, Settings, Sparkles, Workflow } from "lucide-react";
+import { Activity, BookOpen, BookText, Bot, Building2, Check, ChevronsUpDown, FlaskConical, Inbox, LayoutDashboard, LifeBuoy, LogOut, Plug, Settings, Sparkles, Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -34,6 +34,7 @@ const MAIN: NavItem[] = [
   { href: "/", label: "Home", hint: "How much work runs on agents", icon: LayoutDashboard, tone: AREA.home },
   { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox, tone: AREA.inbox },
   { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"], tone: AREA.work },
+  { href: "/knowledge", label: "Knowledge", hint: "What AutonomOS knows about you", icon: BookText, tone: AREA.knowledge },
   { href: "/playbooks", label: "Playbooks", hint: "Templates to start from", icon: BookOpen, tone: AREA.playbooks },
   { href: "/agents", label: "Agents", hint: "Doing the work for you", icon: Bot, tone: AREA.agents },
   { href: "/activity", label: "History", hint: "Everything that happened", icon: Activity, tone: AREA.history },

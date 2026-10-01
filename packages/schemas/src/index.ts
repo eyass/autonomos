@@ -136,6 +136,27 @@ export const CompanyProfileSchema = z.object({
 });
 export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
 
+// Company knowledge: what AutonomOS knows about a company, built up from every source (its
+// website, help centre, files, pasted text). Each fact names the source it came from.
+export const KNOWLEDGE_SOURCE_KINDS = ["website", "help_center", "url", "file", "paste"] as const;
+export type KnowledgeSourceKind = (typeof KNOWLEDGE_SOURCE_KINDS)[number];
+
+export const CompanyBriefSchema = z.object({
+  summary: z.string().default("").describe("Three to five plain sentences: what the company does, for whom, and how it operates"),
+  offering: z.array(z.string()).default([]).describe("Products and services, one short line each"),
+  customers: z.string().default("").describe("Who the customers are"),
+  policies: z
+    .array(z.object({ topic: z.string().describe("For example Refunds, Returns, Shipping, SLA"), rule: z.string().describe("The rule itself, with numbers"), sourceId: z.string() }))
+    .default([])
+    .describe("Rules the company applies, with their numbers"),
+  tone: z.string().default("").describe("How the company writes to customers"),
+  terminology: z.array(z.object({ term: z.string(), meaning: z.string() })).default([]).describe("Words with a meaning particular to this company"),
+  teams: z.array(z.string()).default([]),
+  systems: z.array(z.string()).default([]).describe("Software the company says it uses"),
+  facts: z.array(z.object({ text: z.string(), sourceId: z.string() })).default([]).describe("Other useful facts, one line each"),
+});
+export type CompanyBrief = z.infer<typeof CompanyBriefSchema>;
+
 export const InterviewSuggestionsSchema = z.object({
   suggestions: z.array(z.string().min(1).max(300)).max(3).describe("Short answers the user can send as-is"),
 });

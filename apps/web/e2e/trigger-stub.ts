@@ -5,7 +5,7 @@
  */
 import { createServer } from "node:http";
 import { executeRun, markRunFailed, RetryableRunError } from "@autonomos/agents";
-import { createServiceClient, SupabaseRunStore } from "@autonomos/db";
+import { createServiceClient, ingestSource, SupabaseRunStore } from "@autonomos/db";
 
 const port = Number(process.env.TRIGGER_STUB_PORT ?? 3999);
 const store = new SupabaseRunStore(createServiceClient());
@@ -31,7 +31,9 @@ const SITE: Record<string, string> = {
   "/site/about": `<html><head><title>About Acme Furniture</title></head><body><main><p>We are 35 people in Amsterdam building the largest marketplace for second-hand furniture in the Benelux.</p></main></body></html>`,
   "/site/pricing": `<html><head><title>Pricing</title><script src="https://js.stripe.com/v3"></script></head><body><main><p>Sellers pay 8% per sale. Buyer protection and refunds are included.</p></main></body></html>`,
   "/site/careers": `<html><head><title>Careers</title></head><body><main><p>Customer support agent (Dutch speaking). Help buyers and sellers with orders, refunds and listings.</p></main></body></html>`,
-  "/site/help": `<html><head><title>Help centre</title></head><body><main><p>Questions about an order or a refund? Contact our support team.</p></main></body></html>`,
+  "/site/help": `<html><head><title>Help centre</title></head><body><main><h1>Help centre</h1><p>Questions about an order or a refund? Contact our support team.</p><a href="/site/help/articles/101-refunds">Refunds</a><a href="/site/help/articles/102-delivery">Delivery</a></main></body></html>`,
+  "/site/help/articles/101-refunds": `<html><head><title>How refunds work</title></head><body><main><h1>How refunds work</h1><p>Buyers can ask for a refund within 14 days of delivery when an item arrives damaged or not as described. Refunds above 250 euro are checked by a team lead before they are paid.</p></main></body></html>`,
+  "/site/help/articles/102-delivery": `<html><head><title>Delivery times</title></head><body><main><h1>Delivery times</h1><p>Sellers ship within five working days. Large items such as sofas are delivered by our courier partner within ten working days.</p></main></body></html>`,
 };
 
 createServer(async (req, res) => {
@@ -53,6 +55,11 @@ createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ id }));
     if (decodeURIComponent(match[1]!) === "agent-run" && payload?.runId) setTimeout(() => void runTask(payload.runId), 50);
+    // Company knowledge reads run the same code as the worker, again until a website is done.
+    if (decodeURIComponent(match[1]!) === "knowledge-ingest" && payload?.sourceId)
+      setTimeout(async () => {
+        for (let round = 0; round < 20; round++) if ((await ingestSource(createServiceClient(), payload.sourceId).catch(() => ({ done: true }))).done) break;
+      }, 50);
     return;
   }
   res.writeHead(404, { "content-type": "application/json" });
