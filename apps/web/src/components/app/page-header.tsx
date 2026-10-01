@@ -3,9 +3,10 @@ import Link from "next/link";
 import type * as React from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TONE, type Tone } from "@/components/app/area";
 
 // `icon` marks what the page is about (an agent, a process, an idea, a run) with a tile beside
-// the title; `tone="agent"` lights it in signal orange while an agent is working.
+// the title, in the colour of its area; `tone="agent"` lights it orange while an agent works.
 export function PageHeader({
   title,
   description,
@@ -19,7 +20,7 @@ export function PageHeader({
   actions?: React.ReactNode;
   back?: { href: string; label: string };
   icon?: LucideIcon;
-  tone?: "brand" | "agent";
+  tone?: Tone;
 }) {
   return (
     <div className="mb-8">
@@ -34,10 +35,7 @@ export function PageHeader({
           {Icon ? (
             <span
               aria-hidden
-              className={cn(
-                "mt-0.5 hidden size-12 shrink-0 items-center justify-center rounded-2xl border shadow-sm sm:flex",
-                tone === "agent" ? "border-highlight/25 bg-highlight-soft text-highlight-strong" : "border-brand/15 bg-brand-soft text-brand",
-              )}
+              className={cn("mt-0.5 hidden size-12 shrink-0 items-center justify-center rounded-2xl border shadow-sm sm:flex", TONE[tone].tile)}
             >
               <Icon className="size-5" />
             </span>

@@ -88,7 +88,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
       <PageHeader
         back={{ href: "/activity", label: "Activity" }}
         icon={Activity}
-        tone={active || pending ? "agent" : "brand"}
+        tone={active || pending ? "agent" : "violet"}
         title={`${agent.name}${run.mode === "test" ? " · test run" : ""}`}
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

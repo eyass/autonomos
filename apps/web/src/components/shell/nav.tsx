@@ -8,6 +8,8 @@ import { requestJob } from "@/components/app/job";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogoMark, Wordmark } from "@/components/brand/logo";
+import { AREA, TONE, type Tone } from "@/components/app/area";
+import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
@@ -26,14 +28,15 @@ import {
 
 // The loop: see where you stand, answer what waits for you, map the work and what to automate
 // (or start from a ready-made playbook), run agents, look back. Each item says what it holds.
-type NavItem = { href: string; label: string; hint?: string; icon: typeof LayoutDashboard; also?: string[] };
+type NavItem = { href: string; label: string; hint?: string; icon: typeof LayoutDashboard; also?: string[]; tone?: Tone };
+// Each main area wears its colour (components/app/area.ts) on its icon tile.
 const MAIN: NavItem[] = [
-  { href: "/", label: "Home", hint: "How autonomous you are", icon: LayoutDashboard },
-  { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox },
-  { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"] },
-  { href: "/playbooks", label: "Playbooks", hint: "Templates to start from", icon: BookOpen },
-  { href: "/agents", label: "Agents", hint: "Doing the work for you", icon: Bot },
-  { href: "/activity", label: "History", hint: "Everything that happened", icon: Activity },
+  { href: "/", label: "Home", hint: "How autonomous you are", icon: LayoutDashboard, tone: AREA.home },
+  { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox, tone: AREA.inbox },
+  { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"], tone: AREA.work },
+  { href: "/playbooks", label: "Playbooks", hint: "Templates to start from", icon: BookOpen, tone: AREA.playbooks },
+  { href: "/agents", label: "Agents", hint: "Doing the work for you", icon: Bot, tone: AREA.agents },
+  { href: "/activity", label: "History", hint: "Everything that happened", icon: Activity, tone: AREA.history },
 ];
 const ADMIN: NavItem[] = [
   { href: "/integrations", label: "Integrations", icon: Plug },
@@ -124,7 +127,7 @@ export function AppSidebar({
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {
-            const { href, label, hint, icon: Icon } = item;
+            const { href, label, hint, icon: Icon, tone } = item;
             return (
               <SidebarMenuItem key={href}>
                 <SidebarMenuButton
@@ -134,7 +137,13 @@ export function AppSidebar({
                   className="relative h-9 text-[13.5px] text-sidebar-foreground/85 hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-highlight [&>svg]:size-[17px]"
                 >
                   <Link href={href} title={hint} onClick={() => setOpenMobile(false)}>
-                    <Icon />
+                    {tone ? (
+                      <span aria-hidden className={cn("-ml-1 flex size-6 shrink-0 items-center justify-center rounded-md border group-data-[collapsible=icon]:ml-0", TONE[tone].tile)}>
+                        <Icon className="size-3.5" />
+                      </span>
+                    ) : (
+                      <Icon />
+                    )}
                     <span>{label}</span>
                   </Link>
                 </SidebarMenuButton>

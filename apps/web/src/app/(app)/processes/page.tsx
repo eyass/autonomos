@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { embeddedCount, estimateHeld, processGaps } from "@/lib/process-gaps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TONE, toneFor } from "@/components/app/area";
 
 export const metadata = { title: "Processes" };
 
@@ -255,7 +256,16 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                       ) : null;
                     })()}
                   </TableCell>
-                  <TableCell className="hidden text-muted-foreground @4xl:table-cell">{dept ?? "–"}</TableCell>
+                  <TableCell className="hidden text-muted-foreground @4xl:table-cell">
+                    {dept ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span aria-hidden className={`size-2 shrink-0 rounded-full ${TONE[toneFor(dept)].bar}`} />
+                        {dept}
+                      </span>
+                    ) : (
+                      "–"
+                    )}
+                  </TableCell>
                   <TableCell className="hidden tabular-nums @2xl:table-cell">
                     {held ? (
                       <span className="text-xs text-muted-foreground" title={held}>

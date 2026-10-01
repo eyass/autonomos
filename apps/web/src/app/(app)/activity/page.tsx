@@ -143,7 +143,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         view === "attention" ? (
           <EmptyState title="Nothing needs attention." description="Warnings, errors and runs waiting on a person show here." />
         ) : (
-          <EmptyState icon={Activity} title="No activity yet." description="Agent runs, approvals and changes appear here as they happen." />
+          <EmptyState icon={Activity} tone="violet" title="No activity yet." description="Agent runs, approvals and changes appear here as they happen." />
         )
       ) : (
         <div className="space-y-4">
