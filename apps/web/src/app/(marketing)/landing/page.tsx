@@ -24,6 +24,23 @@ export const metadata: Metadata = {
   openGraph: { title, description, url: "/", type: "website", siteName: "AutonomOS", images: OG_IMAGES },
 };
 
+// Each step wears the colour of its area in the app: Work blue, ideas amber, agents teal.
+const STEP_TONES = [
+  { panel: "bg-area-blue-soft", number: "text-area-blue/30", label: "text-area-blue-strong", check: "bg-area-blue-soft text-area-blue-strong" },
+  { panel: "bg-area-amber-soft", number: "text-area-amber/35", label: "text-area-amber-strong", check: "bg-area-amber-soft text-area-amber-strong" },
+  { panel: "bg-brand-soft", number: "text-brand/30", label: "text-brand-strong", check: "bg-brand-soft text-brand-strong" },
+];
+
+// The six controls, each with its own colour on the dark section.
+const CONTROL_TONES = [
+  "bg-area-blue/20 text-area-blue-soft",
+  "bg-brand/30 text-brand-soft",
+  "bg-area-amber/20 text-area-amber-soft",
+  "bg-area-rose/20 text-area-rose-soft",
+  "bg-area-violet/25 text-area-violet-soft",
+  "bg-area-green/20 text-area-green-soft",
+];
+
 const STEPS = [
   {
     visual: InventoryVisual,
@@ -195,22 +212,22 @@ export default function LandingPage() {
           <ol className="mt-16 space-y-16 sm:space-y-24">
             {STEPS.map((s, i) => (
               <li key={s.label} className="grid items-center gap-8 md:grid-cols-2 md:gap-16">
-                <div className={cn("relative rounded-3xl bg-grid-light bg-brand-soft/50 p-6 sm:p-10", i % 2 === 1 && "md:order-2")}>
+                <div className={cn("relative rounded-3xl bg-grid-light p-6 sm:p-10", STEP_TONES[i].panel, i % 2 === 1 && "md:order-2")}>
                   <div className="mx-auto max-w-sm [&>div]:shadow-lg [&>div]:shadow-brand/10">
                     <s.visual />
                   </div>
                 </div>
                 <div>
                   <p className="flex items-center gap-3">
-                    <span className="font-display text-5xl font-semibold leading-none tracking-tight text-brand/20 sm:text-6xl">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="eyebrow text-highlight-strong">{s.label}</span>
+                    <span className={cn("font-display text-5xl font-semibold leading-none tracking-tight sm:text-6xl", STEP_TONES[i].number)}>{String(i + 1).padStart(2, "0")}</span>
+                    <span className={cn("eyebrow", STEP_TONES[i].label)}>{s.label}</span>
                   </p>
                   <h3 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">{s.title}</h3>
                   <p className="mt-3 max-w-md text-base text-muted-foreground">{s.body}</p>
                   <ul className="mt-6 space-y-2.5 text-sm">
                     {s.points.map((p) => (
                       <li key={p} className="flex items-center gap-2.5">
-                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+                        <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full", STEP_TONES[i].check)}>
                           <Check size={12} />
                         </span>
                         {p}
@@ -273,9 +290,9 @@ export default function LandingPage() {
           </ol>
 
           <div className="mt-20 grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
-            {CONTROLS.map((c) => (
+            {CONTROLS.map((c, i) => (
               <div key={c.title} className="flex gap-4 bg-ink p-6">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white">
+                <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", CONTROL_TONES[i])}>
                   <c.icon size={18} />
                 </span>
                 <div>

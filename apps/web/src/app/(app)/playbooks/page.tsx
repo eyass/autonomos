@@ -47,7 +47,7 @@ export default async function PlaybooksPage({ searchParams }: { searchParams: Pr
         </nav>
       ) : null}
       {!all.length ? (
-        <EmptyState icon={BookOpen} title="No playbooks yet" description="Ready-made playbooks appear here as they are published." />
+        <EmptyState icon={BookOpen} tone="amber" title="No playbooks yet" description="Ready-made playbooks appear here as they are published." />
       ) : (
         <div className="space-y-6">
           {ready.length ? <Section title="Ready with your tools" items={ready} /> : null}

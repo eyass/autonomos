@@ -30,6 +30,7 @@ export default async function AgentsPage() {
         <PageHeader title="Agents" description="Agents that run your processes, with what they can do and how they perform." />
         <EmptyState
           icon={Bot}
+          tone="brand"
           title="You haven't deployed any agents."
           description="Agents are built from automation ideas, or from a ready-made playbook."
           action={

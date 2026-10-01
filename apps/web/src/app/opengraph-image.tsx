@@ -11,7 +11,7 @@ export default function OpengraphImage() {
   return new ImageResponse(
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 72, background: "#0a1f1d", color: "#f5f3ee" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: "#0f4c47", display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 6, paddingBottom: 16 }}>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: "#0f766e", display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 6, paddingBottom: 16 }}>
           {[8, 13, 18, 23, 32].map((h, i) => (
             <div key={i} style={{ width: 6, height: h, borderRadius: 3, background: i === 4 ? "#f0561f" : "#ffffff", opacity: i === 4 ? 1 : 0.4 + i * 0.18 }} />
           ))}

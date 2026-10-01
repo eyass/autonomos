@@ -1,9 +1,31 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Handshake, Headset, Megaphone, Package, Users, Wallet, type LucideIcon } from "lucide-react";
+import { TONE, type Tone } from "@/components/app/area";
+import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/app/button-link";
 import { DEPARTMENTS, type Department } from "./departments";
 import { TOOLS, ToolLogo } from "./tools";
 import { WorkflowChains } from "./workflows";
+
+// Each team's mark: an icon in its own colour, the same on every page that lists teams.
+function TeamMark({ slug }: { slug: string }) {
+  const team = TEAM[slug];
+  if (!team) return null;
+  return (
+    <span aria-hidden className={cn("flex size-9 items-center justify-center rounded-xl border", TONE[team.tone].tile)}>
+      <team.icon className="size-[18px]" />
+    </span>
+  );
+}
+
+const TEAM: Record<string, { icon: LucideIcon; tone: Tone }> = {
+  operations: { icon: Package, tone: "blue" },
+  marketing: { icon: Megaphone, tone: "rose" },
+  finance: { icon: Wallet, tone: "green" },
+  sales: { icon: Handshake, tone: "amber" },
+  support: { icon: Headset, tone: "brand" },
+  people: { icon: Users, tone: "violet" },
+};
 
 // A card per team, linking to its page: used on the landing page and the solutions index.
 export function DepartmentCards({ exclude }: { exclude?: string }) {
@@ -13,7 +35,10 @@ export function DepartmentCards({ exclude }: { exclude?: string }) {
         <li key={d.slug}>
           <Link href={`/solutions/${d.slug}`} className="group flex h-full flex-col rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-brand/10">
             <span className="flex items-center justify-between gap-2">
-              <span className="font-display text-lg font-semibold">{d.name}</span>
+              <span className="flex items-center gap-3">
+                <TeamMark slug={d.slug} />
+                <span className="font-display text-lg font-semibold">{d.name}</span>
+              </span>
               <ArrowRight size={16} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
             </span>
             <span className="mt-1 text-sm text-muted-foreground">{d.headline}</span>

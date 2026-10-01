@@ -5,6 +5,7 @@ import { reconcileStuckRuns } from "@/server/run-health";
 import { agentStates } from "@/server/readiness";
 import { CircleCheck } from "lucide-react";
 import Link from "next/link";
+import { TONE, toneFor } from "@/components/app/area";
 import { hours, money, num, pct, aiMoney } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -191,7 +192,7 @@ export default async function OverviewPage() {
       <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-3">
         {/* Two meters, not one: what already runs on the company's own software, and what
             AutonomOS agents add (0% until one is live). */}
-        <Card className={chart.length > 1 ? "" : "lg:col-span-3"}>
+        <Card className={`bg-gradient-to-br from-brand-soft to-card to-70% ${chart.length > 1 ? "" : "lg:col-span-3"}`}>
           <CardContent className={`grid gap-5 ${chart.length > 1 ? "" : "sm:grid-cols-2"}`}>
             <div data-testid="autonomy-live">
               <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -253,9 +254,10 @@ export default async function OverviewPage() {
       <StatStrip
         className="mb-4 lg:mb-6"
         items={[
-          { label: "Active agents", value: num(m.activeAgents), hint: `${m.processesAutomated} of ${m.processesMapped} processes` },
+          { label: "Active agents", tone: "brand", value: num(m.activeAgents), hint: `${m.processesAutomated} of ${m.processesMapped} processes` },
           {
             label: "Hours saved",
+            tone: "green",
             value: hours(m.minutesSaved),
             // Measured: counted from finished live runs. Each run is credited with its process's
             // estimated minutes, so the number is only as good as that estimate.
@@ -263,9 +265,10 @@ export default async function OverviewPage() {
               ? `Measured over ${num(m.productionRuns)} live run${m.productionRuns === 1 ? "" : "s"}, at each process's estimated minutes; ${money(m.valueCreated, m.currency)} this month${m.roi !== null ? `, ${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}× AI cost` : ""}`
               : "Measured from live runs only; none yet",
           },
-          { label: "Tasks done", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
+          { label: "Tasks done", tone: "blue", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
           {
             label: "AI spend this month",
+            tone: "amber",
             value: (
               <span className="inline-flex items-center gap-1">
                 {aiMoney(m.aiCost, m.currency)}
@@ -341,17 +344,22 @@ export default async function OverviewPage() {
             <CardTitle>Autonomy by department</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Each department keeps its colour everywhere (from its name). */}
             {m.departmentAutonomy
+              .map((d) => ({ ...d, tone: toneFor(d.name) }))
               .filter((d) => d.processes > 0)
               .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
               .map((d) => (
                 <Link key={d.departmentId ?? "none"} href={d.departmentId ? `/processes?department=${d.departmentId}` : "/processes"} className="block">
                   <div className="mb-1 flex justify-between gap-2 text-sm">
-                    <span className="truncate">{d.name}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden className={`size-2 shrink-0 rounded-full ${TONE[d.tone].bar}`} />
+                      <span className="truncate">{d.name}</span>
+                    </span>
                     <span className="tabular-nums text-muted-foreground">{pct(d.score)}</span>
                   </div>
                   <div className="h-2 rounded-full bg-muted">
-                    <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(2, (d.score ?? 0) * 100)}%` }} />
+                    <div className={`h-2 rounded-full ${TONE[d.tone].bar}`} style={{ width: `${Math.max(2, (d.score ?? 0) * 100)}%` }} />
                   </div>
                 </Link>
               ))}

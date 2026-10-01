@@ -91,6 +91,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
       <PageHeader
         back={{ href: "/opportunities", label: "Automation ideas" }}
         icon={Target}
+        tone="amber"
         title={o.title}
         description={
           <span className="flex flex-wrap items-center gap-2">

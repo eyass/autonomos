@@ -118,6 +118,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       ) : !liveHandoffs.length ? (
         <EmptyState
           icon={Inbox}
+          tone="agent"
           title={testHandoffs.length ? "Nothing live needs a person." : "Nothing needs a person right now."}
           description={
             testHandoffs.length
