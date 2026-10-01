@@ -145,7 +145,7 @@ export function AuthForm({ mode, providers = ["google"] }: { mode: "login" | "si
   return (
     <Card>
       <CardHeader className="text-center">
-        <CardTitle className="text-xl">{mode === "signup" ? "Create your account" : "Welcome back"}</CardTitle>
+        <CardTitle as="h1" className="text-xl">{mode === "signup" ? "Create your account" : "Welcome back"}</CardTitle>
         <CardDescription>{mode === "signup" ? "Start mapping what your company can automate" : "Sign in to your workspace"}</CardDescription>
       </CardHeader>
       <CardContent>

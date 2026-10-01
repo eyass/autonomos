@@ -149,7 +149,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         <div className="space-y-4">
           {[...byDay.entries()].map(([day, list]) => (
             <Card key={day} className="gap-0 overflow-hidden py-0 sm:gap-0 sm:py-0">
-              <div className="eyebrow border-b border-border bg-muted/40 px-4 py-2 text-[10px] text-muted-foreground sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
+              <div className="eyebrow border-b border-border bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground sm:px-5">{dateTime(`${day}T12:00:00Z`).split(",")[0]}</div>
               <ul>
                 {grouped(list).map(({ first: e, rest, status }) => {
                   const who =

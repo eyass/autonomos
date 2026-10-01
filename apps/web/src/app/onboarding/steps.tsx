@@ -16,7 +16,7 @@ export function Steps({ current }: { current: 0 | 1 | 2 }) {
         const label = (
           <span className="flex items-center gap-2">
             <span
-              className={`flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold ${
+              className={`flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold ${
                 done ? "bg-primary text-primary-foreground" : i === current ? "bg-highlight text-white ring-4 ring-highlight-soft" : "border border-border bg-card text-muted-foreground"
               }`}
             >

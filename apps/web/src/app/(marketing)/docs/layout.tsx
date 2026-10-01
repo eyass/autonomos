@@ -7,7 +7,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       <aside className="lg:sticky lg:top-20 lg:self-start">
         <DocsNav items={DOCS_ROUTES} />
       </aside>
-      <div className="min-w-0 max-w-3xl">{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }

@@ -17,8 +17,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { recordTitle } from "@/lib/titles";
 
 type FutureStep = { title: string; actor: "agent" | "human" | "system"; approval?: boolean };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("automation_opportunities", (await params).id, "Automation idea");
+}
 
 export default async function OpportunityPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ found?: string }> }) {
   const { id } = await params;

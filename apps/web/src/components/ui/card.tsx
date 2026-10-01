@@ -27,9 +27,11 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+// A heading, so card sections are reachable by heading navigation: h2 under a page's h1 by
+// default; `as` sets the level where a card sits deeper (or is the page's own title).
+function CardTitle({ className, as: Tag = "h2", ...props }: React.ComponentProps<"h2"> & { as?: "h1" | "h2" | "h3" | "h4" | "div" }) {
   return (
-    <div
+    <Tag
       data-slot="card-title"
       className={cn("leading-none font-semibold", className)}
       {...props}

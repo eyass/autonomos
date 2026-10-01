@@ -121,17 +121,17 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
   return (
     <Card data-testid={`integration-${i.key}`} className="min-w-0 gap-3 transition-shadow hover:shadow-md sm:gap-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-3">
+        <CardTitle as="h3" className="flex items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-white shadow-[0_1px_2px_rgb(18_24_22/0.05)]">
             <SystemLogo src={i.logo} name={i.name} className="size-6" />
           </span>
           <span className="min-w-0 truncate text-[15px]">{i.name}</span>
         </CardTitle>
-        <CardDescription className={connected || review ? "line-clamp-1 sm:line-clamp-2" : "line-clamp-1"}>{i.description}</CardDescription>
+        <CardDescription className="line-clamp-2">{i.description}</CardDescription>
         {folds ? (
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground sm:hidden">
             <span>{i.agents.length ? `Used by ${i.agents.length} agent${i.agents.length === 1 ? "" : "s"}` : "No agent uses it"}</span>
-            <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+            <button type="button" className="-my-1.5 min-h-7 px-1 font-medium text-foreground underline-offset-2 hover:underline" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
               {expanded ? "Less" : "Details"}
             </button>
           </div>

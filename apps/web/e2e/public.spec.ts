@@ -87,3 +87,10 @@ test("help is a permanent redirect to the docs, never a 404", async ({ page, req
   await expect(page).toHaveURL(/\/docs$/);
   expect(statuses).not.toContain(404);
 });
+
+test("a mistyped public address shows not found, not a sign-in form", async ({ page }) => {
+  const res = await page.goto("/secruity");
+  expect(res?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1, name: "This page does not exist" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+});

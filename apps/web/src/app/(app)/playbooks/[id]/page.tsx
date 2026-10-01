@@ -5,8 +5,12 @@ import { isAdmin, requireSession } from "@/lib/session";
 import { canUseComposio } from "@/server/integrations";
 import { getPlaybook, playbookPolicyFields, playbookSensitive, playbookSlots } from "@/server/playbooks";
 import { PlaybookSetup } from "./setup";
+import { recordTitle } from "@/lib/titles";
 
-export const metadata = { title: "Playbook" };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("playbooks", (await params).id, "Playbook");
+}
 
 export default async function PlaybookPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireSession();

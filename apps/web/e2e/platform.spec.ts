@@ -9,7 +9,7 @@ test("sample workspace, approval limits and API keys", async ({ page, request })
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password").fill("correct-horse-battery");
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("heading", { name: "Your company" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your company", exact: true })).toBeVisible();
   await page.getByLabel("Company website").fill("http://127.0.0.1:3999/site");
   await page.getByRole("button", { name: "Read my website" }).click();
   await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");

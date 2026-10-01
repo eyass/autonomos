@@ -231,7 +231,10 @@ export default function LandingPage() {
             Each agent chains the steps a person would take. The hand marks a step a person approves.
           </SectionHeading>
           <div className="mt-12">
-            <WorkflowChains />
+            <WorkflowChains phoneLimit={2} />
+            <Link href="/solutions" className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline sm:hidden">
+              More workflows by team <ArrowRight size={14} />
+            </Link>
           </div>
         </div>
       </section>
@@ -348,7 +351,7 @@ export default function LandingPage() {
                 )}
               >
                 {p.featured ? (
-                  <span className="absolute -top-3 left-6 rounded-full bg-primary px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
+                  <span className="absolute -top-3 left-6 rounded-full bg-primary px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary-foreground">
                     Most teams
                   </span>
                 ) : null}

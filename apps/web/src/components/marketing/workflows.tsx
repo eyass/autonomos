@@ -62,7 +62,7 @@ function Node({ step }: { step: Step }) {
         <ToolLogo tool={step.tool} size={28} className="border border-border" />
       )}
       <span className="min-w-0">
-        <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{step.tool === "policy" ? "Policy engine" : TOOLS[step.tool]}</span>
+        <span className="block font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{step.tool === "policy" ? "Policy engine" : TOOLS[step.tool]}</span>
         <span className="block text-sm font-medium leading-snug">{step.action}</span>
         {step.gate ? (
           <span className="mt-1 inline-flex items-center gap-1 rounded bg-highlight-soft px-1.5 py-0.5 text-[11px] font-medium text-highlight-strong">
@@ -74,11 +74,16 @@ function Node({ step }: { step: Step }) {
   );
 }
 
-export function WorkflowChains({ flows = LANDING_FLOWS }: { flows?: Flow[] }) {
+// `phoneLimit` keeps a phone to the first few chains, so the section stays a screen or two long.
+export function WorkflowChains({ flows = LANDING_FLOWS, phoneLimit }: { flows?: Flow[]; phoneLimit?: number }) {
   return (
     <div className="grid gap-4">
-      {flows.map((f) => (
-        <figure key={f.title} className="rounded-2xl border border-border bg-background p-4 sm:p-5" aria-label={`${f.title}: ${f.steps.map((s) => s.action).join(", then ")}`}>
+      {flows.map((f, i) => (
+        <figure
+          key={f.title}
+          className={cn("rounded-2xl border border-border bg-background p-4 sm:p-5", phoneLimit !== undefined && i >= phoneLimit && "max-sm:hidden")}
+          aria-label={`${f.title}: ${f.steps.map((s) => s.action).join(", then ")}`}
+        >
           <figcaption className="mb-3 flex items-center justify-between gap-3">
             <span className="text-sm font-semibold">{f.title}</span>
             <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-brand-strong">

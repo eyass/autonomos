@@ -4,6 +4,11 @@ import { connectedIntegrationKeys } from "@/server/opportunities";
 import { toolOptions } from "../../tool-options";
 import { EditAgentForm } from "./form";
 import { PageHeader } from "@/components/app/page-header";
+import { recordTitle } from "@/lib/titles";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("agents", (await params).id, "Edit agent", "Edit ");
+}
 
 export default async function EditAgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

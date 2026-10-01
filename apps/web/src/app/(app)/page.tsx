@@ -26,7 +26,7 @@ export default async function OverviewPage() {
   // Recompute and store today's snapshot so the trend always includes today.
   const m = await snapshotMetrics(db, session.org.id);
   const supabase = await createClient();
-  const [{ data: trend }, { data: movers }, { data: top }] = await Promise.all([
+  const [{ data: trend }, { data: movers }, { data: top }, { count: ideasEver }] = await Promise.all([
     supabase.from("metrics").select("period, metric, value").eq("organization_id", session.org.id).in("metric", ["autonomy_score", "autonomy_live"]).eq("dimension", "").order("period").limit(730),
     // What moves the score: agents going live, changing level or pausing, and newly mapped work.
     supabase
@@ -43,6 +43,8 @@ export default async function OverviewPage() {
       .in("status", ["suggested", "reviewing", "approved"])
       .order("opportunity_score", { ascending: false })
       .limit(5),
+    // Any idea at all, so an empty list can say whether ideas are still to come or all handled.
+    supabase.from("automation_opportunities").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id),
   ]);
 
   // The path to a first live agent, shown until it is walked. Each step links to where it is done.
@@ -129,7 +131,7 @@ export default async function OverviewPage() {
                   <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
                 ) : (
                   <span
-                    className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold tabular-nums ${p === next ? "bg-primary text-primary-foreground" : "border"}`}
+                    className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold tabular-nums ${p === next ? "bg-primary text-primary-foreground" : "border"}`}
                   >
                     {i + 1}
                   </span>
@@ -137,7 +139,7 @@ export default async function OverviewPage() {
                 <span className="min-w-0">
                   <span className={`flex items-center gap-2 font-medium ${p.done ? "text-muted-foreground" : ""}`}>
                     {p.title}
-                    {p === next ? <span className="eyebrow rounded bg-highlight-soft px-1.5 py-0.5 text-[9px] text-highlight-strong">Next</span> : null}
+                    {p === next ? <span className="eyebrow rounded bg-highlight-soft px-1.5 py-0.5 text-[11px] text-highlight-strong">Next</span> : null}
                   </span>
                   {!p.done ? <span className="mt-0.5 block text-xs text-muted-foreground">{p.detail}</span> : null}
                 </span>
@@ -318,7 +320,19 @@ export default async function OverviewPage() {
             </div>
           ) : (
             <CardContent>
-              <p className="text-sm text-muted-foreground">Approve a process to see what to automate next.</p>
+              <p className="text-sm text-muted-foreground">
+                {ideasEver ? (
+                  <>
+                    Every idea so far has an agent or a decision.{" "}
+                    <Link href="/processes" className="font-medium text-primary underline-offset-4 hover:underline">
+                      Find more ideas on a process
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  "Approve a process to see what to automate next."
+                )}
+              </p>
             </CardContent>
           )}
         </Card>

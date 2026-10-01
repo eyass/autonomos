@@ -47,7 +47,7 @@ export function PageHeader({
           {description ? <div className="mt-1.5 max-w-2xl text-sm text-muted-foreground sm:text-[15px]">{description}</div> : null}
           </div>
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
+        {actions ? <div className="flex shrink-0 flex-wrap gap-2 max-sm:[&>*]:grow max-sm:[&>*]:basis-[calc(50%-0.25rem)]">{actions}</div> : null}
       </div>
     </div>
   );

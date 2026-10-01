@@ -27,6 +27,7 @@ import { StatStrip } from "@/components/app/stat-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { recordTitle } from "@/lib/titles";
 
 // Test runs execute on this server after the response, so give them room to finish.
 export const maxDuration = 300;
@@ -39,6 +40,10 @@ function snapshot(v: { autonomy_level: number; instructions: unknown; trigger_co
     policy_config: v.policy_config as VersionSnapshot["policy_config"],
     tools: ((v.agent_tools as Array<{ tool_key: string }> | null) ?? []).map((t) => t.tool_key).sort(),
   };
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("agents", (await params).id, "Agent");
 }
 
 export default async function AgentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
