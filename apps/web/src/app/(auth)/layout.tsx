@@ -19,8 +19,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <span className="flex items-center gap-2 text-sm font-semibold">
                 <span className="signal-pulse size-2 rounded-full bg-highlight" /> Refund handling
               </span>
-              <span className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-brand-strong">
-                <LevelMeter level={3} className="h-3" /> L3
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-strong">
+                <LevelMeter level={3} className="h-3" /> Approve
               </span>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">Waiting for you · above the €50 limit</p>
@@ -33,13 +33,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         <div className="relative max-w-sm">
           <p className="text-3xl font-semibold leading-tight tracking-[-0.02em]">Agents you can trust with real actions.</p>
-          <p className="mt-3 text-sm text-white/65">Every agent runs at an explicit level. You raise it when its record earns it.</p>
+          <p className="mt-3 text-sm text-white/65">Every agent runs in a clear mode. You hand over more when its record earns it.</p>
           <ol className="mt-8 space-y-2.5">
             {AUTONOMY_LEVELS.map((l, i) => (
-              <li key={l.code} className="flex items-center gap-3 font-mono text-xs text-white/70">
+              <li key={l.code} className="flex items-center gap-3 text-xs text-white/70">
                 <LevelMeter level={i + 1} tone="inverted" className="h-3" />
-                <span className={i === 4 ? "font-bold text-highlight" : "font-bold text-white"}>{l.code}</span>
-                <span>{l.name}</span>
+                <span className={i === 3 ? "w-14 font-bold text-highlight" : "w-14 font-bold text-white"}>{l.name}</span>
+                <span>{l.short}</span>
               </li>
             ))}
           </ol>

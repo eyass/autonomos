@@ -1,4 +1,4 @@
-import { AUTONOMY_COEFFICIENTS, type AutonomyLevel } from "@autonomos/schemas";
+import { AUTONOMY_COEFFICIENTS, modeOf, type AutonomyLevel } from "@autonomos/schemas";
 import { monthlyMinutes } from "./scoring";
 
 export type ProcessForMetrics = {
@@ -87,14 +87,16 @@ export type AutonomyRecommendation = {
 };
 
 // PRD sections 89-90: recommend, never change automatically.
-export function autonomyRecommendation(level: number, stats: ReturnType<typeof agentStats>, agentName: string): AutonomyRecommendation | null {
+export function autonomyRecommendation(stored: number, stats: ReturnType<typeof agentStats>, agentName: string): AutonomyRecommendation | null {
+  // An older 5 is Auto, the highest mode.
+  const level = Math.min(stored, 4);
   const pct = (n: number | null) => `${Math.round((n ?? 0) * 1000) / 10}%`;
   if (level >= 3 && stats.runs >= 5 && ((stats.failureRate ?? 0) > 0.15 || (stats.approvalAcceptanceRate ?? 1) < 0.7)) {
     return {
       direction: "decrease",
       from: level,
       to: level - 1,
-      message: `${agentName} is making more mistakes than expected. Consider moving it from L${level} to L${level - 1} or pausing it.`,
+      message: `${agentName} is making more mistakes than expected. Consider moving it from ${modeOf(level).name} to ${modeOf(level - 1).name} or pausing it.`,
       evidence: [`Failure rate ${pct(stats.failureRate)}`, `Approvals accepted unchanged ${pct(stats.approvalAcceptanceRate)}`],
     };
   }
@@ -103,17 +105,8 @@ export function autonomyRecommendation(level: number, stats: ReturnType<typeof a
       direction: "increase",
       from: 3,
       to: 4,
-      message: `${agentName} has had ${stats.approvalsResolved} approvals and ${pct(stats.approvalAcceptanceRate)} were approved without changes. Consider moving it from L3 to L4 for low-value actions.`,
+      message: `${agentName} has had ${stats.approvalsResolved} approvals and ${pct(stats.approvalAcceptanceRate)} were approved without changes. Consider moving it from Approve to Auto for low-value actions.`,
       evidence: [`${stats.runs} production runs`, `Failure rate ${pct(stats.failureRate)}`],
-    };
-  }
-  if (level === 4 && stats.runs >= 100 && (stats.humanInterventionRate ?? 1) <= 0.02 && (stats.failureRate ?? 1) <= 0.01) {
-    return {
-      direction: "increase",
-      from: 4,
-      to: 5,
-      message: `${agentName} rarely needs a human. Consider L5 with the same limits.`,
-      evidence: [`Intervention rate ${pct(stats.humanInterventionRate)}`],
     };
   }
   return null;

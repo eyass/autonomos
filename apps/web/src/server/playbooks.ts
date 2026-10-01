@@ -1,6 +1,6 @@
 import "server-only";
 import { choosePlaybookTools, generatePlaybook } from "@autonomos/ai";
-import { AgentConfigSchema, DEPARTMENTS, PlaybookStepSchema, type AgentConfig, type Department, type PlaybookDraft, type PlaybookStep } from "@autonomos/schemas";
+import { AgentConfigSchema, DEPARTMENTS, INDUSTRIES, PlaybookStepSchema, type AgentConfig, type Department, type Industry, type PlaybookDraft, type PlaybookStep } from "@autonomos/schemas";
 import { policyFieldsFor, policyForTools, sensitiveAreas } from "@autonomos/agents";
 import { CAPABILITIES, capabilitiesOf, capabilityInfo, getTool, getToolkit, integrationKeyFor, isCapability, toolkitFor, type Capability, type ToolDefinition } from "@autonomos/integrations";
 import { audit, activity, recordUsage } from "@/lib/audit";
@@ -33,6 +33,8 @@ export type PlaybookRow = {
   title: string;
   summary: string;
   department: string;
+  // The industries it suits; empty means it is not specific to any.
+  industries: Industry[];
   capabilities: Capability[];
   trigger: string | null;
   steps: PlaybookStep[];
@@ -48,6 +50,7 @@ const asRow = (r: Record<string, unknown>) =>
     ...r,
     steps: ((r.steps as unknown[]) ?? []).map((s) => PlaybookStepSchema.parse(s)),
     capabilities: ((r.capabilities as string[]) ?? []).filter(isCapability),
+    industries: ((r.industries as string[]) ?? []).filter((i): i is Industry => (INDUSTRIES as readonly string[]).includes(i)),
     estimated_minutes_per_occurrence: r.estimated_minutes_per_occurrence === null ? null : Number(r.estimated_minutes_per_occurrence),
   }) as unknown as PlaybookRow;
 
@@ -132,6 +135,7 @@ export type PlaybookEdit = {
   title: string;
   summary: string;
   department: string;
+  industries: string[];
   trigger: string;
   steps: PlaybookStep[];
   estimatedMinutes: number | null;
@@ -177,6 +181,7 @@ export async function updatePlaybook(session: Session, id: string, edit: Playboo
       title: edit.title.trim(),
       summary: edit.summary.trim(),
       department: edit.department,
+      industries: INDUSTRIES.filter((i) => edit.industries.includes(i)),
       trigger: edit.trigger.trim() || null,
       steps: steps as never,
       capabilities: neededCapabilities(steps),
@@ -264,16 +269,21 @@ export type GalleryPlaybook = {
   title: string;
   summary: string;
   department: string;
+  industries: Industry[];
+  // Made for the workspace's own industry.
+  forYou: boolean;
   capabilities: Array<{ key: Capability; label: string; covered: boolean }>;
   steps: number;
   minutes: number | null;
   ready: boolean;
 };
 
-// Published playbooks for a workspace: the ones its connected tools already cover first.
+// Published playbooks for a workspace, marked when made for its industry: the ones its
+// connected tools already cover first.
 export async function playbookGallery(session: Session): Promise<GalleryPlaybook[]> {
   const [rows, mine] = await Promise.all([listPlaybooks({ status: "published" }), workspaceTools(session)]);
   const covered = new Set(mine.flatMap((t) => t.capabilities));
+  const industry = session.org.industry;
   return rows
     .map((p) => {
       const capabilities = p.capabilities.map((c) => ({ key: c, label: capabilityInfo(c)!.label, covered: covered.has(c) }));
@@ -282,6 +292,8 @@ export async function playbookGallery(session: Session): Promise<GalleryPlaybook
         title: p.title,
         summary: p.summary,
         department: p.department,
+        industries: p.industries,
+        forYou: Boolean(industry) && p.industries.includes(industry as Industry),
         capabilities,
         steps: p.steps.length,
         minutes: p.estimated_minutes_per_occurrence,

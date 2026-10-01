@@ -8,7 +8,7 @@ import { getTool, isHighRisk, type ToolDefinition } from "@autonomos/integration
 export type PolicyOutcome =
   | "allow" // execute now
   | "require_approval" // stop and ask a human
-  | "draft" // L2: record the proposal, a human performs the action
+  | "draft" // Draft mode: record the proposal, a person performs the action
   | "simulate" // test run: show what would happen, execute nothing
   | "deny"; // never execute
 
@@ -101,7 +101,7 @@ export function evaluatePolicy(toolKey: string, args: Record<string, unknown>, c
   if (ctx.mode === "production" && ctx.agentStatus !== "active") {
     deny("Agent is active", `Agent status is ${ctx.agentStatus}; only active agents execute`);
   }
-  if (ctx.autonomyLevel === 1) deny("Autonomy level permits agent actions", "L1 is human only");
+  if (ctx.autonomyLevel === 1) deny("The agent may act in this mode", "Manual: your team does this work");
 
   if (ctx.actionsThisRun >= ctx.policy.maxActionsPerRun) {
     deny("Maximum actions per run", `Limit of ${ctx.policy.maxActionsPerRun} reached`);
@@ -142,7 +142,7 @@ export function evaluatePolicy(toolKey: string, args: Record<string, unknown>, c
     const explicitlyRequired = ctx.policy.approvalRequiredFor.some((k) => matchesTool(k, def));
 
     if (ctx.autonomyLevel === 3) {
-      needApproval("L3 requires approval for every action", "Agent proposes, a human approves");
+      needApproval("Approve mode: every action needs approval", "The agent proposes, a person approves");
     }
 
     if (explicitlyRequired) needApproval("Approval required for this action", `Policy lists ${def.key}`);

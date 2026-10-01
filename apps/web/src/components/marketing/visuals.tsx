@@ -91,14 +91,14 @@ export function OpportunityVisual() {
 // Step 3: the agent tested on sandbox data, then live under approvals.
 export function AgentVisual() {
   return (
-    <Frame label="Example agent: test passed on sandbox data, live at autonomy level 3, three runs waiting for approval">
+    <Frame label="Example agent: test passed on sandbox data, live in Approve mode, three runs waiting for approval">
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-semibold">
           <span className="signal-pulse size-1.5 rounded-full bg-highlight" />
           Refund agent
         </p>
-        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-brand-strong">
-          <LevelMeter level={3} className="h-2.5" /> L3
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-strong">
+          <LevelMeter level={3} className="h-2.5" /> Approve
         </span>
       </div>
       <ol className="mt-2.5 space-y-1.5 text-[11px]">
@@ -184,8 +184,8 @@ function Connector() {
   );
 }
 
-// Hours of the example process an agent takes over at each level, from the same coefficients
-// the product uses for its autonomy score. The track is the time people keep.
+// Hours of the example process an agent takes over in each mode, from the same coefficients
+// the product uses for its share of work on agents. The track is the time people keep.
 const TOTAL_HOURS = 43;
 
 export function HoursByLevel() {
@@ -203,7 +203,7 @@ export function HoursByLevel() {
         <table>
           <thead>
             <tr>
-              <th>Level</th>
+              <th>Mode</th>
               <th>Agent hours</th>
               <th>People hours</th>
             </tr>
@@ -211,9 +211,7 @@ export function HoursByLevel() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.code}>
-                <td>
-                  {r.code} {r.name}
-                </td>
+                <td>{r.name}</td>
                 <td>{r.agent}</td>
                 <td>{r.people}</td>
               </tr>
@@ -223,12 +221,12 @@ export function HoursByLevel() {
       </div>
       <ol aria-hidden className="mt-5 space-y-3">
         {rows.map((r) => (
-          <li key={r.code} className="grid grid-cols-[2.25rem_1fr] items-center gap-x-3 gap-y-1 sm:grid-cols-[2.25rem_1fr_9.5rem]">
-            <span className="font-mono text-xs font-bold" style={{ color: `var(--level-${Math.max(r.level, 3)})` }}>
-              {r.code}
+          <li key={r.code} className="grid grid-cols-[4rem_1fr] items-center gap-x-3 gap-y-1 sm:grid-cols-[4rem_1fr_9.5rem]">
+            <span className="text-xs font-semibold" style={{ color: `var(--level-${Math.max(r.level + 1, 3)})` }}>
+              {r.name}
             </span>
             <span className="flex h-3 gap-[2px] overflow-hidden rounded-full">
-              {r.agent > 0 ? <span className="h-full rounded-full" style={{ width: `${(r.agent / TOTAL_HOURS) * 100}%`, background: r.level === 5 ? "var(--highlight)" : "var(--brand)" }} /> : null}
+              {r.agent > 0 ? <span className="h-full rounded-full" style={{ width: `${(r.agent / TOTAL_HOURS) * 100}%`, background: r.level === 4 ? "var(--highlight)" : "var(--brand)" }} /> : null}
               {r.people > 0 ? <span className="h-full flex-1 rounded-full bg-muted" /> : null}
             </span>
             <span className="col-start-2 text-xs tabular-nums text-muted-foreground sm:col-start-auto sm:text-right">
@@ -309,8 +307,8 @@ export function SetupFlow() {
         <Frame label="Example: a refund agent being built and tested, the test passed">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold">Refund agent</p>
-            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-brand-strong">
-              <LevelMeter level={3} className="h-2.5" /> L3
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-strong">
+              <LevelMeter level={3} className="h-2.5" /> Approve
             </span>
           </div>
           <ol className="mt-2.5 space-y-1.5 text-[11px]">

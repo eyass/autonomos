@@ -2,7 +2,7 @@ import "server-only";
 import { applyGuardrails, guardrailsFor, policyForTools } from "@autonomos/agents";
 import { createRun, RunNotAllowedError } from "@autonomos/db";
 import { buildSandboxTicket, getTool, registerSnapshots, SAMPLE_TICKETS, snapshotOf, type ToolSnapshot } from "@autonomos/integrations";
-import { AgentConfigSchema, PolicyConfigSchema, type AgentConfig, type PolicyConfig } from "@autonomos/schemas";
+import { AgentConfigSchema, modeOf, PolicyConfigSchema, type AgentConfig, type PolicyConfig } from "@autonomos/schemas";
 import { deactivateAgentSchedule, TriggerNotConfiguredError, upsertAgentSchedule } from "@autonomos/workflows";
 import { sandboxStore } from "@autonomos/db";
 import { activity, audit, track } from "@/lib/audit";
@@ -70,7 +70,7 @@ async function guardedConfig(session: Session, processId: string, config: AgentC
   if (gate.policyGaps.length) throw new HttpError(409, `On the process, ${gate.policyGaps.join("; ")}. The agent enforces these, so they are needed first.`);
   const caps = guardrailsFor(gate.sensitive, gate.policy);
   if (mode === "update" && config.autonomyLevel > caps.maxLevel) {
-    throw new HttpError(409, `Work involving ${gate.sensitive.join(" and ")} runs at L${caps.maxLevel} at most.`);
+    throw new HttpError(409, `Work involving ${gate.sensitive.join(" and ")} runs in ${modeOf(caps.maxLevel).name} mode at most.`);
   }
   const writes = config.tools.filter((t) => getTool(t)?.access === "write");
   return AgentConfigSchema.parse(applyGuardrails(config, gate.sensitive, writes, gate.policy));
@@ -150,7 +150,7 @@ export async function updateAgentConfig(session: Session, agentId: string, next:
   await audit(session, { action: "agent.version_created", agentId, agentVersionId: versionId, input: { note, config }, output: { previousVersion: version.version } });
   if (previous.autonomyLevel !== config.autonomyLevel) {
     await track(session, "autonomy_changed", { agent_id: agentId, from: previous.autonomyLevel, to: config.autonomyLevel });
-    await activity(session, { actionType: "autonomy_changed", title: `${config.name} moved from L${previous.autonomyLevel} to L${config.autonomyLevel}`, agentId, processId: agent.process_id });
+    await activity(session, { actionType: "autonomy_changed", title: `${config.name} moved from ${modeOf(previous.autonomyLevel).name} to ${modeOf(config.autonomyLevel).name}`, agentId, processId: agent.process_id });
   }
   return versionId;
 }
@@ -168,7 +168,7 @@ export async function changeAutonomy(session: Session, agentId: string, level: n
       : template.amountThresholds,
     ...policyOverride,
   });
-  return updateAgentConfig(session, agentId, { ...config, autonomyLevel: level as AgentConfig["autonomyLevel"], policy }, `Autonomy changed to L${level}`);
+  return updateAgentConfig(session, agentId, { ...config, autonomyLevel: level as AgentConfig["autonomyLevel"], policy }, `Mode changed to ${modeOf(level).name}`);
 }
 
 async function syncSchedule(session: Session, agentId: string, config: AgentConfig, existingScheduleId: string | null) {
@@ -228,7 +228,7 @@ export async function activateAgent(session: Session, agentId: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can activate agents");
   const db = adminDb();
   const { agent, version, config } = await loadAgentConfig(session, agentId);
-  if (config.autonomyLevel < 2) throw new HttpError(409, "An L1 agent cannot be activated; L1 means humans do the work");
+  if (config.autonomyLevel < 2) throw new HttpError(409, "An agent in Manual mode cannot be activated; in Manual your team does the work");
   const readiness = await agentReadiness(session, { id: agentId, versionId: version.id }, config, "activate");
   const blocking = readiness.checks.filter((c) => c.blocking && !c.ok);
   if (blocking.length) throw new HttpError(409, `Not ready to go live: ${blocking.map((c) => `${c.label}: ${c.detail}`).join(" ")}`);
@@ -242,7 +242,7 @@ export async function activateAgent(session: Session, agentId: string) {
   await db.from("agents").update({ status: "active", active_version_id: version.id }).eq("organization_id", session.org.id).eq("id", agentId);
   if (agent.opportunity_id) await db.from("automation_opportunities").update({ status: "live" }).eq("organization_id", session.org.id).eq("id", agent.opportunity_id);
   await audit(session, { action: "agent.activated", agentId, agentVersionId: version.id, processId: agent.process_id });
-  await activity(session, { actionType: "agent_activated", title: `${agent.name} is live at L${config.autonomyLevel}`, agentId, processId: agent.process_id, status: "success" });
+  await activity(session, { actionType: "agent_activated", title: `${agent.name} is live in ${modeOf(config.autonomyLevel).name} mode`, agentId, processId: agent.process_id, status: "success" });
   await track(session, "agent_activated", { agent_id: agentId, autonomy_level: config.autonomyLevel });
 }
 

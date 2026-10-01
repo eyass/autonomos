@@ -24,7 +24,7 @@ import {
   tempered,
   type PolicyValues,
 } from "@autonomos/agents";
-import { DEPARTMENTS, DiscoveredProcessSchema, tidyTitle, type CompanyProfile, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
+import { DEPARTMENTS, DiscoveredProcessSchema, normalizeIndustry, tidyTitle, type DiscoveredProcess, type DiscoveredStep } from "@autonomos/schemas";
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
@@ -727,7 +727,7 @@ export async function draftInitialInventory(session: Session, evidence?: string[
     company: await companyContext(session),
     profile: profile ?? {
       summary: session.org.companySummary ?? session.org.description ?? session.org.name,
-      industry: (session.org.industry ?? "Other") as CompanyProfile["industry"],
+      industry: normalizeIndustry(session.org.industry) ?? "Other",
       customers: null,
       improvementAreas: areas,
       likelyProcesses: [],

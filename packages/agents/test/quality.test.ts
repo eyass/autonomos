@@ -29,7 +29,7 @@ const base = {
 };
 
 describe("compliance guardrails", () => {
-  it("caps collections at L3 and puts every write behind approval", async () => {
+  it("caps collections at Approve and puts every write behind approval", async () => {
     const { applyGuardrails } = await import("../src");
     const c = applyGuardrails(base, ["debt collection"], ["zendesk.send_reply", "stripe.create_refund"]);
     expect(c.autonomyLevel).toBe(3);

@@ -1,5 +1,5 @@
 "use client";
-import { AUTONOMY_LEVELS, INTEGRATION_EVENTS, type AgentConfig, type ConditionRule } from "@autonomos/schemas";
+import { AUTONOMY_LEVELS, INTEGRATION_EVENTS, modeOf, type AgentConfig, type ConditionRule } from "@autonomos/schemas";
 import { Check } from "lucide-react";
 import { useState, useTransition } from "react";
 import { AutonomyLadder } from "@/components/domain";
@@ -262,28 +262,27 @@ export function AgentConfigForm({
           {step === 4 ? (
             <>
               <div>
-                <div className="mb-2 text-sm font-medium">Autonomy level</div>
+                <div className="mb-2 text-sm font-medium">Mode</div>
                 <ToggleGroup
                   type="single"
                   variant="outline"
                   className="w-full"
-                  value={String(c.autonomyLevel)}
+                  value={String(modeOf(c.autonomyLevel).level)}
                   onValueChange={(v) => v && set("autonomyLevel", Number(v) as AgentConfig["autonomyLevel"])}
                 >
-                  {AUTONOMY_LEVELS.map((l) => (
+                  {AUTONOMY_LEVELS.filter((l) => l.level > 1).map((l) => (
                     <ToggleGroupItem
                       key={l.level}
                       value={String(l.level)}
-                      disabled={l.level === 1}
                       className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                      aria-label={`${l.code} ${l.name}`}
+                      aria-label={l.name}
                     >
-                      {l.code}
+                      {l.name}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">{AUTONOMY_LEVELS[c.autonomyLevel - 1]?.name}:</span> {AUTONOMY_LEVELS[c.autonomyLevel - 1]?.short}. Start at L3 for anything involving
+                  <span className="font-medium text-foreground">{modeOf(c.autonomyLevel).name}:</span> {modeOf(c.autonomyLevel).short}. Start at Approve for anything involving
                   money or customers.
                 </p>
               </div>
@@ -300,7 +299,7 @@ export function AgentConfigForm({
               </div>
               {moneyTools.length ? (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField label="Maximum refund without approval" hint={c.autonomyLevel <= 3 ? "At L3 every refund needs approval" : "Refunds above this need a human"}>
+                  <FormField label="Maximum refund without approval" hint={c.autonomyLevel <= 3 ? "In Approve mode every refund needs approval" : "Refunds above this need a person"}>
                     <Input
                       type="number"
                       min={0}
@@ -390,7 +389,7 @@ export function AgentConfigForm({
               {c.autonomyLevel > initial.autonomyLevel ? (
                 <Alert variant="warning">
                   <AlertDescription>
-                    Autonomy is higher than {origin === "opportunity" ? "suggested" : "before"}: L{initial.autonomyLevel} → L{c.autonomyLevel}. The agent will act without approval more often.
+                    The mode is more autonomous than {origin === "opportunity" ? "suggested" : "before"}: {modeOf(initial.autonomyLevel).name} → {modeOf(c.autonomyLevel).name}. The agent will act without approval more often.
                   </AlertDescription>
                 </Alert>
               ) : null}

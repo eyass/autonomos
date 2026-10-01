@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 
 // An empty list: what will show here and how to fill it. The mark is the page's icon, or the
-// autonomy scale when a page has none.
+// mode scale when a page has none.
 export function EmptyState({
   title,
   description,

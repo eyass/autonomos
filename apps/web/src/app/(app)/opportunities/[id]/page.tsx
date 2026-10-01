@@ -1,3 +1,4 @@
+import { modeOf } from "@autonomos/schemas";
 import { ChevronDown, Sparkles, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -70,7 +71,7 @@ export default async function OpportunityPage({ params, searchParams }: { params
 
   const statusNote =
     o.status === "live"
-      ? `Live at L${agent?.autonomy_level}. Putting this on hold or rejecting it pauses the agent.`
+      ? `Live in ${modeOf(agent?.autonomy_level).name} mode. Putting this on hold or rejecting it pauses the agent.`
       : o.status === "reviewing"
         ? "On hold. The agent is paused."
         : o.status === "rejected"

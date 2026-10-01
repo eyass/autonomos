@@ -84,7 +84,7 @@ const FOOTER = [
     title: "Resources",
     links: [
       { href: "/docs", label: "Docs" },
-      { href: "/docs/autonomy-levels", label: "Autonomy levels" },
+      { href: "/docs/autonomy-levels", label: "Agent modes" },
       { href: "/security", label: "Security" },
     ],
   },

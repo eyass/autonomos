@@ -1,5 +1,6 @@
 import { JobButton } from "@/components/app/job";
 import { latestJob } from "@/server/jobs";
+import { modeOf } from "@autonomos/schemas";
 import { snapshotMetrics } from "@autonomos/db";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { agentStates } from "@/server/readiness";
@@ -91,7 +92,7 @@ export default async function OverviewPage() {
     },
     {
       done: m.activeAgents > 0,
-      title: "Go live at L2 or L3",
+      title: "Go live in Draft or Approve mode",
       detail: eligible
         ? `${eligible.name} passed every check. It drafts or proposes; a person approves.`
         : blocked?.firstBlocker
@@ -163,7 +164,7 @@ export default async function OverviewPage() {
   if (!m.processesMapped) {
     return (
       <>
-        <PageHeader title="Home" description="How autonomous is your company?" />
+        <PageHeader title="Home" description="How much of your work runs on agents" />
         {playbookCard}
       </>
     );
@@ -196,9 +197,9 @@ export default async function OverviewPage() {
           <CardContent className={`grid gap-5 ${chart.length > 1 ? "" : "sm:grid-cols-2"}`}>
             <div data-testid="autonomy-live">
               <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                AutonomOS live
-                <InfoTip label="What AutonomOS live means">
-                  The share of your mapped work, weighted by time, that live AutonomOS agents now do without a person. It stays at 0% until you activate an agent. Tests never count.
+                Work on agents
+                <InfoTip label="What work on agents means">
+                  The share of your mapped work, weighted by time, that live AutonomOS agents now do instead of a person. It stays at 0% until you activate an agent. Tests never count.
                 </InfoTip>
               </div>
               <div className="mt-1 font-display text-5xl font-semibold tracking-tight text-brand tabular-nums" data-testid="autonomy-score">
@@ -216,7 +217,7 @@ export default async function OverviewPage() {
               <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 Already automated in your stack
                 <InfoTip label="What already automated means">
-                  Work your existing software already does without a person, from the autonomy level recorded on each process. AutonomOS did not do this part.
+                  Work your existing software already does without a person, from the mode recorded on each process. AutonomOS did not do this part.
                 </InfoTip>
               </div>
               <div className="mt-1 text-2xl font-semibold tabular-nums">{pct(m.baselineAutonomy)}</div>
@@ -315,7 +316,7 @@ export default async function OverviewPage() {
                     <>
                       <span>{(o.processes as unknown as { title: string } | null)?.title}</span>
                       <span>Estimated ~{num(Number(o.estimated_hours_saved_monthly ?? 0))} h / month</span>
-                      <span>L{o.target_autonomy_level} target</span>
+                      <span>Could run on {modeOf(o.target_autonomy_level).name}</span>
                     </>
                   }
                 />
@@ -341,7 +342,7 @@ export default async function OverviewPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Autonomy by department</CardTitle>
+            <CardTitle>Work on agents by department</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Each department keeps its colour everywhere (from its name). */}

@@ -31,7 +31,7 @@ import {
 type NavItem = { href: string; label: string; hint?: string; icon: typeof LayoutDashboard; also?: string[]; tone?: Tone };
 // Each main area wears its colour (components/app/area.ts) on its icon tile.
 const MAIN: NavItem[] = [
-  { href: "/", label: "Home", hint: "How autonomous you are", icon: LayoutDashboard, tone: AREA.home },
+  { href: "/", label: "Home", hint: "How much work runs on agents", icon: LayoutDashboard, tone: AREA.home },
   { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox, tone: AREA.inbox },
   { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"], tone: AREA.work },
   { href: "/playbooks", label: "Playbooks", hint: "Templates to start from", icon: BookOpen, tone: AREA.playbooks },

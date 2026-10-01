@@ -7,7 +7,7 @@ const LIFECYCLES = {
     flow: ["Suggested", "Approved", "Building", "Live"],
     notes: [
       ["Building", "An agent was created and is being tested with simulated actions."],
-      ["Live", "The agent is active and does the work under its autonomy level."],
+      ["Live", "The agent is active and does the work in its mode."],
       ["Hold", "Pauses a live agent. Reopen to continue."],
       ["Reject", "Not worth automating now. A live agent is paused. Reopen to undo."],
       ["Done", "Finished and kept for the record. Reopen to undo."],

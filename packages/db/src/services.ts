@@ -55,7 +55,7 @@ export async function createRun(
       }
     }
   }
-  if (agent.autonomy_level === 1) throw new RunNotAllowedError("L1 is human only; raise autonomy to L2 or higher to run the agent");
+  if (agent.autonomy_level === 1) throw new RunNotAllowedError("The agent is set to Manual, so your team does this work; switch it to Draft, Approve or Auto to run it");
 
   // Test runs use the newest version so edits can be tested before activation.
   let versionId = agent.active_version_id;
@@ -202,7 +202,7 @@ export async function computeOrgMetrics(db: DbClient, organizationId: string, si
   };
 }
 
-// Persist today's autonomy score so the trend chart has history (PRD section 52).
+// Persist today's share of work on agents so the trend chart has history (PRD section 52).
 export async function snapshotMetrics(db: DbClient, organizationId: string) {
   const m = await computeOrgMetrics(db, organizationId);
   const period = new Date().toISOString().slice(0, 10);

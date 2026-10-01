@@ -15,8 +15,8 @@ export const DOCS: DocPage[] = [
   {
     slug: "autonomy-levels",
     href: "/docs/autonomy-levels",
-    title: "Autonomy levels",
-    description: "What L1 to L5 mean and when to raise an agent's level.",
+    title: "Agent modes",
+    description: "Manual, Draft, Approve and Auto: what each means and when to move an agent up.",
     body: AutonomyLevels,
   },
   {
@@ -77,51 +77,47 @@ function GettingStarted() {
           <strong>Approve one process.</strong> Pick a process you know well, check its steps, volume and time, and approve it.
         </li>
         <li>
-          <strong>Create the opportunity.</strong> AutonomOS scores the process by value, difficulty and risk, shows the evidence, and proposes a target autonomy level.
+          <strong>Create the opportunity.</strong> AutonomOS scores the process by value, difficulty and risk, shows the evidence, and proposes the mode the work could run in.
         </li>
         <li>
           <strong>Build and test the agent.</strong> The agent wizard drafts instructions, tools and policies. Run a test: every write is simulated, and the result lists the approvals a production run
           would need.
         </li>
         <li>
-          <strong>Activate at L2 or L3.</strong> Start where a person still acts or approves. Raise the level once the agent has a record you trust. See{" "}
-          <Link href="/docs/autonomy-levels">Autonomy levels</Link>.
+          <strong>Go live in Draft or Approve mode.</strong> Start where a person still sends or approves. Move to Auto once the agent has a record you trust. See{" "}
+          <Link href="/docs/autonomy-levels">Agent modes</Link>.
         </li>
       </ol>
-      <p>The overview then shows your autonomy score, active agents and time saved.</p>
+      <p>Home then shows how much of your work runs on agents, your live agents and the time saved.</p>
     </>
   );
 }
 
 function AutonomyLevels() {
   const levels = [
-    ["L1", "Human only", "People do the work. AutonomOS maps and measures it."],
-    ["L2", "Agent assists", "The agent researches and drafts. A person takes every action."],
-    ["L3", "Agent proposes", "The agent prepares each action. A person approves it before it runs."],
-    ["L4", "Agent executes with exceptions", "The agent acts on routine cases. Exceptions and anything above a threshold go to a person."],
-    ["L5", "Autonomous", "The agent runs the process end to end within its policies and hard limits. People monitor."],
+    ["Manual", "Your team does the work. AutonomOS maps and measures it."],
+    ["Draft", "The agent researches and prepares the work. A person checks it and takes every action."],
+    ["Approve", "The agent prepares each action. A person approves it before it runs."],
+    ["Auto", "The agent acts on routine cases. Exceptions and anything above a money limit go to a person."],
   ];
   return (
     <>
-      <p>Every agent runs at one autonomy level. The level decides which actions need a person. Policies and hard limits apply at every level.</p>
+      <p>Every agent runs in one mode. The mode decides which actions need a person. Allowed tools, policies and hard limits apply in every mode.</p>
       <ul>
-        {levels.map(([code, name, body]) => (
-          <li key={code}>
-            <strong>
-              {code}, {name}.
-            </strong>{" "}
-            {body}
+        {levels.map(([name, body]) => (
+          <li key={name}>
+            <strong>{name}.</strong> {body}
           </li>
         ))}
       </ul>
-      <h2>Choosing a level</h2>
+      <h2>Choosing a mode</h2>
       <ul>
-        <li>Start new agents at L2 or L3.</li>
-        <li>Move to L4 when approvals are almost always granted unchanged.</li>
-        <li>Keep financial actions above your money threshold under approval, even at L4.</li>
+        <li>Start new agents in Draft or Approve.</li>
+        <li>Move to Auto when approvals are almost always granted unchanged.</li>
+        <li>Keep money actions above your limit under approval, even in Auto.</li>
       </ul>
-      <h2>The autonomy score</h2>
-      <p>Your company autonomy score weighs each process by the time it takes and by the level it runs at. It rises as more of your recurring work runs at higher levels.</p>
+      <h2>Work on agents</h2>
+      <p>Home shows the share of your recurring work that runs on agents. Each process counts by the time it takes and by its mode: none in Manual, a fifth in Draft, two fifths in Approve and four fifths in Auto, where people still handle exceptions.</p>
     </>
   );
 }
@@ -135,7 +131,7 @@ function Approvals() {
       </p>
       <h2>What needs approval</h2>
       <ul>
-        <li>Every action the agent&apos;s autonomy level does not allow it to take alone.</li>
+        <li>Every action the agent&apos;s mode does not allow it to take alone.</li>
         <li>Financial and other high-risk actions, by default.</li>
         <li>Amounts above the agent&apos;s money threshold.</li>
         <li>Cases a policy flags, for example a customer who had a recent refund.</li>
@@ -247,7 +243,7 @@ function Api() {
       <h2>Endpoints</h2>
       <ul>
         <li>
-          <code>GET /api/agents</code>: agents with status and autonomy level.
+          <code>GET /api/agents</code>: agents with status and mode (autonomy level 1 Manual, 2 Draft, 3 Approve, 4 Auto).
         </li>
         <li>
           <code>GET /api/activity?limit=50</code>: what AutonomOS and its agents did, newest first.

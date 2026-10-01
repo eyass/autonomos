@@ -7,16 +7,31 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { requireSession } from "@/lib/session";
 import { isPlatformAdmin, playbookGallery, type GalleryPlaybook } from "@/server/playbooks";
+import { INDUSTRIES, type Industry } from "@autonomos/schemas";
+import { IndustryPicker } from "./industry-picker";
 
 export const metadata = { title: "Playbooks" };
 
 // Ready-made playbooks: templates for common work that run on whichever tools a company uses.
-export default async function PlaybooksPage({ searchParams }: { searchParams: Promise<{ department?: string }> }) {
+export default async function PlaybooksPage({ searchParams }: { searchParams: Promise<{ department?: string; industry?: string }> }) {
   const session = await requireSession();
-  const { department } = await searchParams;
+  const { department, industry: industryParam } = await searchParams;
   const all = await playbookGallery(session);
-  const departments = [...new Set(all.map((p) => p.department))].sort();
-  const shown = department ? all.filter((p) => p.department === department) : all;
+  const yours = session.org.industry;
+  // Opens on the workspace's own industry when there are playbooks made for it.
+  const industry = industryParam === "all" ? null : industryParam && (INDUSTRIES as readonly string[]).includes(industryParam) ? industryParam : yours && all.some((p) => p.forYou) ? yours : null;
+  // A playbook tagged with no industry suits every industry.
+  const inIndustry = industry ? all.filter((p) => !p.industries.length || p.industries.includes(industry as Industry)) : all;
+  const departments = [...new Set(inIndustry.map((p) => p.department))].sort();
+  const shown = department ? inIndustry.filter((p) => p.department === department) : inIndustry;
+  const href = (next: { industry?: string | null; department?: string | null }) => {
+    const q = new URLSearchParams();
+    const i = next.industry === undefined ? industry : next.industry;
+    const d = next.department === undefined ? department : next.department;
+    q.set("industry", i ?? "all");
+    if (d) q.set("department", d);
+    return `/playbooks?${q}`;
+  };
   const ready = shown.filter((p) => p.ready);
   const rest = shown.filter((p) => !p.ready);
   return (
@@ -32,12 +47,23 @@ export default async function PlaybooksPage({ searchParams }: { searchParams: Pr
           ) : null
         }
       />
+      {all.length ? (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <IndustryPicker value={industry ?? "all"} yours={yours} />
+          {industry && industry === yours ? <span className="text-muted-foreground">Made for your industry. Shared playbooks included.</span> : null}
+          {industry ? (
+            <Link href={href({ industry: null, department: null })} className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+              Show all industries
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
       {departments.length > 1 ? (
         <nav aria-label="Departments" className="mb-4 flex flex-wrap gap-2">
           {[undefined, ...departments].map((d) => (
             <Link
               key={d ?? "all"}
-              href={d ? `/playbooks?department=${encodeURIComponent(d)}` : "/playbooks"}
+              href={href({ department: d ?? null })}
               aria-current={d === department ? "page" : undefined}
               className="rounded-full border px-3 py-1 text-sm text-muted-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:text-foreground"
             >
@@ -48,6 +74,8 @@ export default async function PlaybooksPage({ searchParams }: { searchParams: Pr
       ) : null}
       {!all.length ? (
         <EmptyState icon={BookOpen} tone="amber" title="No playbooks yet" description="Ready-made playbooks appear here as they are published." />
+      ) : !shown.length ? (
+        <EmptyState icon={BookOpen} tone="amber" title="No playbooks here yet" description="Try another department or show all industries." />
       ) : (
         <div className="space-y-6">
           {ready.length ? <Section title="Ready with your tools" items={ready} /> : null}

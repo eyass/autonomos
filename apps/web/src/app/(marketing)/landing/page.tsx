@@ -60,17 +60,16 @@ const STEPS = [
     visual: AgentVisual,
     label: "Agent",
     title: "Deploy under control",
-    body: "The agent is tested on sandbox data first, then goes live at the level you choose, with approvals where money or customers are involved.",
-    points: ["Test runs simulate every write", "Autonomy L1 to L5", "Pause everything in one click"],
+    body: "The agent is tested on sandbox data first, then goes live in the mode you choose, with approvals where money or customers are involved.",
+    points: ["Test runs simulate every write", "Draft, Approve or Auto", "Pause everything in one click"],
   },
 ];
 
 const LEVELS = [
-  { level: "L1", name: "Human only", body: "People do it." },
-  { level: "L2", name: "Agent assists", body: "It drafts, you act." },
-  { level: "L3", name: "Agent proposes", body: "You approve each action." },
-  { level: "L4", name: "Agent executes", body: "You handle exceptions." },
-  { level: "L5", name: "Autonomous", body: "It runs within its limits." },
+  { name: "Manual", body: "Your team does the work." },
+  { name: "Draft", body: "The agent prepares it, you check and send." },
+  { name: "Approve", body: "The agent acts once you approve each step." },
+  { name: "Auto", body: "The agent acts, you handle the exceptions." },
 ];
 
 const CONTROLS = [
@@ -267,23 +266,22 @@ export default function LandingPage() {
             <PolicyFlow />
           </div>
 
-          <h3 className="mt-20 text-xl font-semibold tracking-tight sm:text-2xl">Raise autonomy one level at a time</h3>
-          <p className="mt-2 max-w-xl text-sm text-white/60 sm:text-base">Every agent starts where you are comfortable, and AutonomOS recommends when it has earned the next level.</p>
-          <ol className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+          <h3 className="mt-20 text-xl font-semibold tracking-tight sm:text-2xl">Hand over work one step at a time</h3>
+          <p className="mt-2 max-w-xl text-sm text-white/60 sm:text-base">Every agent starts where you are comfortable, and AutonomOS recommends when it has earned the next mode. Limits apply in every mode.</p>
+          <ol className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
             {LEVELS.map((l, i) => (
               <li
-                key={l.level}
+                key={l.name}
                 className={cn(
                   "flex flex-col rounded-xl border p-4 lg:min-h-[var(--h)]",
-                  i === 4 ? "border-highlight/50 bg-highlight/10" : "border-white/10 bg-white/[0.04]",
+                  i === 3 ? "border-highlight/50 bg-highlight/10" : "border-white/10 bg-white/[0.04]",
                 )}
                 style={{ "--h": `${7.5 + i * 2}rem` } as React.CSSProperties}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={cn("font-mono text-xs font-bold", i === 4 ? "text-highlight" : "text-white/70")}>{l.level}</span>
+                  <span className={cn("text-sm font-semibold", i === 3 ? "text-highlight" : "text-white")}>{l.name}</span>
                   <LevelMeter level={i + 1} tone="inverted" />
                 </div>
-                <span className="mt-3 text-sm font-semibold">{l.name}</span>
                 <p className="mt-1 text-sm text-white/60">{l.body}</p>
               </li>
             ))}
@@ -314,7 +312,7 @@ export default function LandingPage() {
       <section id="example" className="scroll-mt-16 border-b border-border">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[1fr_1.4fr] lg:gap-16">
           <SectionHeading eyebrow="The math" title="320 refunds a month, 43 hours of work">
-            An illustrative example: what each autonomy level takes off your team, from the same coefficients the autonomy score uses.
+            An illustrative example: what each mode takes off your team, from the same coefficients the home score uses.
           </SectionHeading>
           <HoursByLevel />
         </div>
@@ -422,8 +420,8 @@ export default function LandingPage() {
           <div aria-hidden className="bg-ink-glow pointer-events-none absolute inset-0" />
           <div aria-hidden className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_100%,black,transparent_70%)]" />
           <div className="relative">
-            <LevelMeter level={5} tone="inverted" className="mx-auto h-8" />
-            <h2 className="mx-auto mt-6 max-w-2xl text-3xl font-semibold tracking-[-0.03em] sm:text-5xl">How autonomous is your company?</h2>
+            <LevelMeter level={4} tone="inverted" className="mx-auto h-8" />
+            <h2 className="mx-auto mt-6 max-w-2xl text-3xl font-semibold tracking-[-0.03em] sm:text-5xl">How much of your work could agents do?</h2>
             <p className="mx-auto mt-4 max-w-md text-white/65">Connect your tools and see the recurring work AutonomOS finds, in minutes.</p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <ButtonLink href="/signup" size="lg" className="h-11 bg-highlight px-6 text-highlight-foreground hover:bg-highlight/90">

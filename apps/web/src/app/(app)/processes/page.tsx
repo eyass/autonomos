@@ -1,3 +1,4 @@
+import { AUTONOMY_LEVELS, modeOf } from "@autonomos/schemas";
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -43,7 +44,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
       .eq("organization_id", session.org.id),
     supabase.from("agents").select("process_id, autonomy_level").eq("organization_id", session.org.id).eq("status", "active"),
   ]);
-  // A process runs at the level of its best live agent (same rule as the autonomy score).
+  // A process runs in the mode of its best live agent (same rule as the share of work on agents).
   const agentLevel = new Map<string, number>();
   for (const a of liveAgents ?? []) agentLevel.set(a.process_id, Math.max(agentLevel.get(a.process_id) ?? 1, a.autonomy_level));
   const effective = (p: { id: string; current_autonomy_level: number }) => Math.max(p.current_autonomy_level, agentLevel.get(p.id) ?? 1);
@@ -60,7 +61,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
     q.status ? p.status === q.status : view === "review" ? p.status === "draft" : view === "candidates" ? p.status === "candidate" : p.status !== "archived" && p.status !== "candidate",
   );
   if (q.department) list = list.filter((p) => p.department_id === q.department);
-  if (q.autonomy) list = list.filter((p) => String(effective(p)) === q.autonomy);
+  if (q.autonomy) list = list.filter((p) => String(modeOf(effective(p)).level) === q.autonomy);
   if (q.risk) list = list.filter((p) => (q.risk === "high" ? p.risk_level >= 4 : q.risk === "low" ? p.risk_level <= 2 : p.risk_level === 3));
   if (q.value) list = list.filter((p) => (q.value === "high" ? p.business_value >= 4 : p.business_value <= 3));
   if (q.q) list = list.filter((p) => p.title.toLowerCase().includes(q.q!.toLowerCase()));
@@ -177,11 +178,11 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
                 </NativeSelectOption>
               ))}
             </NativeSelect>
-            <NativeSelect name="autonomy" defaultValue={q.autonomy ?? ""} aria-label="Autonomy">
-              <NativeSelectOption value="">Any autonomy</NativeSelectOption>
-              {[1, 2, 3, 4, 5].map((l) => (
-                <NativeSelectOption key={l} value={l}>
-                  L{l}
+            <NativeSelect name="autonomy" defaultValue={q.autonomy ?? ""} aria-label="Mode">
+              <NativeSelectOption value="">Any mode</NativeSelectOption>
+              {AUTONOMY_LEVELS.map((l) => (
+                <NativeSelectOption key={l.level} value={l.level}>
+                  {l.name}
                 </NativeSelectOption>
               ))}
             </NativeSelect>
@@ -209,7 +210,7 @@ export default async function ProcessesPage({ searchParams }: { searchParams: Pr
               <TableHead>Process</TableHead>
               <TableHead className="hidden @4xl:table-cell">Department</TableHead>
               <TableHead className="hidden @2xl:table-cell">Monthly time</TableHead>
-              <TableHead className="hidden @2xl:table-cell">Autonomy</TableHead>
+              <TableHead className="hidden @2xl:table-cell">Mode</TableHead>
               <TableHead className="hidden @4xl:table-cell">Scores</TableHead>
               <TableHead className="text-right @lg:text-left">Status</TableHead>
             </TableRow>

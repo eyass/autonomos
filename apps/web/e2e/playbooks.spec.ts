@@ -60,8 +60,13 @@ test("ready-made playbooks: studio to agent", async ({ page }) => {
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText("Published", { exact: true })).toBeVisible();
 
-  // In the workspace: the help desk is connected (Zendesk), the payment system is not yet.
+  // In the workspace: the gallery opens on the company's industry, with the ready-made
+  // library for it and playbooks that suit any industry.
   await page.goto("/playbooks");
+  await expect(page.getByLabel("Industry")).toHaveValue("Marketplaces");
+  await expect(page.getByRole("link", { name: /New listing moderation/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Weekly client performance report/ })).toHaveCount(0);
+  // In the workspace: the help desk is connected (Zendesk), the payment system is not yet.
   await page.getByRole("link", { name: new RegExp(title) }).click();
   await expect(page.getByLabel("Help desk", { exact: true })).toHaveValue("zendesk");
   await expect(page.getByRole("button", { name: "Use this playbook" })).toBeDisabled();

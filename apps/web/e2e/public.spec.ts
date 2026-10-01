@@ -8,7 +8,7 @@ const PAGES: Array<{ path: string; heading: RegExp }> = [
   { path: "/solutions/finance", heading: /Finance on autopilot/ },
   { path: "/solutions/people", heading: /People on autopilot/ },
   { path: "/docs", heading: /Getting started/ },
-  { path: "/docs/autonomy-levels", heading: /Autonomy levels/ },
+  { path: "/docs/autonomy-levels", heading: /Agent modes/ },
   { path: "/docs/running-agents", heading: /Running agents/ },
   { path: "/terms", heading: /Terms of service/ },
   { path: "/privacy", heading: /Privacy policy/ },

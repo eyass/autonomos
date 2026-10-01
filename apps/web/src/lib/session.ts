@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createServiceClient, isPaused, type Database } from "@autonomos/db";
-import type { CompanyProfile } from "@autonomos/schemas";
+import { normalizeIndustry, type CompanyProfile } from "@autonomos/schemas";
 import { createClient } from "./supabase/server";
 
 export const ORG_COOKIE = "aos_org";
@@ -53,7 +53,7 @@ export function toSession(user: { id: string; email: string }, profile: { first_
     org: {
       id: org.id,
       name: org.name,
-      industry: org.industry,
+      industry: normalizeIndustry(org.industry),
       website: org.website,
       employeeCount: org.employee_count,
       country: org.country,

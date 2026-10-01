@@ -1,3 +1,4 @@
+import { modeOf } from "@autonomos/schemas";
 import { getTool } from "@autonomos/integrations";
 
 type Json = Record<string, unknown>;
@@ -26,7 +27,7 @@ function triggerText(t: Json) {
 // Human-readable differences between two configuration versions, newest second.
 export function diffVersions(prev: VersionSnapshot, next: VersionSnapshot): string[] {
   const out: string[] = [];
-  if (prev.autonomy_level !== next.autonomy_level) out.push(`Autonomy L${prev.autonomy_level} → L${next.autonomy_level}`);
+  if (prev.autonomy_level !== next.autonomy_level) out.push(`Mode ${modeOf(prev.autonomy_level).name} → ${modeOf(next.autonomy_level).name}`);
   if (triggerText(prev.trigger_config) !== triggerText(next.trigger_config)) out.push(`Trigger ${triggerText(prev.trigger_config)} → ${triggerText(next.trigger_config)}`);
   out.push(...listChange("Tools", prev.tools, next.tools, toolName));
   const pi = prev.instructions;

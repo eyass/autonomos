@@ -22,7 +22,7 @@ export async function generatePlaybook(input: { department?: string; goal?: stri
       "Never name a product or vendor anywhere. Say 'the help desk', 'the payment system', 'the CRM'.",
       "Each step that looks something up or changes something names its capability (a key from capabilities) and whether it reads or writes. Judgement steps have capability null and access none.",
       "Include the read steps the agent needs to understand the case before any write.",
-      "Anything that moves money, messages customers, touches personal data or deletes records runs at autonomy level 3 at most, with a person approving.",
+      "Anything that moves money, messages customers, touches personal data or deletes records runs at autonomy level 3 (Approve) at most, with a person approving.",
       "Write the instructions as operating procedure: objective, context, must-follow rules, steps, when to hand to a person, and what done means.",
       "Plain business language. Short step titles.",
     ],

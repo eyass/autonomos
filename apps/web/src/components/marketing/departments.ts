@@ -2,7 +2,7 @@ import type { Flow } from "./workflows";
 import type { ToolSlug } from "./tools";
 
 // The public pages per team: each shows illustrative workflows an agent runs across that team's
-// tools. Levels follow the platform's rules (personal data, collections and money stay at L3 or
+// tools. Modes follow the platform's rules (personal data, collections and money stay at Approve or
 // below, or behind approval).
 export type Department = { slug: string; name: string; headline: string; sub: string; tools: ToolSlug[]; flows: Flow[] };
 

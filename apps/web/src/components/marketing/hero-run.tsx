@@ -64,7 +64,7 @@ export function HeroRun() {
                 ))}
               </ul>
               <div className="mt-6 rounded-lg border border-border bg-card p-2.5">
-                <p className="eyebrow text-muted-foreground">Autonomy</p>
+                <p className="eyebrow text-muted-foreground">Work on agents</p>
                 <p className="mt-1 font-display text-2xl font-semibold leading-none text-brand">38%</p>
                 <LevelMeter level={3} className="mt-2 h-3" />
               </div>
@@ -77,8 +77,8 @@ export function HeroRun() {
                   <p className="font-mono text-[11px] text-muted-foreground">Run #1,284 · ticket 48213</p>
                   <p className="mt-0.5 truncate font-display text-base font-semibold sm:text-lg">Refund handling</p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-strong">
-                  <LevelMeter level={3} className="h-3" /> L3
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand-soft px-1.5 py-0.5 text-[11px] font-semibold text-brand-strong">
+                  <LevelMeter level={3} className="h-3" /> Approve
                 </span>
               </div>
               <ol className="relative mt-4 space-y-3 before:absolute before:top-2 before:bottom-2 before:left-[11px] before:w-px before:bg-border">

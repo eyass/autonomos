@@ -7,7 +7,7 @@ import { createAgent } from "@/server/agents";
 import { draftAgentForOpportunity } from "@/server/opportunities";
 
 // POST /api/opportunities/:id/create-agent
-// Body: { config?: AgentConfig }. Without a config the AI-drafted configuration is used, starting at L3.
+// Body: { config?: AgentConfig }. Without a config the AI-drafted configuration is used, starting in Approve mode (3).
 export async function POST(request: Request, ctx: RouteContext<"/api/opportunities/[id]/create-agent">) {
   return handle(async () => {
     const session = await requireApiSession(request);

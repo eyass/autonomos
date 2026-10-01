@@ -1,3 +1,4 @@
+import { modeOf } from "@autonomos/schemas";
 import { Workflow } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -232,7 +233,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
             ? [
                 { label: "Human time", value: "Not estimated", hint: held },
                 { label: "Cost", value: "–" },
-                { label: "Autonomy", value: `L${effective} today` },
+                { label: "Mode", value: `${modeOf(effective).name} today` },
                 { label: "Scores", value: "Not scored yet" },
               ]
             : [
@@ -244,7 +245,7 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
                     : FREQUENCY_LABEL[p.frequency],
                 },
                 { label: "Cost", value: `${money((monthlyMinutes / 60) * rate, session.org.currency)}/mo`, hint: `at ${money(rate, session.org.currency)}/h` },
-                { label: "Autonomy", value: <LevelChange from={effective} to={p.potential_autonomy_level} />, hint: activeAgent ? `with ${activeAgent.name}` : undefined },
+                { label: "Mode", value: <LevelChange from={effective} to={p.potential_autonomy_level} />, hint: activeAgent ? `with ${activeAgent.name}` : undefined },
                 { label: "Scores", value: <Scores value={p.business_value} difficulty={p.automation_difficulty} risk={p.risk_level} className="mt-1 gap-x-2" /> },
               ]
         }
@@ -339,14 +340,14 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
               </CardHeader>
               <div>
                 {(agents ?? []).map((a) => (
-                  <RowLink key={a.id} href={`/agents/${a.id}`} title={a.name} meta={<span>Agent · L{a.autonomy_level}</span>} aside={<StatusBadge status={a.status} />} />
+                  <RowLink key={a.id} href={`/agents/${a.id}`} title={a.name} meta={<span>Agent · {modeOf(a.autonomy_level).name}</span>} aside={<StatusBadge status={a.status} />} />
                 ))}
                 {(opportunities ?? []).map((o) => (
                   <RowLink
                     key={o.id}
                     href={`/opportunities/${o.id}`}
                     title={o.title}
-                    meta={<span>Opportunity · target L{o.target_autonomy_level}</span>}
+                    meta={<span>Opportunity · could run on {modeOf(o.target_autonomy_level).name}</span>}
                     aside={<StatusBadge status={o.status} kind="opportunity" />}
                   />
                 ))}

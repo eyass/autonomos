@@ -4,7 +4,7 @@ import { executeRun, RetryableRunError } from "../src";
 import { refunds, setup, ticket } from "./fixtures";
 
 describe("run engine: refund workflow", () => {
-  it("L3 stops for approval, then executes exactly once after approval", async () => {
+  it("Approve mode stops for approval, then executes exactly once after approval", async () => {
     const { store, runId, ticketId } = setup({ level: 3 });
     const first = await executeRun(runId, store);
     expect(first.status).toBe("waiting_for_approval");
@@ -17,7 +17,7 @@ describe("run engine: refund workflow", () => {
 
     store.resolveApproval(approval.id, "approved");
     const second = await executeRun(runId, store);
-    // The reply and ticket update also require approval at L3.
+    // The reply and ticket update also require approval in Approve mode.
     expect(second.status).toBe("waiting_for_approval");
     expect(await refunds(store)).toHaveLength(1);
 
@@ -38,7 +38,7 @@ describe("run engine: refund workflow", () => {
     expect(result.estimatedMinutesSaved).toBe(5);
   });
 
-  it("L4 executes a routine refund without approval", async () => {
+  it("Auto executes a routine refund without approval", async () => {
     const { store, runId, ticketId } = setup({ level: 4 });
     const r = await executeRun(runId, store);
     expect(r).toMatchObject({ status: "completed", success: true });
@@ -50,7 +50,7 @@ describe("run engine: refund workflow", () => {
     expect(store.audit.filter((a) => a.action === "tool.executed")).toHaveLength(3);
   });
 
-  it("L4 asks for approval when the customer had a recent refund", async () => {
+  it("Auto asks for approval when the customer had a recent refund", async () => {
     const { store, runId } = setup({ level: 4, ticket: "large" });
     expect((await executeRun(runId, store)).status).toBe("waiting_for_approval");
     const approval = [...store.approvals.values()][0]!;
