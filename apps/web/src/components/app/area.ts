@@ -22,6 +22,7 @@ export const AREA = {
   agents: "brand",
   history: "violet",
   integrations: "rose",
+  knowledge: "rose",
 } as const satisfies Record<string, Tone>;
 
 // A fixed sequence for things with no area of their own (stat tiles, departments, chart series).

@@ -47,7 +47,7 @@ export default async function MappingPage() {
     <>
       <LiveRefresh active={status === "running"} />
       {status === "done" ? <AutoRedirect href={next} /> : null}
-      <Steps current={2} />
+      <Steps current={3} />
       <h1 className="mb-1 text-xl font-semibold">{status === "done" ? "Your first process inventory is ready" : status === "failed" ? "Mapping stopped" : "Mapping your processes"}</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         {status === "done"

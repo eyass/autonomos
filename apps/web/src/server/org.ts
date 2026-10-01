@@ -44,7 +44,7 @@ export async function createOrganization(input: z.infer<typeof CreateOrgSchema>)
       improvement_areas: input.areas,
       ...(input.currency ? { currency: input.currency } : {}),
       ...(input.hourlyCost ? { default_hourly_cost: input.hourlyCost } : {}),
-      ...(complete ? { onboarding_step: "connect" } : {}),
+      ...(complete ? { onboarding_step: "knowledge" } : {}),
     })
     .eq("id", orgId);
   for (const name of input.areas) {
@@ -68,7 +68,7 @@ export const AboutSchema = z.object({
 
 export async function saveAbout(session: Session, input: z.infer<typeof AboutSchema>) {
   const db = adminDb();
-  await db.from("organizations").update({ company_summary: input.summary, improvement_areas: input.areas, onboarding_step: "connect" }).eq("id", session.org.id);
+  await db.from("organizations").update({ company_summary: input.summary, improvement_areas: input.areas, onboarding_step: "knowledge" }).eq("id", session.org.id);
   for (const name of input.areas) {
     await db.from("departments").upsert({ organization_id: session.org.id, name }, { onConflict: "organization_id,name", ignoreDuplicates: true });
   }

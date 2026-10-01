@@ -296,7 +296,7 @@ export async function readSite(state: SiteReadState, options: ReadSiteOptions): 
         for (const a of root.querySelectorAll("a[href]")) enqueue(a.getAttribute("href") ?? "", finalUrl, item.depth + 1);
         const { title, text } = readable(root);
         const plain = text.replace(/^# /gm, "");
-        if (plain.length < 80) {
+        if (plain.length < 40) {
           if (isScriptRendered(res.html, plain)) state.counts.unreadable++;
           else state.counts.skipped++;
           return;

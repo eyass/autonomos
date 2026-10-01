@@ -26,6 +26,8 @@ export type KnowledgeSourceView = {
   counts: { found?: number; read?: number; skipped?: number; sampledOut?: number; unreadable?: number; capped?: number } | null;
   createdAt: string;
   processedAt: string | null;
+  // Found by AutonomOS (the website and its help centre), not added by a person.
+  auto: boolean;
 };
 
 const FREE_PLAN_SOURCES = 20;
@@ -38,7 +40,7 @@ const requireEditor = (session: Session) => {
 export async function listSources(session: Session): Promise<KnowledgeSourceView[]> {
   const { data } = await adminDb()
     .from("knowledge_sources")
-    .select("id, kind, title, url, file_path, status, error, pages, passages, summary, created_at, processed_at, counts:crawl->state->counts")
+    .select("id, kind, title, url, file_path, status, error, pages, passages, summary, created_at, processed_at, added_by, counts:crawl->state->counts")
     .eq("organization_id", session.org.id)
     .order("created_at", { ascending: true });
   return (data ?? []).map((r) => ({
@@ -55,6 +57,7 @@ export async function listSources(session: Session): Promise<KnowledgeSourceView
     counts: (r.counts as KnowledgeSourceView["counts"]) ?? null,
     createdAt: r.created_at,
     processedAt: r.processed_at,
+    auto: !r.added_by,
   }));
 }
 
@@ -131,19 +134,21 @@ export async function addUrlSource(session: Session, input: { url: string }): Pr
   } catch {
     throw new HttpError(422, "Enter a web address, for example help.yourcompany.com");
   }
-  const id = await upsertSiteSource(session, "help_center", url, `Help centre (${new URL(url).hostname}${new URL(url).pathname === "/" ? "" : new URL(url).pathname})`);
+  const id = await upsertSiteSource(session, "help_center", url, `Help centre (${new URL(url).host}${new URL(url).pathname === "/" ? "" : new URL(url).pathname})`, false);
   await audit(session, { action: "knowledge.source_added", input: { kind: "help_center", url } });
   return id;
 }
 
-async function upsertSiteSource(session: Session, kind: "website" | "help_center", url: string, title: string): Promise<string> {
+async function upsertSiteSource(session: Session, kind: "website" | "help_center", url: string, title: string, auto: boolean): Promise<string> {
   const db = adminDb();
   const { data: existing } = await db.from("knowledge_sources").select("id, status").eq("organization_id", session.org.id).eq("kind", kind).eq("url", url).maybeSingle();
   if (existing) {
+    // Typed in by a person: it counts as theirs from now on.
+    if (!auto) await db.from("knowledge_sources").update({ added_by: session.user.id }).eq("id", existing.id);
     if (existing.status === "failed") await readAgain(session, existing.id);
     return existing.id;
   }
-  const { data, error } = await db.from("knowledge_sources").insert({ organization_id: session.org.id, kind, title, url, added_by: session.user.id }).select("id").single();
+  const { data, error } = await db.from("knowledge_sources").insert({ organization_id: session.org.id, kind, title, url, added_by: auto ? null : session.user.id }).select("id").single();
   if (error || !data) throw new Error(`knowledge source: ${error?.message}`);
   await enqueue(data.id);
   return data.id;
@@ -164,9 +169,9 @@ export async function startWebsiteSources(session: Session): Promise<void> {
   const links = await homeLinks(home, { timeoutMs: 6000, allowPrivate: process.env.CRAWL_ALLOW_PRIVATE === "1", fetchImpl: fetch }).catch(() => [] as string[]);
   for (const help of helpCentreCandidates(home, links).slice(0, 3)) {
     const u = new URL(help);
-    await upsertSiteSource(session, "help_center", help, `Help centre (${u.hostname}${u.pathname === "/" ? "" : u.pathname})`);
+    await upsertSiteSource(session, "help_center", help, `Help centre (${u.host}${u.pathname === "/" ? "" : u.pathname})`, true);
   }
-  await upsertSiteSource(session, "website", home, `Website (${new URL(home).hostname})`);
+  await upsertSiteSource(session, "website", home, `Website (${new URL(home).host})`, true);
 }
 
 export function startWebsiteSourcesInBackground(session: Session) {
@@ -191,6 +196,13 @@ export async function removeSource(session: Session, sourceId: string) {
   await audit(session, { action: "knowledge.source_removed", input: { title: source.title } });
   // What the other sources say stays; the brief is rebuilt without this one.
   after(() => rebuildBrief(db, session.org.id).catch((e) => console.error("rebuild brief", e)));
+}
+
+// Onboarding: the knowledge step is done once the company added at least one source itself.
+export async function completeKnowledgeStep(session: Session) {
+  const { count } = await adminDb().from("knowledge_sources").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).not("added_by", "is", null);
+  if (!count) throw new HttpError(409, "Add at least one document, your help centre or a piece of text first");
+  await adminDb().from("organizations").update({ onboarding_step: "connect" }).eq("id", session.org.id);
 }
 
 // A link to the original upload, valid for ten minutes.
