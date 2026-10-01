@@ -708,7 +708,7 @@ export function readerArgs(r: InventoryReader, sinceIso: string, per: number): R
 // BigQuery: the shape of the warehouse, never its rows. Table names, columns, row counts and
 // when each table last changed tell discovery what the business measures and which reports
 // or analyses an agent could run on it.
-const BQ_REGIONS = [
+export const BQ_REGIONS = [
   { region: "region-eu", location: "EU" },
   { region: "region-us", location: "US" },
 ];

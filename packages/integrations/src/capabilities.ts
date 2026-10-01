@@ -20,6 +20,7 @@ export const CAPABILITY_KEYS = [
   "hr",
   "esign",
   "forms",
+  "warehouse",
 ] as const;
 export type Capability = (typeof CAPABILITY_KEYS)[number];
 
@@ -86,6 +87,14 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { key: "marketing", label: "Email marketing", hint: "Campaigns and audiences", group: "marketing", toolkits: ["mailchimp", "klaviyo", "brevo", "activecampaign"], categories: ["marketing"] },
   { key: "hr", label: "HR", hint: "People, leave and payroll", group: "hr", toolkits: ["bamboohr", "personio", "hibob", "workday"], categories: ["hr", "hr & recruiting"] },
   { key: "esign", label: "E-signature", hint: "Contracts sent for signing", group: "productivity", toolkits: ["docusign", "pandadoc", "dropbox_sign"], categories: ["signatures"] },
+  {
+    key: "warehouse",
+    label: "Data warehouse",
+    hint: "Tables of customers, orders and other records",
+    group: "data",
+    toolkits: ["googlebigquery"],
+    categories: ["data warehouse", "analytics & data"],
+  },
   { key: "forms", label: "Forms", hint: "Forms and surveys people fill in", group: "forms", toolkits: ["typeform", "googleforms", "jotform", "tally"], categories: ["forms & surveys"] },
 ];
 

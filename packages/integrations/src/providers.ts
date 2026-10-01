@@ -2,6 +2,7 @@ import { Composio } from "@composio/core";
 import { ToolError, classifyHttpStatus } from "./errors";
 import { authPlan } from "./directory";
 import { getTool, type ToolDefinition } from "./tools";
+import { checkWarehouseSql, WAREHOUSE_ROW_LIMIT } from "./warehouse";
 
 export type SandboxRecord = Record<string, unknown> & { id: string };
 
@@ -42,6 +43,7 @@ export async function executeTool(key: string, rawArgs: unknown, ctx: ToolExecut
     return { results: await ctx.knowledge.search(String(args.query)) };
   }
   if (!ctx.connection) throw new ToolError("not_connected", `${def.integration} is not connected`);
+  if (def.key === "warehouse.query") return runWarehouseQuery(args, ctx);
   if (ctx.connection.provider === "sandbox") {
     // Sample data exists only for the built-in systems; every other toolkit runs on a live account.
     if (def.source === "composio") throw new ToolError("not_connected", `${def.integration} needs a live connection; sample data covers only the built-in systems`);
@@ -330,6 +332,34 @@ async function runComposio(def: ToolDefinition, args: Record<string, unknown>, c
     if (/Timeout/i.test(name)) throw new ToolError("timeout", String((error as Error).message));
     if (/ConnectedAccountNotFound/i.test(name)) throw new ToolError("not_connected", String((error as Error).message));
     if (/ToolNotFound/i.test(name)) throw new ToolError("invalid_data", String((error as Error).message));
+    throw new ToolError("network", String((error as Error)?.message ?? error));
+  }
+}
+
+// A read-only query in the data warehouse. The SQL is checked again here (the policy engine
+// checked it against the agent's allowed dataset already) and always runs with a row cap.
+async function runWarehouseQuery(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<unknown> {
+  const scope = { project: String(args.project_id), dataset: String(args.dataset) };
+  const check = checkWarehouseSql(String(args.sql), scope);
+  if (!check.ok) throw new ToolError("policy_violation", check.reason);
+  if (ctx.connection?.provider !== "composio" || !ctx.connection.externalAccountId) throw new ToolError("not_connected", "The data warehouse needs a live connection");
+  try {
+    const response = (await getComposio().tools.execute("GOOGLEBIGQUERY_QUERY", {
+      userId: ctx.organizationId,
+      connectedAccountId: ctx.connection.externalAccountId,
+      arguments: stripUndefined({ project_id: scope.project, query: check.sql, location: args.location }),
+      dangerouslySkipVersionCheck: true,
+    })) as { successful?: boolean; error?: string | null; data?: unknown };
+    if (response.successful === false) throw new ToolError("invalid_data", response.error ?? "The query failed");
+    const d = unwrap(response.data);
+    const names = ((d.schema as { fields?: Array<{ name?: string }> } | undefined)?.fields ?? []).map((f) => String(f.name ?? ""));
+    const rows = (Array.isArray(d.rows) ? d.rows : []).map((r) => {
+      const cells = (r as { f?: Array<{ v?: unknown }> }).f;
+      return Array.isArray(cells) && names.length ? Object.fromEntries(names.map((n, i) => [n, cells[i]?.v ?? null])) : r;
+    });
+    return { rows, row_count: rows.length, truncated: rows.length >= WAREHOUSE_ROW_LIMIT };
+  } catch (error) {
+    if (error instanceof ToolError) throw error;
     throw new ToolError("network", String((error as Error)?.message ?? error));
   }
 }

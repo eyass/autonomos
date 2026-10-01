@@ -326,6 +326,16 @@ export const ConditionRuleSchema = z.object({
 });
 export type ConditionRule = z.infer<typeof ConditionRuleSchema>;
 
+// Where an agent may read in a data warehouse: one dataset per query tool. A query outside it
+// is denied in code (see evaluatePolicy and packages/integrations/src/warehouse.ts).
+export const DataScopeSchema = z.object({
+  tool: z.string(),
+  project: z.string().min(1),
+  dataset: z.string().min(1),
+  location: z.string().optional(),
+});
+export type DataScope = z.infer<typeof DataScopeSchema>;
+
 export const WorkingHoursSchema = z.object({
   timezone: z.string(),
   days: z.array(z.number().int().min(0).max(6)),
@@ -343,6 +353,7 @@ export const PolicyConfigSchema = z.object({
   maxActionsPerRun: z.number().int().positive().default(10),
   maxActionsPerDay: z.number().int().positive().default(200),
   maxStepsPerRun: z.number().int().positive().default(15),
+  dataScopes: z.array(DataScopeSchema).default([]),
 });
 export type PolicyConfig = z.infer<typeof PolicyConfigSchema>;
 

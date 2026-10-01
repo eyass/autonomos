@@ -1,5 +1,5 @@
 import { readOnlyTools, toolkitFor } from "./directory";
-import { adsCustomerIds, adsField, arr, bqProjects, bqRegion, bqRow, exec, firstList, genericCandidates, iso, readerArgs, redact, SCANNABLE, type ScanContext } from "./scan";
+import { adsCustomerIds, adsField, arr, BQ_REGIONS, bqProjects, bqRegion, bqRow, exec, firstList, genericCandidates, iso, readerArgs, redact, SCANNABLE, type ScanContext } from "./scan";
 
 // A first inventory of a connected system, taken once when it is connected: what it holds
 // and how to read it. BigQuery projects, datasets and table schemas; ad accounts; mail labels;
@@ -157,7 +157,8 @@ async function bigQuery(ctx: ScanContext, add: Add, step: Step) {
   for (const project_id of projects) {
     const locations = new Set<string>();
     await step(`datasets in ${project_id}`, async () => {
-      for (const d of arr((await exec(ctx, "GOOGLEBIGQUERY_LIST_DATASETS", { project_id, max_results: 200 })).datasets)) {
+      // The list comes back under "datasets" or wrapped once more, depending on the toolkit version.
+      for (const d of firstList(await exec(ctx, "GOOGLEBIGQUERY_LIST_DATASETS", { project_id, max_results: 200 }))) {
         const ref = (d.datasetReference ?? {}) as { datasetId?: string };
         const id =
           ref.datasetId ??
@@ -170,6 +171,23 @@ async function bigQuery(ctx: ScanContext, add: Add, step: Step) {
         add({ kind: "dataset", id: `${project_id}.${id}`, name: id, parent: project_id, location });
       }
     });
+    // When the list gives nothing, ask BigQuery itself in the two multi-regions.
+    if (!locations.size) {
+      for (const { region, location } of BQ_REGIONS) {
+        await step(`datasets in ${project_id} (${location})`, async () => {
+          const found = arr((await exec(ctx, "GOOGLEBIGQUERY_QUERY", { project_id, location, query: `SELECT schema_name, location FROM \`${project_id}\`.\`${region}\`.INFORMATION_SCHEMA.SCHEMATA LIMIT 200` })).rows).map((r) =>
+            bqRow(r, ["schema_name", "location"]),
+          );
+          for (const d of found) {
+            const id = String(d.schema_name ?? "");
+            if (!id) continue;
+            const at = String(d.location ?? location);
+            locations.add(at);
+            add({ kind: "dataset", id: `${project_id}.${id}`, name: id, parent: project_id, location: at });
+          }
+        });
+      }
+    }
     for (const location of [...locations].slice(0, 4)) {
       const region = bqRegion(location);
       const rows = async (query: string, names: string[]) => arr((await exec(ctx, "GOOGLEBIGQUERY_QUERY", { project_id, location, query })).rows).map((r) => bqRow(r, names));

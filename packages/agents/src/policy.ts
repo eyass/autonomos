@@ -1,5 +1,5 @@
 import type { AutonomyLevel, ConditionRule, PolicyConfig } from "@autonomos/schemas";
-import { getTool, isHighRisk, type ToolDefinition } from "@autonomos/integrations";
+import { checkWarehouseSql, getTool, isHighRisk, type ToolDefinition } from "@autonomos/integrations";
 
 // Deterministic policy engine (PRD sections 63-65, 72, 91).
 // Every write the agent proposes passes through evaluatePolicy before anything executes.
@@ -123,6 +123,21 @@ export function evaluatePolicy(toolKey: string, args: Record<string, unknown>, c
       deny(`Hard limit on ${limit.field}`, `${value} exceeds the hard limit of ${limit.max}`);
     } else {
       pass(`Hard limit on ${limit.field}`, `${value} ≤ ${limit.max}`);
+    }
+  }
+
+  // A warehouse query runs only inside the agent's allowed dataset, and only as one SELECT.
+  if (toolKey === "warehouse.query") {
+    const scope = (ctx.policy.dataScopes ?? []).find((s) => s.tool === toolKey);
+    const rule = "Query stays inside the allowed dataset";
+    if (!scope) {
+      deny(rule, "No dataset is allowed for this agent");
+    } else if (args.project_id !== scope.project || args.dataset !== scope.dataset) {
+      deny(rule, `Only ${scope.project}.${scope.dataset} may be queried`);
+    } else {
+      const check = checkWarehouseSql(String(args.sql ?? ""), scope);
+      if (check.ok) pass(rule, `${scope.project}.${scope.dataset}`);
+      else deny(rule, check.reason);
     }
   }
 

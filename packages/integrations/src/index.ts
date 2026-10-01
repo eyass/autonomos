@@ -9,3 +9,4 @@ export * from "./inventory";
 export * from "./composio-tools";
 export * from "./capabilities";
 export * from "./playbook-library";
+export * from "./warehouse";

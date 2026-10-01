@@ -125,3 +125,27 @@ describe("policy engine", () => {
     expect(evaluatePolicy("stripe.create_refund", { payment_id: "x", currency: "eur" }, ctx()).outcome).not.toBe("allow");
   });
 });
+
+describe("warehouse queries", () => {
+  const scoped = (dataScopes: Array<{ tool: string; project: string; dataset: string }>) =>
+    ctx({ autonomyLevel: 3, allowedTools: ["warehouse.query"], policy: { ...refundPolicy(3), dataScopes } });
+  const query = (sql: string, extra: Record<string, unknown> = {}) => ({ project_id: "pmg-prod", dataset: "crm", sql, ...extra });
+  const scope = [{ tool: "warehouse.query", project: "pmg-prod", dataset: "crm" }];
+
+  it("runs a lookup inside the allowed dataset without approval, even at L3", () => {
+    expect(evaluatePolicy("warehouse.query", query("SELECT plan FROM crm.customers WHERE email = 'a@b.com'"), scoped(scope)).outcome).toBe("allow");
+  });
+
+  it("denies a query when the agent has no dataset", () => {
+    const e = evaluatePolicy("warehouse.query", query("SELECT 1 FROM crm.customers"), scoped([]));
+    expect(e.outcome).toBe("deny");
+    expect(e.reasons.join(" ")).toMatch(/No dataset/);
+  });
+
+  it("denies another dataset, another project and anything but a SELECT", () => {
+    expect(evaluatePolicy("warehouse.query", query("SELECT * FROM hr.salaries", { dataset: "hr" }), scoped(scope)).outcome).toBe("deny");
+    expect(evaluatePolicy("warehouse.query", query("SELECT * FROM crm.customers", { project_id: "other" }), scoped(scope)).outcome).toBe("deny");
+    expect(evaluatePolicy("warehouse.query", query("SELECT * FROM crm.customers c JOIN hr.salaries s ON s.id = c.id"), scoped(scope)).outcome).toBe("deny");
+    expect(evaluatePolicy("warehouse.query", query("DELETE FROM crm.customers WHERE true"), scoped(scope)).outcome).toBe("deny");
+  });
+});

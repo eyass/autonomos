@@ -171,6 +171,21 @@ export const TOOLS = [
     input: z.object({ query: z.string().min(2) }),
     modifiableFields: [],
   }),
+  // A read-only SELECT inside one dataset of a data warehouse, for steps where the warehouse
+  // stands in for a CRM or another system (see warehouse.ts). The policy engine denies any query
+  // outside the agent's allowed dataset or that is not a single SELECT.
+  tool({
+    key: "warehouse.query",
+    integration: "googlebigquery",
+    label: "Look up records in the data warehouse",
+    description:
+      "Run one read-only SQL SELECT in the allowed BigQuery dataset, for example to find a customer by email. Name tables as dataset.table. At most 50 rows come back; filter and select only the columns you need.",
+    access: "read",
+    riskTags: [],
+    reversible: true,
+    input: z.object({ project_id: z.string().min(1), dataset: z.string().min(1), sql: z.string().min(8), location: z.string().optional() }),
+    modifiableFields: [],
+  }),
 ] as const;
 
 export type ToolKey = (typeof TOOLS)[number]["key"];
@@ -222,7 +237,10 @@ export function toolsForIntegrations(connected: string[]): ToolDefinition[] {
   return TOOLS.filter((t) => set.has(t.integration)) as unknown as ToolDefinition[];
 }
 
-export const BUILTIN_INTEGRATIONS = new Set(TOOLS.map((t) => t.integration));
+// Integrations whose built-in tools replace their Composio actions. A data warehouse's guarded
+// query tool is added to its Composio actions instead of replacing them.
+const ADDITIVE = new Set(["googlebigquery"]);
+export const BUILTIN_INTEGRATIONS = new Set(TOOLS.map((t) => t.integration).filter((i) => !ADDITIVE.has(i)));
 
 export function isHighRisk(def: ToolDefinition): boolean {
   return def.riskTags.some((t) => HIGH_RISK_TAGS.includes(t));
