@@ -1,5 +1,5 @@
 import { logger, schedules, tasks } from "@trigger.dev/sdk";
-import { checkRecordWatches, createServiceClient, createRun, RunNotAllowedError, snapshotMetrics } from "@autonomos/db";
+import { checkRecordWatches, createServiceClient, createRun, healConnections, healInventories, healRuns, healSchedules, RunNotAllowedError, snapshotMetrics } from "@autonomos/db";
 import type { agentRunTask } from "./agent-run";
 
 // Expire approvals that nobody resolved, and resume their runs so they close cleanly.
@@ -77,5 +77,37 @@ export const recordWatchTask = schedules.task({
       if (r.error) logger.warn("record watch failed", { agentId: r.agentId, integration: r.integration, error: r.error });
     }
     logger.info("record watches checked", { agents: results.length, runs: results.reduce((n, r) => n + r.started.length, 0), seeded: results.reduce((n, r) => n + r.seeded, 0) });
+  },
+});
+
+// Self-healing: runs nobody picked up or that went quiet are started again once, resumes lost
+// after an approval are redone, schedules that drifted from their agent are put back, and failed
+// system inventories are taken again. Each repair is in the audit log.
+export const selfHealTask = schedules.task({
+  id: "self-heal",
+  cron: "*/5 * * * *",
+  run: async () => {
+    const db = createServiceClient();
+    const runs = await healRuns(db, async (runId, idempotencyKey) => {
+      await tasks.trigger<typeof agentRunTask>("agent-run", { runId }, { idempotencyKey });
+    });
+    const scheduled = await healSchedules(db, {
+      create: async (agentId, cron, timezone) => (await schedules.create({ task: "agent-schedule", cron, timezone, externalId: agentId, deduplicationKey: `agent-${agentId}` })).id,
+      deactivate: async (id) => {
+        await schedules.deactivate(id);
+      },
+    });
+    const inventories = await healInventories(db);
+    logger.info("self-heal", { ...runs, schedules: scheduled, inventories });
+  },
+});
+
+// Connections whose sign-in stopped working are found within the hour, not inside a failed run.
+export const connectionHealthTask = schedules.task({
+  id: "connection-health",
+  cron: "17 * * * *",
+  run: async () => {
+    const result = await healConnections(createServiceClient());
+    logger.info("connection health", result);
   },
 });

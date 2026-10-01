@@ -29,6 +29,8 @@ export type IntegrationView = {
   sandboxAvailable: boolean;
   oauthAvailable: boolean;
   webhook: { url: string; secret: string } | null;
+  // Why a connection needs reconnecting (its sign-in expired or was revoked).
+  lastError: string | null;
   // What the system holds, mapped once when it was connected.
   inventory: InventoryView | null;
   // Which agents use it, and what each is allowed to read and do there (their latest version).
@@ -78,7 +80,7 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
     supabase.from("integrations").select("*").order("sort_order"),
     supabase
       .from("integration_connections")
-      .select("id, integration_key, status, provider, account_label, connected_at, inventory, inventory_status, inventoried_at, inventory_error, users:connected_by(first_name, last_name, email)")
+      .select("id, integration_key, status, provider, account_label, connected_at, last_error, inventory, inventory_status, inventoried_at, inventory_error, users:connected_by(first_name, last_name, email)")
       .eq("organization_id", session.org.id),
   ]);
   // Webhook signing secrets are only loaded for admins, server-side.
@@ -151,6 +153,7 @@ export async function loadIntegrations(session: Session): Promise<IntegrationVie
         sandboxAvailable: SANDBOX_INTEGRATIONS.includes(i.key),
         oauthAvailable: canUseComposio(),
         webhook: c && c.status === "connected" && secrets.get(c.id) ? { url: `${appUrl}/api/webhooks/${c.id}`, secret: secrets.get(c.id)! } : null,
+        lastError: c?.status === "error" ? (c.last_error ?? "Its sign-in stopped working.") : null,
         inventory: c && c.status === "connected" ? inventoryView(c) : null,
         agents: byIntegration.get(i.key) ?? [],
       };

@@ -1,4 +1,5 @@
 import { ToolError } from "./errors";
+import { classifyFailure, withRetry } from "./heal";
 import { readOnlyTools, toolkitFor, type ToolMeta } from "./directory";
 import type { InventoryReader, SystemInventory } from "./inventory";
 import { composioVersionOption, getComposio, LEGACY_TOOLKIT_VERSION, type ConnectionInfo, type SandboxRecord, type SandboxStore } from "./providers";
@@ -281,17 +282,17 @@ const LEGACY_VERSION = LEGACY_TOOLKIT_VERSION;
 export async function exec(ctx: Pick<ScanContext, "organizationId" | "connection">, slug: string, args: Record<string, unknown>, version?: string | null): Promise<Record<string, unknown>> {
   if (!ctx.connection.externalAccountId) throw new ToolError("not_connected", "No connected account");
   const toolkit = toolkitFor(ctx.connection.integration);
-  const r = (await getComposio().tools.execute(slug, {
-    userId: ctx.organizationId,
-    connectedAccountId: ctx.connection.externalAccountId,
-    arguments: args,
-    ...composioVersionOption(toolkit, version),
-  })) as {
-    successful?: boolean;
-    error?: string | null;
-    data?: unknown;
-  };
-  if (r.successful === false) throw new ToolError("invalid_data", r.error ?? `${slug} failed`);
+  // Reads only: any temporary failure is retried with backoff before it counts.
+  const r = await withRetry(async () => {
+    const res = (await getComposio().tools.execute(slug, {
+      userId: ctx.organizationId,
+      connectedAccountId: ctx.connection.externalAccountId!,
+      arguments: args,
+      ...composioVersionOption(toolkit, version),
+    })) as { successful?: boolean; error?: string | null; data?: unknown };
+    if (res.successful === false) throw new ToolError(classifyFailure({ message: res.error }), res.error ?? `${slug} failed`);
+    return res;
+  });
   let d = (r.data ?? {}) as Record<string, unknown>;
   // Composio sometimes wraps the upstream payload once more.
   if (d.response_data && typeof d.response_data === "object") d = d.response_data as Record<string, unknown>;

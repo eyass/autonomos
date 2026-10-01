@@ -1,5 +1,6 @@
 import { Composio } from "@composio/core";
 import { ToolError, classifyHttpStatus } from "./errors";
+import { classifyFailure, isTransient, safeToRetryWrite, withRetry } from "./heal";
 import { authPlan, toolkitFor } from "./directory";
 import { getTool, type ToolDefinition } from "./tools";
 
@@ -343,14 +344,21 @@ async function runComposio(def: ToolDefinition, args: Record<string, unknown>, c
   if (!mapping) throw new ToolError("not_connected", `${def.key} cannot be connected to a live account yet`);
   if (!ctx.connection?.externalAccountId) throw new ToolError("not_connected", `${def.integration} has no connected account`);
   try {
-    const response = await getComposio().tools.execute(mapping.slug, {
-      userId: ctx.organizationId,
-      connectedAccountId: ctx.connection.externalAccountId,
-      arguments: stripUndefined(mapping.toArgs({ ...args, __idempotency_key: ctx.idempotencyKey })),
-      ...composioVersionOption(toolkitFor(def.integration), def.version),
-    });
-    const r = response as { successful?: boolean; error?: string | null; data?: unknown };
-    if (r.successful === false) throw new ToolError("invalid_data", r.error ?? `${mapping.slug} failed`);
+    // Temporary failures are retried with backoff: any of them for a read, only a rate limit
+    // (refused before it ran) for an action that changes something, so nothing happens twice.
+    const r = await withRetry(
+      async () => {
+        const response = (await getComposio().tools.execute(mapping.slug, {
+          userId: ctx.organizationId,
+          connectedAccountId: ctx.connection!.externalAccountId!,
+          arguments: stripUndefined(mapping.toArgs({ ...args, __idempotency_key: ctx.idempotencyKey })),
+          ...composioVersionOption(toolkitFor(def.integration), def.version),
+        })) as { successful?: boolean; error?: string | null; data?: unknown };
+        if (response.successful === false) throw new ToolError(classifyFailure({ message: response.error }), response.error ?? `${mapping.slug} failed`);
+        return response;
+      },
+      { when: def.access === "read" ? isTransient : safeToRetryWrite },
+    );
     return mapping.fromResult ? mapping.fromResult(r.data, args) : r.data;
   } catch (error) {
     if (error instanceof ToolError) throw error;
@@ -437,4 +445,18 @@ function safeJson<T>(raw: string | undefined): T | null {
 
 function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
+
+// The live state of a connected account at Composio: ACTIVE, or EXPIRED, INACTIVE, FAILED when
+// the sign-in no longer works. null when Composio cannot be asked right now (try later).
+export async function connectedAccountStatus(externalAccountId: string): Promise<string | null> {
+  try {
+    const a = (await withRetry(() => getComposio().connectedAccounts.get(externalAccountId))) as unknown as { status?: string };
+    return a.status ?? null;
+  } catch (e) {
+    const name = (e as Error)?.name ?? "";
+    if (/NotFound/i.test(name) || /not found/i.test(String((e as Error)?.message))) return "DELETED";
+    console.error("connected account status unavailable", e);
+    return null;
+  }
 }

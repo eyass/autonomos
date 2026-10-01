@@ -13,8 +13,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 export function IntegrationGrid({ integrations, canManage, compact, highlight = [] }: { integrations: IntegrationView[]; canManage: boolean; compact?: boolean; highlight?: string[] }) {
   // Connected systems first, then tools detected on the company website, then the rest.
   const connected = integrations.filter((i) => i.status === "connected");
-  const found = integrations.filter((i) => i.status !== "connected" && highlight.includes(i.key));
-  const rest = integrations.filter((i) => i.status !== "connected" && !highlight.includes(i.key));
+  // Connections whose sign-in stopped working come first: one click puts them back.
+  const broken = integrations.filter((i) => i.status === "error");
+  const found = integrations.filter((i) => i.status !== "connected" && i.status !== "error" && highlight.includes(i.key));
+  const rest = integrations.filter((i) => i.status !== "connected" && i.status !== "error" && !highlight.includes(i.key));
   const categories = [...new Set(rest.map((i) => i.category))];
   const section = (title: string, items: IntegrationView[], note?: string) => (
     <section key={title}>
@@ -96,6 +98,7 @@ export function IntegrationGrid({ integrations, canManage, compact, highlight = 
           ) : null}
         </div>
       ) : null}
+      {broken.length ? section("Needs reconnecting", broken, "AutonomOS found these sign-ins no longer work. Agents that use them wait until they are reconnected.") : null}
       {connected.length ? section("Connected", compact ? connected : shown) : null}
       {connected.length && !compact ? (
         <details className="group space-y-6">
@@ -137,7 +140,9 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
           </div>
         ) : null}
         <CardAction className="flex items-center gap-2">
-          {connected ? (
+          {i.status === "error" ? (
+            <Badge variant="destructive">Needs reconnecting</Badge>
+          ) : connected ? (
             <Badge
               variant={i.provider === "sandbox" ? "warning" : "success"}
               title={i.provider === "sandbox" ? "Sample data held in AutonomOS; nothing real changes" : "A real account: agent actions change real data"}
@@ -218,6 +223,18 @@ function IntegrationCard({ i, canManage, compact, found }: { i: IntegrationView;
           <Access i={i} />
         ) : null}
       </CardContent>
+      {i.status === "error" ? (
+        <CardFooter className="flex-col items-start gap-2">
+          <p className="text-sm text-muted-foreground">{i.lastError}</p>
+          {canManage ? (
+            <ActionButton size="sm" action={() => connectOAuthAction(i.key)}>
+              Reconnect {i.name}
+            </ActionButton>
+          ) : (
+            <p className="text-xs text-muted-foreground">An admin can reconnect it.</p>
+          )}
+        </CardFooter>
+      ) : null}
       {canManage && (connected || review) ? (
         <CardFooter className={`flex-wrap gap-2 ${folded}`}>
           {connected ? (
