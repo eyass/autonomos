@@ -1,5 +1,6 @@
 import { configure, schedules, tasks } from "@trigger.dev/sdk";
 import type { agentRunTask } from "./trigger/agent-run";
+import type { knowledgeIngestTask } from "./trigger/knowledge";
 
 // Application-side helpers for enqueueing work on Trigger.dev. The durable runtime is
 // required: without TRIGGER_SECRET_KEY these fail loudly rather than running inline.
@@ -30,6 +31,14 @@ export function triggerConfigured() {
 export async function enqueueRun(runId: string, idempotencyKey = `run-${runId}`) {
   ensureConfigured();
   const handle = await tasks.trigger<typeof agentRunTask>("agent-run", { runId }, { idempotencyKey, tags: [`run_${runId}`] });
+  return handle.id;
+}
+
+// Reads a company-knowledge source on the worker. A fresh key per request, so "Read again" and
+// a retry each start their own read.
+export async function enqueueKnowledgeIngest(sourceId: string) {
+  ensureConfigured();
+  const handle = await tasks.trigger<typeof knowledgeIngestTask>("knowledge-ingest", { sourceId }, { idempotencyKey: `knowledge-${sourceId}-${Date.now()}`, tags: [`source_${sourceId}`] });
   return handle.id;
 }
 

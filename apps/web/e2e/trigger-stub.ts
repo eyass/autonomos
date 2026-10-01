@@ -5,7 +5,7 @@
  */
 import { createServer } from "node:http";
 import { executeRun, markRunFailed, RetryableRunError } from "@autonomos/agents";
-import { createServiceClient, SupabaseRunStore } from "@autonomos/db";
+import { createServiceClient, ingestSource, SupabaseRunStore } from "@autonomos/db";
 
 const port = Number(process.env.TRIGGER_STUB_PORT ?? 3999);
 const store = new SupabaseRunStore(createServiceClient());
@@ -53,6 +53,11 @@ createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ id }));
     if (decodeURIComponent(match[1]!) === "agent-run" && payload?.runId) setTimeout(() => void runTask(payload.runId), 50);
+    // Company knowledge reads run the same code as the worker, again until a website is done.
+    if (decodeURIComponent(match[1]!) === "knowledge-ingest" && payload?.sourceId)
+      setTimeout(async () => {
+        for (let round = 0; round < 20; round++) if ((await ingestSource(createServiceClient(), payload.sourceId).catch(() => ({ done: true }))).done) break;
+      }, 50);
     return;
   }
   res.writeHead(404, { "content-type": "application/json" });
