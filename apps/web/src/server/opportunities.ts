@@ -1,6 +1,6 @@
 import "server-only";
 import { availableTools } from "./tool-catalog";
-import { getPlaybook, playbookAgentConfig } from "./playbooks";
+import { getPlaybook, playbookAgentConfig, storedDataScope } from "./playbooks";
 import { policyForTools } from "@autonomos/agents";
 import type { AgentConfig } from "@autonomos/schemas";
 import { generateAgentDraft, generateOpportunities, type ProcessForAnalysis } from "@autonomos/ai";
@@ -174,7 +174,7 @@ export async function defaultAgentConfig(session: Session, opportunityId: string
   if (fromPlaybook?.playbook_id) {
     const playbook = await getPlaybook(fromPlaybook.playbook_id).catch(() => null);
     if (playbook && fromPlaybook.required_tools.length) {
-      const config = await playbookAgentConfig(session, playbook, fromPlaybook.required_tools);
+      const config = await playbookAgentConfig(session, playbook, fromPlaybook.required_tools, storedDataScope(fromPlaybook.playbook_bindings));
       return { opportunity: fromPlaybook, config, connected: await connectedIntegrationKeys(session) };
     }
   }

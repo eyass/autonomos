@@ -72,6 +72,10 @@ test("ready-made playbooks: studio to agent", async ({ page }) => {
   await page.getByRole("link", { name: new RegExp(title) }).click();
   await expect(page.getByLabel("Help desk", { exact: true })).toHaveValue("zendesk");
   await expect(page.getByRole("button", { name: "Use this playbook" })).toBeDisabled();
+  // Any connected tool can be picked where these records live somewhere else.
+  await page.getByLabel("Payments", { exact: true }).selectOption("zendesk");
+  await expect(page.getByText("Not a usual payments tool.", { exact: false })).toBeVisible();
+  await page.getByLabel("Payments", { exact: true }).selectOption("");
   // Connect a payment system right from the step.
   await page.getByTestId("slot-payments").getByRole("button", { name: "Sample data" }).first().click();
   await expect(page.getByLabel("Payments", { exact: true })).toHaveValue("stripe");

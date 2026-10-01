@@ -21,6 +21,7 @@ export function refundPolicy(level: number): PolicyConfig {
     maxActionsPerRun: 6,
     maxActionsPerDay: 200,
     maxStepsPerRun: 15,
+    dataScopes: [],
   };
 }
 
@@ -35,6 +36,7 @@ export function defaultPolicy(): PolicyConfig {
     maxActionsPerRun: 10,
     maxActionsPerDay: 200,
     maxStepsPerRun: 15,
+    dataScopes: [],
   };
 }
 

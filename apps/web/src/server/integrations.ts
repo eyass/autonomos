@@ -133,7 +133,8 @@ export async function connectSandbox(session: Session, key: string) {
 }
 
 // Only paths inside the app are allowed as a place to come back to after signing in.
-export const safeReturnTo = (path?: string | null) => (path && /^\/[A-Za-z0-9/_-]*$/.test(path) && !path.startsWith("//") ? path : null);
+// A page of our own to come back to, optionally with the playbook step a tool was connected for.
+export const safeReturnTo = (path?: string | null) => (path && /^\/[A-Za-z0-9/_-]*(\?for=[a-z_]+)?$/.test(path) && !path.startsWith("//") ? path : null);
 
 export async function startOAuthConnection(session: Session, key: string, appUrl: string, returnTo?: string) {
   if (!isAdmin(session)) throw new HttpError(403, "Only admins can connect integrations");

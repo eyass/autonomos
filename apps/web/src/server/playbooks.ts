@@ -2,12 +2,13 @@ import "server-only";
 import { choosePlaybookTools, generatePlaybook } from "@autonomos/ai";
 import { AgentConfigSchema, DEPARTMENTS, INDUSTRIES, PlaybookStepSchema, type AgentConfig, type Department, type Industry, type PlaybookDraft, type PlaybookStep } from "@autonomos/schemas";
 import { policyFieldsFor, policyForTools, sensitiveAreas } from "@autonomos/agents";
-import { CAPABILITIES, capabilitiesOf, capabilityInfo, getTool, getToolkit, integrationKeyFor, isCapability, toolkitFor, type Capability, type ToolDefinition } from "@autonomos/integrations";
+import { CAPABILITIES, capabilitiesOf, capabilityInfo, getTool, getToolkit, integrationKeyFor, isCapability, isInventory, toolkitFor, WAREHOUSE_QUERY_TOOLS, type Capability, type ToolDefinition } from "@autonomos/integrations";
 import { audit, activity, recordUsage } from "@/lib/audit";
 import { adminDb, HttpError, type Session } from "@/lib/session";
 import { SANDBOX_INTEGRATIONS } from "@/server/integrations";
 import { confirmProcess, saveDiscoveredProcesses, setComplianceOwner, setPolicyThresholds, setProcessStatus } from "@/server/processes";
 import { availableTools, registerWorkspaceTools } from "@/server/tool-catalog";
+import { inventoryInBackground } from "@/server/inventory";
 
 // Ready-made playbooks: templates the site's administrators draft with AI, review and publish.
 // A playbook never names a product. Each step names the kind of system it needs (a help desk,
@@ -246,10 +247,53 @@ export type Slot = {
   label: string;
   hint: string;
   group: string;
-  // Connected tools that fill it, most likely first.
+  // Connected tools of this kind, most likely first: the recommended choices.
   options: Array<{ key: string; name: string; logo: string | null }>;
+  // The workspace's other connected tools, for when those records live somewhere else.
+  others: Array<{ key: string; name: string; logo: string | null }>;
   suggestions: Suggestion[];
+  // Every step of this kind only looks things up, so a data warehouse can stand in for it.
+  readOnly: boolean;
+  // Connected warehouses that can stand in, with the datasets to choose from (null while the
+  // warehouse is still being mapped).
+  warehouses: Warehouse[];
 };
+
+export type WarehouseDataset = { project: string; dataset: string; location?: string; tables: number };
+export type Warehouse = { key: string; name: string; logo: string | null; datasets: WarehouseDataset[] | null };
+export type DataScopeChoice = { project: string; dataset: string; location?: string };
+
+// The datasets of a connected warehouse, from its stored inventory. Without one, it is mapped in
+// the background and the page shows it as being mapped.
+async function warehouseDatasets(session: Session, key: string): Promise<WarehouseDataset[] | null> {
+  const { data } = await adminDb().from("integration_connections").select("inventory, inventory_status").eq("organization_id", session.org.id).eq("integration_key", key).maybeSingle();
+  if (!isInventory(data?.inventory)) {
+    if (data && data.inventory_status !== "running") inventoryInBackground(session.org.id, key);
+    return null;
+  }
+  const resources = data.inventory.resources;
+  return resources
+    .filter((r) => r.kind === "dataset" && r.parent)
+    .map((r) => ({
+      project: r.parent!,
+      dataset: r.name ?? r.id.split(".").pop()!,
+      location: r.location,
+      tables: resources.filter((t) => t.kind === "table" && t.parent === r.parent && t.name?.split(".")[0] === (r.name ?? r.id.split(".").pop())).length,
+    }));
+}
+
+// The tables of one dataset with their columns, written into the agent's context so it can
+// write a correct query.
+async function datasetTables(session: Session, key: string, scope: DataScopeChoice): Promise<string[]> {
+  const { data } = await adminDb().from("integration_connections").select("inventory").eq("organization_id", session.org.id).eq("integration_key", key).maybeSingle();
+  if (!isInventory(data?.inventory)) return [];
+  return data.inventory.resources
+    .filter((t) => t.kind === "table" && t.parent === scope.project && t.name?.split(".")[0] === scope.dataset)
+    .slice(0, 30)
+    .map((t) => `${t.name}${t.fields?.length ? ` (${t.fields.slice(0, 40).join(", ")})` : ""}`);
+}
+
+const readOnlyCapability = (p: Pick<PlaybookRow, "steps">, capability: string) => p.steps.filter((s) => s.capability === capability).every((s) => s.access !== "write");
 
 // Each capability a playbook needs, with the workspace's tools that can fill it.
 export async function playbookSlots(session: Session, p: PlaybookRow, tools?: WorkspaceTool[]): Promise<Slot[]> {
@@ -259,7 +303,25 @@ export async function playbookSlots(session: Session, p: PlaybookRow, tools?: Wo
     p.capabilities.map(async (capability) => {
       const info = capabilityInfo(capability)!;
       const options = mine.filter((t) => t.capabilities.includes(capability)).map(({ key, name, logo }) => ({ key, name, logo }));
-      return { capability, label: info.label, hint: info.hint, group: info.group, options, suggestions: options.length ? [] : await suggestionsFor(capability, connected) };
+      const readOnly = readOnlyCapability(p, capability);
+      const warehouses =
+        readOnly && capability !== "warehouse"
+          ? await Promise.all(mine.filter((t) => WAREHOUSE_QUERY_TOOLS[t.key] && !t.capabilities.includes(capability)).map(async ({ key, name, logo }) => ({ key, name, logo, datasets: await warehouseDatasets(session, key) })))
+          : [];
+      // A warehouse only looks things up through its guarded query, so it is never offered as
+      // a general tool.
+      const others = mine.filter((t) => !t.capabilities.includes(capability) && !WAREHOUSE_QUERY_TOOLS[t.key]).map(({ key, name, logo }) => ({ key, name, logo }));
+      return {
+        capability,
+        label: info.label,
+        hint: info.hint,
+        group: info.group,
+        options,
+        others,
+        suggestions: options.length ? [] : await suggestionsFor(capability, connected),
+        readOnly,
+        warehouses,
+      };
     }),
   );
 }
@@ -283,10 +345,12 @@ export type GalleryPlaybook = {
 export async function playbookGallery(session: Session): Promise<GalleryPlaybook[]> {
   const [rows, mine] = await Promise.all([listPlaybooks({ status: "published" }), workspaceTools(session)]);
   const covered = new Set(mine.flatMap((t) => t.capabilities));
+  // A connected data warehouse covers every kind of system a playbook only reads from.
+  const warehouse = mine.some((t) => WAREHOUSE_QUERY_TOOLS[t.key]);
   const industry = session.org.industry;
   return rows
     .map((p) => {
-      const capabilities = p.capabilities.map((c) => ({ key: c, label: capabilityInfo(c)!.label, covered: covered.has(c) }));
+      const capabilities = p.capabilities.map((c) => ({ key: c, label: capabilityInfo(c)!.label, covered: covered.has(c) || (warehouse && readOnlyCapability(p, c)) }));
       return {
         id: p.id,
         title: p.title,
@@ -304,7 +368,13 @@ export async function playbookGallery(session: Session): Promise<GalleryPlaybook
 }
 
 // The agent's actions for each step, from the tool the workspace connected for it.
-async function toolsForSteps(session: Session, p: PlaybookRow, bindings: Partial<Record<Capability, string>>): Promise<string[][]> {
+async function toolsForSteps(session: Session, p: PlaybookRow, bindings: Partial<Record<Capability, string>>, scoped: Set<string> = new Set()): Promise<string[][]> {
+  // Steps a data warehouse stands in for use its guarded query tool; AI picks the rest.
+  if (scoped.size) {
+    const rest = Object.fromEntries(Object.entries(bindings).filter(([c]) => !scoped.has(c))) as Partial<Record<Capability, string>>;
+    const chosen = Object.keys(rest).length ? await toolsForSteps(session, p, rest) : p.steps.map(() => [] as string[]);
+    return p.steps.map((s, i) => (s.capability && scoped.has(s.capability) ? [WAREHOUSE_QUERY_TOOLS[bindings[s.capability as Capability]!]!] : chosen[i]!));
+  }
   const bound = [...new Set(Object.values(bindings).filter((k): k is string => Boolean(k)))];
   const all = await availableTools(session, bound);
   const summary = (t: ToolDefinition) => ({ key: t.key, label: t.label, description: t.description, access: t.access, integration: t.integration });
@@ -323,7 +393,15 @@ export const playbookSensitive = (p: Pick<PlaybookRow, "title" | "summary" | "st
 export async function startFromPlaybook(
   session: Session,
   id: string,
-  input: { occurrencesPerMonth: number; minutesPerOccurrence: number | null; bindings: Record<string, string>; complianceOwner?: string; policy?: Record<string, string> },
+  input: {
+    occurrencesPerMonth: number;
+    minutesPerOccurrence: number | null;
+    bindings: Record<string, string>;
+    // The dataset chosen where a data warehouse stands in for a kind of system.
+    scopes?: Record<string, DataScopeChoice>;
+    complianceOwner?: string;
+    policy?: Record<string, string>;
+  },
 ): Promise<string> {
   const p = await getPlaybook(id, { publishedOnly: true });
   const minutes = input.minutesPerOccurrence ?? p.estimated_minutes_per_occurrence ?? null;
@@ -337,14 +415,31 @@ export async function startFromPlaybook(
   const mine = await workspaceTools(session);
   const byKey = new Map(mine.map((t) => [t.key, t]));
   const bindings: Partial<Record<Capability, string>> = {};
+  const scoped = new Set<string>();
+  let dataScope: (DataScopeChoice & { integration: string; tables: string[] }) | null = null;
   for (const c of p.capabilities) {
     const key = input.bindings[c];
-    const label = capabilityInfo(c)!.label.toLowerCase();
+    const name = capabilityInfo(c)!.label;
+    const label = /^[A-Z]{2,}$/.test(name) ? name : name.toLowerCase();
     if (!key) throw new HttpError(409, `Connect a ${label} tool first`);
     if (!byKey.has(key)) throw new HttpError(409, `That ${label} tool is not connected`);
+    const fits = byKey.get(key)!.capabilities.includes(c);
+    // Any other connected tool may fill it, when that is where the company keeps these records:
+    // AI picks its actions for the steps, and starting fails below if it has none that fit.
+    if (!fits && WAREHOUSE_QUERY_TOOLS[key]) {
+      // A data warehouse may stand in for a kind of system the playbook only reads from.
+      if (!readOnlyCapability(p, c)) throw new HttpError(409, `This playbook changes records in the ${label}, so it needs a ${label} tool; a data warehouse can only look things up`);
+      const scope = input.scopes?.[c];
+      const datasets = (await warehouseDatasets(session, key)) ?? [];
+      const known = scope && datasets.find((d) => d.project === scope.project && d.dataset === scope.dataset);
+      if (!known) throw new HttpError(409, `Pick the ${byKey.get(key)!.name} dataset that holds your ${label} records`);
+      if (dataScope && (dataScope.project !== known.project || dataScope.dataset !== known.dataset)) throw new HttpError(409, "Use one dataset for every step the data warehouse covers");
+      dataScope = { integration: key, project: known.project, dataset: known.dataset, location: known.location, tables: await datasetTables(session, key, known) };
+      scoped.add(c);
+    }
     bindings[c] = key;
   }
-  const stepTools = await toolsForSteps(session, p, bindings);
+  const stepTools = await toolsForSteps(session, p, bindings, scoped);
   const missing = p.steps.findIndex((s, i) => s.access !== "none" && !stepTools[i]!.length);
   if (missing >= 0) {
     const s = p.steps[missing]!;
@@ -431,7 +526,7 @@ export async function startFromPlaybook(
       rationale: `From the ready-made playbook "${p.title}".`,
       recommended_next_step: "Build and test the agent",
       playbook_id: p.id,
-      playbook_bindings: bindings as never,
+      playbook_bindings: (dataScope ? { ...bindings, dataScope } : bindings) as never,
       created_by: session.user.id,
     })
     .select("id")
@@ -455,7 +550,7 @@ function futureSteps(p: PlaybookRow, nameOf: (c: string | null) => string | unde
 }
 
 // The agent a playbook describes, with the actions chosen for the workspace's tools.
-export async function playbookAgentConfig(session: Session, p: PlaybookRow, tools: string[]): Promise<AgentConfig> {
+export async function playbookAgentConfig(session: Session, p: PlaybookRow, tools: string[], dataScope?: StoredDataScope | null): Promise<AgentConfig> {
   // Registers the Composio actions of the workspace's tools, so policy and the version snapshot see them.
   await Promise.all([registerWorkspaceTools(session.org.id), availableTools(session)]);
   const level = Math.min(4, Math.max(2, p.agent.autonomyLevel)) as AgentConfig["autonomyLevel"];
@@ -463,13 +558,37 @@ export async function playbookAgentConfig(session: Session, p: PlaybookRow, tool
     name: p.agent.name,
     description: p.agent.description,
     autonomyLevel: level,
-    instructions: p.agent.instructions,
+    instructions: dataScope ? withDataScope(p.agent.instructions, dataScope) : p.agent.instructions,
     trigger: { type: "manual" },
     tools,
-    policy: policyForTools(tools, level),
+    policy: {
+      ...policyForTools(tools, level),
+      dataScopes: dataScope ? [{ tool: WAREHOUSE_QUERY_TOOLS[dataScope.integration] ?? "warehouse.query", project: dataScope.project, dataset: dataScope.dataset, location: dataScope.location }] : [],
+    },
     successCriteria: p.agent.successCriteria,
     modelConfig: { modelClass: "AGENT_MODEL" },
   });
+}
+
+export type StoredDataScope = DataScopeChoice & { integration: string; tables: string[] };
+
+// The scope stored on an opportunity started from a playbook, if a warehouse stands in.
+export function storedDataScope(bindings: unknown): StoredDataScope | null {
+  const d = (bindings as { dataScope?: StoredDataScope } | null)?.dataScope;
+  return d && typeof d.project === "string" && typeof d.dataset === "string" && typeof d.integration === "string" ? { ...d, tables: Array.isArray(d.tables) ? d.tables : [] } : null;
+}
+
+// Where the agent finds the records a warehouse stands in for: the dataset, how to call the
+// query tool, and the tables with their columns.
+function withDataScope(instructions: AgentConfig["instructions"], d: StoredDataScope): AgentConfig["instructions"] {
+  const where = [
+    `Records this work needs (for example the customer) are in the data warehouse, dataset ${d.dataset} in project ${d.project}${d.location ? ` (location ${d.location})` : ""}.`,
+    `Look them up with warehouse.query: project_id "${d.project}", dataset "${d.dataset}"${d.location ? `, location "${d.location}"` : ""}, and one SELECT naming tables as ${d.dataset}.<table>. Only this dataset can be read, and nothing can be changed there.`,
+    d.tables.length ? `Tables: ${d.tables.join("; ")}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return { ...instructions, context: [instructions.context, where].filter(Boolean).join("\n\n") };
 }
 
 // Drafts an administrator has under way, and the ones that failed in the last hour.
