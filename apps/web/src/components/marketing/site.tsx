@@ -73,6 +73,7 @@ const FOOTER = [
       { href: "/#how-it-works", label: "How it works" },
       { href: "/#control", label: "Control" },
       { href: "/#pricing", label: "Pricing" },
+      { href: "/#faq", label: "FAQ" },
       { href: "/signup", label: "Start free" },
     ],
   },

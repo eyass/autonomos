@@ -1,5 +1,5 @@
 import { OG_IMAGES } from "@/components/marketing/config";
-import { ArrowRight, Check, ListChecks, Lock, OctagonX, ScrollText, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, Check, ListChecks, Plus, Lock, OctagonX, ScrollText, ShieldCheck, Wallet } from "lucide-react";
 import { TOOLS, ToolLogo, type ToolSlug } from "@/components/marketing/tools";
 import { WorkflowChains } from "@/components/marketing/workflows";
 import { DepartmentCards } from "@/components/marketing/solutions";
@@ -15,7 +15,7 @@ import { LevelMeter } from "@/components/brand/logo";
 import { ButtonLink } from "@/components/app/button-link";
 
 const title = "AutonomOS: find the recurring work, deploy constrained AI agents";
-const description = "AutonomOS finds the recurring work in your company, deploys constrained AI agents for it, and measures how autonomous you are becoming.";
+const description = "AutonomOS finds the recurring work in your company, deploys constrained AI agents for it, and shows how much of your work runs on agents.";
 
 export const metadata: Metadata = {
   title: { absolute: title },
@@ -414,6 +414,40 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="scroll-mt-16 border-b border-border">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: FAQ.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }) }} />
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[1fr_1.6fr] lg:gap-16">
+          <div>
+            <SectionHeading eyebrow="FAQ" title="Questions, answered">
+              Anything else? Write to us at{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-foreground underline-offset-4 hover:underline">
+                {CONTACT_EMAIL}
+              </a>
+              .
+            </SectionHeading>
+          </div>
+          <div className="divide-y divide-border border-y border-border">
+            {FAQ.map((f) => (
+              <details key={f.q} className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-left text-base font-medium hover:text-primary [&::-webkit-details-marker]:hidden">
+                  {f.q}
+                  <Plus size={18} aria-hidden className="shrink-0 text-muted-foreground transition-transform group-open:rotate-45" />
+                </summary>
+                <div className="-mt-1 pb-5 pr-8 text-sm leading-6 text-muted-foreground sm:text-[15px]">
+                  <p>{f.a}</p>
+                  {f.href ? (
+                    <Link href={f.href} className="mt-2 inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline">
+                      {f.link} <ArrowRight size={14} />
+                    </Link>
+                  ) : null}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="px-4 py-16 sm:px-6 sm:py-24">
         <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-ink px-6 py-14 text-center text-ink-foreground sm:px-12 sm:py-20">
@@ -437,6 +471,48 @@ export default function LandingPage() {
     </>
   );
 }
+
+const FREE = PLANS.design_partner;
+
+// Answers stay within what the security, privacy and docs pages already say.
+const FAQ = [
+  {
+    q: "Do I need engineers to set it up?",
+    a: `No. Add your website, connect your tools in a few clicks and pick an idea. Your first agent can run on sandbox data within one session.`,
+  },
+  {
+    q: "What is the difference between Draft, Approve and Auto?",
+    a: "In Draft the agent prepares the work and a person checks and sends it. In Approve the agent asks before each change. In Auto the agent acts on its own and hands you the exceptions. Every agent starts in the mode you pick, and AutonomOS recommends when it has earned the next one.",
+  },
+  {
+    q: "Can an agent do something I did not approve?",
+    a: "Every write is checked in code before it reaches a live system: the tool must be on the agent's allowlist, the emergency stop must be off and hard money limits always apply. Even in Auto, amounts above your approval limit, high-risk actions and low-confidence decisions wait for a person.",
+  },
+  {
+    q: "Can I try it without touching live accounts?",
+    a: "Yes. Every integration can run on sandbox data held in AutonomOS, with realistic customers, payments and refund history. Test runs simulate every write and are always free.",
+  },
+  {
+    q: "Where is my data stored, and who processes it?",
+    a: "Your data is stored in the region your workspace was set up in, the EU or the US. Text an agent works on is sent to an AI model provider to draft and decide, Gemini by default. The Security page lists every subprocessor.",
+    href: "/security",
+    link: "How security works",
+  },
+  {
+    q: "Is AutonomOS SOC 2 certified?",
+    a: "Not yet. Our controls are designed against the SOC 2 Trust Services Criteria, and an independent SOC 2 Type II audit is planned.",
+    href: "/security",
+    link: "See the controls",
+  },
+  {
+    q: "How does pricing work?",
+    a: `You pay for work done, not seats. The free plan includes ${FREE.activeAgents} live agent and ${num(FREE.runsPerMonth)} runs a month, with no card needed. Test runs are always free.`,
+  },
+  {
+    q: "Which tools does it work with?",
+    a: `${TOOL_COUNT} tools, including Gmail, Slack, HubSpot, Salesforce, Stripe, Zendesk and Shopify. Popular tools connect in one click.`,
+  },
+];
 
 function SectionHeading({
   eyebrow,
