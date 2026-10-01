@@ -40,7 +40,7 @@ test("demo loop", async ({ page }) => {
   await Promise.all([page.waitForResponse((r) => r.url().endsWith("/api/jobs") && r.status() === 200), page.getByRole("button", { name: "Read my website" }).click()]);
   await page.reload();
   await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");
-  await expect(page.getByLabel("Industry")).toHaveValue("Marketplace");
+  await expect(page.getByLabel("Industry")).toHaveValue("Marketplaces");
   await expect(page.getByLabel("Number of employees")).toHaveValue("20–49");
   await expect(page.getByLabel("Country")).toHaveValue("Netherlands");
   await expect(page.getByLabel("What does your company do?")).toHaveValue(/marketplace/i);

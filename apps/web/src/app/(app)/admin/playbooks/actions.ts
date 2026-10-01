@@ -26,6 +26,11 @@ const Edit = z.object({
   title: z.string().trim().min(1).max(160),
   summary: z.string().trim().max(1000),
   department: z.string().trim().min(1).max(60),
+  industries: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((v) => (Array.isArray(v) ? v : v ? [v] : []))
+    .pipe(z.array(z.string().max(60)).max(20)),
   trigger: z.string().trim().max(300),
   steps: z.array(Step).max(12),
   estimatedMinutes: z

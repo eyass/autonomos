@@ -43,18 +43,40 @@ export type Department = (typeof DEPARTMENTS)[number];
 export const EMPLOYEE_COUNTS = ["1–19", "20–49", "50–99", "100–249", "250–499", "500+"] as const;
 
 export const INDUSTRIES = [
-  "SaaS",
-  "Marketplace",
-  "E-commerce",
-  "Recruitment",
-  "Property services",
-  "Travel",
-  "Agency",
+  "SaaS & software",
+  "Marketplaces",
+  "E-commerce & D2C",
+  "Media & publishing",
+  "Agencies",
+  "Recruitment & staffing",
   "Online education",
+  "Travel & booking",
+  "Property & rentals",
+  "Fintech & insurance",
   "Professional services",
-  "Insurance intermediary",
   "Other",
 ] as const;
+export type Industry = (typeof INDUSTRIES)[number];
+
+// Industry names used before the list above (still in older workspaces and stored profiles).
+export const LEGACY_INDUSTRIES: Record<string, Industry> = {
+  SaaS: "SaaS & software",
+  Marketplace: "Marketplaces",
+  "E-commerce": "E-commerce & D2C",
+  Recruitment: "Recruitment & staffing",
+  "Property services": "Property & rentals",
+  Travel: "Travel & booking",
+  Agency: "Agencies",
+  "Insurance intermediary": "Fintech & insurance",
+};
+
+// A stored or typed industry as one of INDUSTRIES; anything unknown is Other, nothing is null.
+export function normalizeIndustry(value: string | null | undefined): Industry | null {
+  const v = (value ?? "").trim();
+  if (!v) return null;
+  if ((INDUSTRIES as readonly string[]).includes(v)) return v as Industry;
+  return LEGACY_INDUSTRIES[v] ?? "Other";
+}
 
 export const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "DKK", "NOK", "PLN", "CAD", "AUD"] as const;
 // AI models are priced in US dollars. To show AI spend next to value in the workspace's own

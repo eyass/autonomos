@@ -129,15 +129,16 @@ export async function suggestInterviewAnswers(input: {
 // ---------------------------------------------------------------------------
 
 const INDUSTRY_SIGNALS: Array<{ industry: CompanyProfile["industry"]; pattern: RegExp }> = [
-  { industry: "Marketplace", pattern: /marketplace|buyers and sellers|sellers and buyers|buy and sell|list your|independent sellers/ },
-  { industry: "Recruitment", pattern: /recruit|staffing|candidates|vacanc|talent acquisition/ },
-  { industry: "Travel", pattern: /\btravel|holiday|booking.*(hotel|flight)|tour operator/ },
-  { industry: "Property services", pattern: /real estate|property management|landlord|tenant|rental homes/ },
+  { industry: "Marketplaces", pattern: /marketplace|buyers and sellers|sellers and buyers|buy and sell|list your|independent sellers|classifieds/ },
+  { industry: "Recruitment & staffing", pattern: /recruit|staffing|candidates|vacanc|talent acquisition/ },
+  { industry: "Travel & booking", pattern: /\btravel|holiday|booking.*(hotel|flight)|tour operator/ },
+  { industry: "Property & rentals", pattern: /real estate|property management|landlord|tenant|rental homes/ },
   { industry: "Online education", pattern: /online course|e-?learning|students|learn online|academy/ },
-  { industry: "Insurance intermediary", pattern: /insurance|insurer|claims|broker/ },
-  { industry: "SaaS", pattern: /software|saas|platform for teams|free trial|\bapi\b|dashboard|integrations/ },
-  { industry: "E-commerce", pattern: /shop now|add to cart|free shipping|our store|order online|webshop/ },
-  { industry: "Agency", pattern: /agency|we help brands|campaigns for clients/ },
+  { industry: "Fintech & insurance", pattern: /insurance|insurer|claims|broker|fintech|payments? platform|lending|open banking/ },
+  { industry: "Media & publishing", pattern: /newsroom|publisher|magazine|newsletter|subscribers?|podcast|editorial|journalis/ },
+  { industry: "SaaS & software", pattern: /software|saas|platform for teams|free trial|\bapi\b|dashboard|integrations/ },
+  { industry: "E-commerce & D2C", pattern: /shop now|add to cart|free shipping|our store|order online|webshop/ },
+  { industry: "Agencies", pattern: /agency|we help brands|campaigns for clients/ },
   { industry: "Professional services", pattern: /consultan|accountan|law firm|advisory/ },
 ];
 
@@ -218,17 +219,17 @@ const COUNTRY_MONEY: Record<string, { currency: CompanyProfile["currency"]; hour
 };
 
 const LIKELY: Record<string, Array<[string, Department, string]>> = {
-  Marketplace: [
+  Marketplaces: [
     ["Refund request handling", "Customer Support", "Buyers pay through the platform and ask for refunds"],
     ["Support ticket response", "Customer Support", "Buyers and sellers contact support"],
     ["Review flagged listings", "Operations", "Listings from independent sellers need moderation"],
   ],
-  "E-commerce": [
+  "E-commerce & D2C": [
     ["Refund request handling", "Customer Support", "Customers pay online and return goods"],
     ["Support ticket response", "Customer Support", "Customers ask about orders and delivery"],
     ["Weekly sales reporting", "Operations", "Online sales are tracked weekly"],
   ],
-  SaaS: [
+  "SaaS & software": [
     ["Support ticket response", "Customer Support", "Customers ask product questions"],
     ["Inbound lead qualification", "Sales", "Trial and demo requests arrive through the website"],
     ["Weekly business reporting", "Operations", "Subscription revenue is reviewed weekly"],
@@ -275,7 +276,7 @@ export function mockProfile(w: WebsiteEvidence): CompanyProfile {
   const tools = new Set(w.detectedTools.map((t) => t.key));
   const areas: Department[] = [];
   if (tools.has("zendesk") || tools.has("intercom") || /support|help cent|customer service|klantenservice/.test(corpus)) areas.push("Customer Support");
-  if (industry === "Marketplace" || /listing|shipping|delivery|fulfil/.test(corpus)) areas.push("Operations");
+  if (industry === "Marketplaces" || /listing|shipping|delivery|fulfil/.test(corpus)) areas.push("Operations");
   if (tools.has("stripe") || /invoice|payment|refund|billing/.test(corpus)) areas.push("Finance");
   if (tools.has("hubspot") || tools.has("salesforce") || /book a demo|request a demo|contact sales/.test(corpus)) areas.push("Sales");
   if (!areas.length) areas.push("Operations");
@@ -293,7 +294,7 @@ export function mockProfile(w: WebsiteEvidence): CompanyProfile {
     currency: money.currency,
     hourlyCostEstimate: money.hourly,
     improvementAreas: [...new Set(areas)].slice(0, 4),
-    customers: industry === "Marketplace" ? "Buyers and independent sellers" : null,
+    customers: industry === "Marketplaces" ? "Buyers and independent sellers" : null,
     likelyProcesses: likely.map(([title, department, why]) => ({ title, department, description: why, evidence: why })),
     evidence,
     confidence: industry === "Other" ? 0.4 : 0.7,

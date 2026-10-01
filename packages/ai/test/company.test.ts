@@ -21,7 +21,7 @@ const site = (over: Partial<WebsiteEvidence> = {}): WebsiteEvidence => ({
 describe("mockProfile", () => {
   it("fills every field the onboarding form needs from website evidence", () => {
     const p = mockProfile(site());
-    expect(p).toMatchObject({ name: "Acme", industry: "Marketplace", employeeCount: "20–49", country: "Netherlands", currency: "EUR", hourlyCostEstimate: 45 });
+    expect(p).toMatchObject({ name: "Acme", industry: "Marketplaces", employeeCount: "20–49", country: "Netherlands", currency: "EUR", hourlyCostEstimate: 45 });
     expect(p.summary).toContain("used furniture");
     expect(p.improvementAreas).toEqual(expect.arrayContaining(["Customer Support", "Finance", "Operations"]));
     expect(p.likelyProcesses.map((l) => l.title)).toContain("Refund request handling");

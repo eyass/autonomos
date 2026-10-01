@@ -857,13 +857,13 @@ isOneToOne: false
                   ]
                 },"playbooks": {
                   Row: {
-                    "agent": NonNullable<Json>,"capabilities": (string)[],"created_at": string,"created_by": string | null,"department": string,"estimated_minutes_per_occurrence": number | null,"id": string,"slug": string,"status": string,"steps": NonNullable<Json>,"summary": string,"title": string,"tool_snapshots": NonNullable<Json>,"toolkits": (string)[],"trigger": string | null,"updated_at": string
+                    "agent": NonNullable<Json>,"capabilities": (string)[],"created_at": string,"created_by": string | null,"department": string,"estimated_minutes_per_occurrence": number | null,"id": string,"industries": (string)[],"slug": string,"status": string,"steps": NonNullable<Json>,"summary": string,"title": string,"tool_snapshots": NonNullable<Json>,"toolkits": (string)[],"trigger": string | null,"updated_at": string
                   }
                   Insert: {
-                    "agent"?: NonNullable<Json>,"capabilities"?: (string)[],"created_at"?: string,"created_by"?: string | null,"department"?: string,"estimated_minutes_per_occurrence"?: number | null,"id"?: string,"slug": string,"status"?: string,"steps"?: NonNullable<Json>,"summary"?: string,"title": string,"tool_snapshots"?: NonNullable<Json>,"toolkits"?: (string)[],"trigger"?: string | null,"updated_at"?: string
+                    "agent"?: NonNullable<Json>,"capabilities"?: (string)[],"created_at"?: string,"created_by"?: string | null,"department"?: string,"estimated_minutes_per_occurrence"?: number | null,"id"?: string,"industries"?: (string)[],"slug": string,"status"?: string,"steps"?: NonNullable<Json>,"summary"?: string,"title": string,"tool_snapshots"?: NonNullable<Json>,"toolkits"?: (string)[],"trigger"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "agent"?: NonNullable<Json>,"capabilities"?: (string)[],"created_at"?: string,"created_by"?: string | null,"department"?: string,"estimated_minutes_per_occurrence"?: number | null,"id"?: string,"slug"?: string,"status"?: string,"steps"?: NonNullable<Json>,"summary"?: string,"title"?: string,"tool_snapshots"?: NonNullable<Json>,"toolkits"?: (string)[],"trigger"?: string | null,"updated_at"?: string
+                    "agent"?: NonNullable<Json>,"capabilities"?: (string)[],"created_at"?: string,"created_by"?: string | null,"department"?: string,"estimated_minutes_per_occurrence"?: number | null,"id"?: string,"industries"?: (string)[],"slug"?: string,"status"?: string,"steps"?: NonNullable<Json>,"summary"?: string,"title"?: string,"tool_snapshots"?: NonNullable<Json>,"toolkits"?: (string)[],"trigger"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {

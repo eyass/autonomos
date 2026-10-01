@@ -9,7 +9,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "playbooks:sql": "tsx scripts/playbooks-sql.ts"
   },
   "dependencies": {
     "@autonomos/schemas": "workspace:*",

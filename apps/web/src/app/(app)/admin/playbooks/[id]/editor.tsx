@@ -19,6 +19,7 @@ type Initial = {
   title: string;
   summary: string;
   department: string;
+  industries: string[];
   trigger: string;
   steps: Step[];
   estimatedMinutes: string;
@@ -34,7 +35,19 @@ const LEVELS = [
   { value: 4, label: "4 · Acts on routine cases, asks on the rest" },
 ];
 
-export function PlaybookEditor({ id, initial, departments, capabilities }: { id: string; initial: Initial; departments: readonly string[]; capabilities: Array<{ key: string; label: string }> }) {
+export function PlaybookEditor({
+  id,
+  initial,
+  departments,
+  industries,
+  capabilities,
+}: {
+  id: string;
+  initial: Initial;
+  departments: readonly string[];
+  industries: readonly string[];
+  capabilities: Array<{ key: string; label: string }>;
+}) {
   const [pending, start] = useTransition();
   const [steps, setSteps] = useState<Step[]>(initial.steps);
   const router = useRouter();
@@ -48,12 +61,12 @@ export function PlaybookEditor({ id, initial, departments, capabilities }: { id:
     });
   const save = (form: FormData) =>
     start(async () => {
-      const r = await savePlaybookAction(id, { ...Object.fromEntries(form), steps });
+      const r = await savePlaybookAction(id, { ...Object.fromEntries(form), industries: form.getAll("industries"), steps });
       if (!r.ok) return void toast.error(r.error);
       toast.success("Saved");
       router.refresh();
     });
-  const field = (name: Exclude<keyof Initial, "steps">, label: string, hint?: string, rows?: number) => (
+  const field = (name: Exclude<keyof Initial, "steps" | "industries">, label: string, hint?: string, rows?: number) => (
     <div className="space-y-1.5">
       <Label htmlFor={`pb-${name}`}>{label}</Label>
       {rows ? <Textarea id={`pb-${name}`} name={name} defaultValue={String(initial[name])} rows={rows} /> : <Input id={`pb-${name}`} name={name} defaultValue={String(initial[name])} />}
@@ -79,6 +92,18 @@ export function PlaybookEditor({ id, initial, departments, capabilities }: { id:
             {field("estimatedMinutes", "Minutes each time", "What a person typically spends.")}
           </div>
           {field("trigger", "What starts it")}
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Industries</legend>
+            <p className="text-xs text-muted-foreground">New workspaces in these industries see it first. Leave all unticked for a playbook that suits anyone.</p>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {industries.map((i) => (
+                <label key={i} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="industries" value={i} defaultChecked={initial.industries.includes(i)} className="size-4 accent-[var(--primary)]" />
+                  {i}
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </Card>
         <Card className="gap-4 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
           <h2 className="text-sm font-semibold">The agent</h2>

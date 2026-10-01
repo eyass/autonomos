@@ -159,7 +159,7 @@ export async function seedDemoOrganization(db: DbClient, userId: string, options
     .insert({
       name: options.name ?? "Northwind Marketplace",
       is_demo: options.isDemo ?? false,
-      industry: "Marketplace",
+      industry: "Marketplaces",
       employee_count: "50–99",
       country: "Netherlands",
       description: "Online marketplace connecting buyers and independent sellers.",

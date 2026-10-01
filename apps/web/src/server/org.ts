@@ -1,5 +1,5 @@
 import "server-only";
-import { CURRENCIES, DEPARTMENTS } from "@autonomos/schemas";
+import { CURRENCIES, DEPARTMENTS, normalizeIndustry } from "@autonomos/schemas";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { activity, audit, track } from "@/lib/audit";
@@ -27,7 +27,7 @@ export async function createOrganization(input: z.infer<typeof CreateOrgSchema>)
   const { data, error } = await supabase.rpc("create_organization", {
     p_name: input.name,
     p_website: input.website,
-    p_industry: input.industry,
+    p_industry: normalizeIndustry(input.industry) ?? "",
     p_employee_count: input.employeeCount,
     p_country: input.country,
     p_description: input.description,
@@ -102,7 +102,7 @@ export async function updateCompany(session: Session, input: z.infer<typeof Comp
     .from("organizations")
     .update({
       name: input.name,
-      industry: input.industry || null,
+      industry: normalizeIndustry(input.industry),
       website: input.website || null,
       employee_count: input.employeeCount || null,
       default_hourly_cost: input.defaultHourlyCost,

@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { requireSession } from "@/lib/session";
 import { CAPABILITIES, capabilityInfo } from "@autonomos/integrations";
-import { DEPARTMENTS } from "@autonomos/schemas";
+import { DEPARTMENTS, INDUSTRIES } from "@autonomos/schemas";
 import { getPlaybook, isPlatformAdmin } from "@/server/playbooks";
 import { PlaybookEditor, PlaybookStatus } from "./editor";
 
@@ -32,11 +32,13 @@ export default async function EditPlaybookPage({ params }: { params: Promise<{ i
       <PlaybookEditor
         id={p.id}
         departments={DEPARTMENTS.filter((d) => d !== "Other")}
+        industries={INDUSTRIES}
         capabilities={CAPABILITIES.map((c) => ({ key: c.key, label: c.label }))}
         initial={{
           title: p.title,
           summary: p.summary,
           department: p.department,
+          industries: p.industries,
           trigger: p.trigger ?? "",
           steps: p.steps,
           estimatedMinutes: p.estimated_minutes_per_occurrence ? String(p.estimated_minutes_per_occurrence) : "",
