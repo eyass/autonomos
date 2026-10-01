@@ -247,8 +247,10 @@ export type Slot = {
   label: string;
   hint: string;
   group: string;
-  // Connected tools that fill it, most likely first.
+  // Connected tools of this kind, most likely first: the recommended choices.
   options: Array<{ key: string; name: string; logo: string | null }>;
+  // The workspace's other connected tools, for when those records live somewhere else.
+  others: Array<{ key: string; name: string; logo: string | null }>;
   suggestions: Suggestion[];
   // Every step of this kind only looks things up, so a data warehouse can stand in for it.
   readOnly: boolean;
@@ -304,14 +306,18 @@ export async function playbookSlots(session: Session, p: PlaybookRow, tools?: Wo
       const readOnly = readOnlyCapability(p, capability);
       const warehouses =
         readOnly && capability !== "warehouse"
-          ? await Promise.all(mine.filter((t) => WAREHOUSE_QUERY_TOOLS[t.key]).map(async ({ key, name, logo }) => ({ key, name, logo, datasets: await warehouseDatasets(session, key) })))
+          ? await Promise.all(mine.filter((t) => WAREHOUSE_QUERY_TOOLS[t.key] && !t.capabilities.includes(capability)).map(async ({ key, name, logo }) => ({ key, name, logo, datasets: await warehouseDatasets(session, key) })))
           : [];
+      // A warehouse only looks things up through its guarded query, so it is never offered as
+      // a general tool.
+      const others = mine.filter((t) => !t.capabilities.includes(capability) && !WAREHOUSE_QUERY_TOOLS[t.key]).map(({ key, name, logo }) => ({ key, name, logo }));
       return {
         capability,
         label: info.label,
         hint: info.hint,
         group: info.group,
         options,
+        others,
         suggestions: options.length ? [] : await suggestionsFor(capability, connected),
         readOnly,
         warehouses,
@@ -418,9 +424,10 @@ export async function startFromPlaybook(
     if (!key) throw new HttpError(409, `Connect a ${label} tool first`);
     if (!byKey.has(key)) throw new HttpError(409, `That ${label} tool is not connected`);
     const fits = byKey.get(key)!.capabilities.includes(c);
-    if (!fits) {
+    // Any other connected tool may fill it, when that is where the company keeps these records:
+    // AI picks its actions for the steps, and starting fails below if it has none that fit.
+    if (!fits && WAREHOUSE_QUERY_TOOLS[key]) {
       // A data warehouse may stand in for a kind of system the playbook only reads from.
-      if (!WAREHOUSE_QUERY_TOOLS[key]) throw new HttpError(409, `${byKey.get(key)!.name} is not a ${label} tool`);
       if (!readOnlyCapability(p, c)) throw new HttpError(409, `This playbook changes records in the ${label}, so it needs a ${label} tool; a data warehouse can only look things up`);
       const scope = input.scopes?.[c];
       const datasets = (await warehouseDatasets(session, key)) ?? [];

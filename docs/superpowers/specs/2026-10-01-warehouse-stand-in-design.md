@@ -1,8 +1,19 @@
-# Customer data from a data warehouse
+# Any tool for a playbook step, and data warehouses for lookups
 
 Date: 2026-10-01. Agreed in chat: if a company's customers live in BigQuery, a playbook should not require a CRM.
 
-## Rule
+## Any connected tool (revised)
+
+The kind of system a step names is a recommendation, not a requirement. Each slot lists:
+- **Recommended:** connected tools of that kind (the default);
+- **Data warehouse:** connected warehouses, on read-only slots, with a dataset to pick;
+- **Your other tools:** every other connected tool.
+
+It also offers "Connect a different tool", which opens the full directory and returns to the slot it was connected for (`?for=<capability>`).
+
+AI picks actions from whichever tool is chosen. Starting fails with "has no action to …" when the tool has none for a step. Warehouses are never offered as general tools: they only read, through the guarded query.
+
+## Warehouse rule
 
 A data warehouse can stand in for any system a playbook only **reads** from: every step of that capability has `access: "read"`. Where a capability has a write step (update a deal), only a real tool of that kind fits, and the page says why. Today 10 of the 14 published playbooks that use a CRM qualify.
 

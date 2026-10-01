@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     await completeOAuthConnection(session, integration, accountId);
-    return NextResponse.redirect(new URL(next ? `${next}?connected=${encodeURIComponent(integration)}` : `/integrations?connected=${integration}`, url.origin));
+    return NextResponse.redirect(new URL(next ? `${next}${next.includes("?") ? "&" : "?"}connected=${encodeURIComponent(integration)}` : `/integrations?connected=${integration}`, url.origin));
   } catch (e) {
     console.error(e);
     return NextResponse.redirect(new URL("/integrations?error=connection_failed", url.origin));

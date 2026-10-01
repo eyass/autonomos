@@ -23,6 +23,8 @@ type Slot = {
   hint: string;
   group: string;
   options: Tool[];
+  // Other connected tools, for when these records live somewhere else.
+  others: Tool[];
   suggestions: Array<Tool & { slug: string; sandbox: boolean }>;
   // Every step of this kind only looks things up, so a data warehouse can stand in.
   readOnly: boolean;
@@ -55,6 +57,7 @@ export function PlaybookSetup({
   policyFields,
   currency,
   connected,
+  connectedFor,
   warehouseNames,
 }: {
   id: string;
@@ -72,22 +75,31 @@ export function PlaybookSetup({
   currency: string;
   // The system just connected (back from its sign-in), to say what it now covers.
   connected?: { key: string; name: string } | null;
+  // The kind of system it was connected for, when connected from that step.
+  connectedFor?: string | null;
   // Connected data warehouses, to explain where one cannot stand in.
   warehouseNames: string[];
 }) {
-  // What the person picked; a slot they did not touch uses its first tool (also one connected just now).
-  // A tool of the right kind comes first; a warehouse is used when it is the only choice or picked.
+  // What the person picked. A slot they did not touch uses its first recommended tool; any other
+  // tool is used only once picked, or when it was connected for that slot just now.
   const [picked, setPicked] = useState<Record<string, string>>(() =>
-    Object.fromEntries(slots.flatMap((s) => (connected && s.warehouses.some((w) => w.key === connected.key) && !s.options.some((o) => o.key === connected.key) ? [[s.capability, connected.key]] : []))),
+    Object.fromEntries(
+      slots.flatMap((s) => {
+        if (!connected || s.options.some((o) => o.key === connected.key)) return [];
+        const fits = s.warehouses.some((w) => w.key === connected.key) || s.others.some((o) => o.key === connected.key);
+        return fits && (connectedFor === s.capability || (!connectedFor && s.warehouses.some((w) => w.key === connected.key))) ? [[s.capability, connected.key]] : [];
+      }),
+    ),
   );
   const [datasets, setDatasets] = useState<Record<string, string>>({});
-  const choices = (s: Slot) => [...s.options, ...s.warehouses];
+  const choices = (s: Slot) => [...s.options, ...s.warehouses, ...s.others];
   const bindings: Record<string, string> = Object.fromEntries(
     slots.flatMap((s) => {
-      const key = choices(s).find((o) => o.key === picked[s.capability])?.key ?? choices(s)[0]?.key;
+      const key = choices(s).find((o) => o.key === picked[s.capability])?.key ?? s.options[0]?.key;
       return key ? [[s.capability, key]] : [];
     }),
   );
+  const isOther = (s: Slot) => s.others.some((o) => o.key === bindings[s.capability]);
   const warehouseOf = (s: Slot) => s.warehouses.find((w) => w.key === bindings[s.capability] && !s.options.some((o) => o.key === w.key)) ?? null;
   const scopes = Object.fromEntries(
     slots.flatMap((s) => {
@@ -110,11 +122,12 @@ export function PlaybookSetup({
     if (!s) return null;
     const w = warehouseOf(s);
     if (w) return { ...w, name: `${w.name} · ${scopes[s.capability]?.dataset ?? "pick a dataset"}` };
-    return s.options.find((o) => o.key === bindings[s.capability]) ?? null;
+    return choices(s).find((o) => o.key === bindings[s.capability]) ?? null;
   };
   // A slot is unfilled without a tool, or with a warehouse but no dataset picked.
   const missing = slots.filter((s) => !bindings[s.capability] || (warehouseOf(s) && !scopes[s.capability]));
   const returnTo = `/playbooks/${id}`;
+  const returnFor = (s: Slot) => `${returnTo}?for=${s.capability}`;
 
   const sandbox = (key: string) => {
     setConnecting(key);
@@ -208,7 +221,7 @@ export function PlaybookSetup({
         </Card>
       </div>
       <aside className="space-y-4">
-        {connected ? <ConnectedNote connected={connected} slots={slots} /> : null}
+        {connected ? <ConnectedNote connected={connected} slots={slots} picked={slots.filter((s) => bindings[s.capability] === connected.key).map((s) => s.capability)} /> : null}
         <Card className="gap-4 px-4 py-4 sm:gap-4 sm:py-4" data-testid="playbook-tools">
           <div>
             <h2 className="text-sm font-semibold">Your tools</h2>
@@ -225,19 +238,40 @@ export function PlaybookSetup({
               </div>
               {choices(s).length ? (
                 <NativeSelect id={`bind-${s.capability}`} value={bindings[s.capability] ?? ""} onChange={(e) => setPicked((b) => ({ ...b, [s.capability]: e.target.value }))}>
-                  {s.options.map((o) => (
-                    <option key={o.key} value={o.key}>
-                      {o.name}
-                    </option>
-                  ))}
-                  {s.warehouses
-                    .filter((w) => !s.options.some((o) => o.key === w.key))
-                    .map((w) => (
-                      <option key={w.key} value={w.key}>
-                        {w.name} · data warehouse
-                      </option>
-                    ))}
+                  {s.options.length ? null : <option value="">Pick a tool</option>}
+                  {s.options.length ? (
+                    <optgroup label="Recommended">
+                      {s.options.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                  {s.warehouses.length ? (
+                    <optgroup label="Data warehouse">
+                      {s.warehouses.map((w) => (
+                        <option key={w.key} value={w.key}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                  {s.others.length ? (
+                    <optgroup label="Your other tools">
+                      {s.others.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
                 </NativeSelect>
+              ) : null}
+              {isOther(s) ? (
+                <p className="text-xs text-muted-foreground">
+                  Not a usual {lower(s.label)} tool. AI looks for actions in it that do these steps, and says so when you start if it has none.
+                </p>
               ) : null}
               {(() => {
                 const w = warehouseOf(s);
@@ -268,7 +302,11 @@ export function PlaybookSetup({
                   {warehouseNames.join(" and ")} cannot stand in here: this playbook changes {lower(s.label)} records, and a data warehouse can only look things up.
                 </p>
               ) : null}
-              {s.options.length ? null : canConnect ? (
+              {s.options.length ? (
+                canConnect && liveConnect ? (
+                  <AddSystems canManage variant="ghost" size="sm" label="Connect a different tool" returnTo={returnFor(s)} />
+                ) : null
+              ) : canConnect ? (
                 <div className="space-y-1.5">
                   {s.suggestions.map((t) => (
                     <div key={t.key} className="flex items-center gap-2 text-sm">
@@ -288,7 +326,7 @@ export function PlaybookSetup({
                       ) : null}
                     </div>
                   ))}
-                  {liveConnect ? <AddSystems canManage variant="ghost" size="sm" label={`Another ${lower(s.label)} tool`} initialGroup={s.group} returnTo={returnTo} /> : null}
+                  {liveConnect ? <AddSystems canManage variant="ghost" size="sm" label="Connect a different tool" initialGroup={s.group} returnTo={returnFor(s)} /> : null}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">Ask a workspace admin to connect a {lower(s.label)} tool.</p>
@@ -338,7 +376,7 @@ export function PlaybookSetup({
           <p className="text-xs text-muted-foreground">
             {missing.length
               ? missing
-                  .map((m) => (warehouseOf(m) ? `pick the dataset with your ${lower(m.label)} records` : `connect a ${lower(m.label)} tool`))
+                  .map((m) => (warehouseOf(m) ? `pick the dataset with your ${lower(m.label)} records` : choices(m).length ? `pick the tool with your ${lower(m.label)} records` : `connect a ${lower(m.label)} tool`))
                   .join(", and ")
                   .replace(/^./, (c) => c.toUpperCase()) + " first."
               : "AI picks the actions of your tools for each step. The agent is tested on them before it can go live."}
@@ -355,17 +393,18 @@ export function PlaybookSetup({
 
 // What the system just connected does for this playbook: the steps it now covers, the dataset
 // still to pick, or why it does not fit.
-function ConnectedNote({ connected, slots }: { connected: { key: string; name: string }; slots: Slot[] }) {
-  const covers = slots.filter((s) => s.options.some((o) => o.key === connected.key)).map((s) => lower(s.label));
+function ConnectedNote({ connected, slots, picked }: { connected: { key: string; name: string }; slots: Slot[]; picked: string[] }) {
+  // Recommended for a slot, or picked for one (connected from that step).
+  const covers = slots.filter((s) => s.options.some((o) => o.key === connected.key) || (picked.includes(s.capability) && s.others.some((o) => o.key === connected.key))).map((s) => lower(s.label));
   const standsIn = slots.filter((s) => s.warehouses.some((w) => w.key === connected.key) && !s.options.some((o) => o.key === connected.key)).map((s) => lower(s.label));
-  const needed = slots.filter((s) => !s.options.length).map((s) => lower(s.label));
+  const needed = slots.filter((s) => !s.options.length && !picked.includes(s.capability)).map((s) => lower(s.label));
   const text = covers.length
     ? `${connected.name} is connected and covers the ${covers.join(" and ")} steps.`
     : standsIn.length
       ? `${connected.name} is connected. Pick the dataset with your ${standsIn.join(" and ")} records to use it here.`
-      : `${connected.name} is connected, but this playbook has no step it fits.${needed.length ? ` It still needs a ${needed.join(" and a ")} tool.` : ""}`;
+      : `${connected.name} is connected. Pick it for a step under Your tools if that is where those records are.${needed.length ? ` This playbook still needs a ${needed.join(" and a ")} tool.` : ""}`;
   return (
-    <div role="status" className={`flex gap-2 rounded-xl border px-3 py-2.5 text-sm ${covers.length || standsIn.length ? "border-success/30 bg-success-soft text-success" : "border-warning/30 bg-warning-soft text-warning"}`}>
+    <div role="status" className={`flex gap-2 rounded-xl border px-3 py-2.5 text-sm ${covers.length || standsIn.length ? "border-success/30 bg-success-soft text-success" : "border-border bg-muted/50 text-foreground"}`}>
       <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{text}</span>
     </div>
