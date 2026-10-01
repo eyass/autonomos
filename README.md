@@ -91,6 +91,28 @@ Discover → "From your systems" reads a recent sample from every connected syst
 - **Output:** each proposal carries evidence ("5 of 15 tickets are about order status") and a volume estimate scaled from the sample. Accepted proposals become draft processes with a "Found in your systems" card and a "What an agent would do" card (`processes.proposed_automation`), which opportunity generation builds on.
 - **Interview:** the guided interview opens with what the systems showed for that department and asks about what the data cannot show.
 
+### Company knowledge
+
+Everything AutonomOS knows about how a company works, built up from every source it is given (Knowledge in the sidebar; a required onboarding step, "Teach AutonomOS about you").
+
+- **Sources:**
+  - the **whole website**, started automatically when onboarding knows it;
+  - the **help centre**, found on the site (help paths and subdomains, hosted Zendesk, Intercom, Freshdesk, HelpScout, GitBook and Notion help centres) or typed in;
+  - **files** (PDF, DOCX, TXT or MD, up to 10 MB; originals kept in the private `knowledge` bucket);
+  - **pasted text**;
+  - documents imported on Discover.
+- **Reading** (`packages/integrations/src/site-reader.ts`, `packages/db/src/knowledge.ts`, worker task `knowledge-ingest`):
+  - **Breadth first:** every level-1 page is read before anything deeper.
+  - **Ordering:** within a level, help, policy, pricing and about pages go first.
+  - **Never fetched:** log in, sign up, account, cart, checkout, search, tag and archive pages, assets, robots.txt disallows.
+  - **Sampled:** large repeated sections (`/listings/123`) are sampled at 10 pages.
+  - **Speed:** 8 requests at a time.
+  - **Caps:** 1,000 website pages and 2,000 help articles.
+  - **Resumable:** a read saves its place and resumes in the next round.
+- **Passages:** about 1,500 characters under their headings, emails, phone numbers and IBANs removed, embedded at 768 dimensions (Gemini `gemini-embedding-001`, or OpenAI `text-embedding-3-small`; a deterministic stand-in without keys).
+- **Search:** `match_knowledge` combines nearest-by-meaning and full-text matches (reciprocal rank fusion). Agents use it through `knowledge.search_documents`.
+- **Brief** (`organizations.company_brief`): summary, offering, customers, policies with their numbers, tone, terms, teams, systems and facts, each with its source. It is merged one source at a time and rebuilt when a source is removed. It goes into every AI task (`companyContext().knowledge`) and every agent prompt (`company_knowledge`, fenced as data).
+
 ### Autonomy score
 
 `Σ(process monthly minutes × coefficient) / Σ(process monthly minutes)` with L1 0, L2 0.2, L3 0.4, L4 0.75, L5 1. A process counts at the level of its best active agent.

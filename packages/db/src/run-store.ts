@@ -1,3 +1,4 @@
+import { briefText, searchKnowledge } from "./knowledge";
 import { isPaused } from "./services";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { emptyRunState, type ActionRecord, type ApprovalRecord, type RunContext, type RunState, type RunStore, type StepRecord } from "@autonomos/agents";
@@ -37,7 +38,7 @@ export class SupabaseRunStore implements RunStore {
       this.db.from("agent_versions").select("*").eq("organization_id", org).eq("id", run.agent_version_id).single(),
       this.db.from("agent_tools").select("tool_key, definition").eq("organization_id", org).eq("agent_version_id", run.agent_version_id),
       this.db.from("processes").select("id, title, description, department_id, estimated_minutes_per_occurrence").eq("organization_id", org).eq("id", run.process_id).single(),
-      this.db.from("organizations").select("id, name, description, industry, agents_paused, agents_paused_until").eq("id", org).single(),
+      this.db.from("organizations").select("id, name, description, industry, agents_paused, agents_paused_until, company_brief").eq("id", org).single(),
     ]);
     // Composio tools run with the definition stored on this version.
     registerSnapshots(must(tools, "load tools").map((t) => t.definition as unknown as ToolSnapshot | null));
@@ -82,7 +83,7 @@ export class SupabaseRunStore implements RunStore {
         departmentId: p.department_id,
         estimatedMinutesPerOccurrence: p.estimated_minutes_per_occurrence === null ? null : Number(p.estimated_minutes_per_occurrence),
       },
-      organization: { id: o.id, name: o.name, description: o.description, industry: o.industry, paused: isPaused(o) },
+      organization: { id: o.id, name: o.name, description: o.description, industry: o.industry, paused: isPaused(o), knowledge: briefText(o.company_brief, 2000) },
     };
   }
 
@@ -107,10 +108,13 @@ export class SupabaseRunStore implements RunStore {
     if (patch.humanMinutes !== undefined) update.human_minutes = patch.humanMinutes;
     if (patch.baselineMinutes !== undefined) update.baseline_minutes = patch.baselineMinutes;
     if (patch.estimatedMinutesSaved !== undefined) update.estimated_minutes_saved = patch.estimatedMinutesSaved;
+    // Every save is a sign of life the healer reads (see heal.ts).
+    update.heartbeat_at = new Date().toISOString();
     check(await this.db.from("agent_runs").update(update).eq("organization_id", ctx.run.organizationId).eq("id", ctx.run.id), "save run");
   }
 
   async appendStep(ctx: RunContext, sequence: number, step: StepRecord) {
+    void this.db.from("agent_runs").update({ heartbeat_at: new Date().toISOString() }).eq("id", ctx.run.id).then(() => undefined);
     // upsert on (run, sequence) keeps step writes idempotent across retries.
     check(
       await this.db.from("agent_run_steps").upsert(
@@ -367,9 +371,13 @@ export function sandboxStore(db: Client, organizationId: string): SandboxStore {
   };
 }
 
+// Company knowledge (passages by meaning and keyword); documents from before knowledge
+// existed are searched as before until they have been read into passages.
 export function knowledgeSearch(db: Client, organizationId: string): KnowledgeSearch {
   return {
     async search(query) {
+      const hits = await searchKnowledge(db, organizationId, query, 6);
+      if (hits.length) return hits.map((h) => ({ title: h.heading && h.heading !== h.title ? `${h.title}: ${h.heading}` : h.title, excerpt: h.excerpt, ...(h.url ? { url: h.url } : {}) }));
       const { data, error } = await db.from("documents").select("title, content").eq("organization_id", organizationId).textSearch("search", query, { type: "websearch", config: "english" }).limit(5);
       if (error) throw new Error(`knowledge search: ${error.message}`);
       return (data ?? []).map((d) => ({ title: d.title, excerpt: excerpt(d.content, query) }));

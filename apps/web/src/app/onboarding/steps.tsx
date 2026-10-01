@@ -4,13 +4,19 @@ import { Check } from "lucide-react";
 // Earlier steps link back, so people can correct their company info after moving on.
 const STEPS = [
   { label: "Your company", href: "/onboarding/about" },
+  { label: "Your knowledge", href: "/onboarding/knowledge" },
   { label: "Connect systems", href: "/onboarding/connect" },
   { label: "Map processes", href: "/onboarding/mapping" },
 ];
 
-export function Steps({ current }: { current: 0 | 1 | 2 }) {
+// Where an unfinished onboarding continues, from organizations.onboarding_step.
+export function onboardingPath(step: string): string {
+  return step === "connect" ? "/onboarding/connect" : step === "knowledge" ? "/onboarding/knowledge" : "/onboarding/about";
+}
+
+export function Steps({ current }: { current: 0 | 1 | 2 | 3 }) {
   return (
-    <ol className="mb-8 grid grid-cols-3 gap-2 text-xs sm:text-[13px]" aria-label="Setup steps">
+    <ol className="mb-8 grid grid-cols-4 gap-2 text-xs sm:text-[13px]" aria-label="Setup steps">
       {STEPS.map((s, i) => {
         const done = i < current;
         const label = (

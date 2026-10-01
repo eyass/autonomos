@@ -5,6 +5,7 @@ import { suggestedWebsite } from "@/server/company-profile";
 import { latestJob } from "@/server/jobs";
 import { Steps } from "../steps";
 import { CompanyForm } from "./form";
+import { onboardingPath } from "@/app/onboarding/steps";
 
 export const metadata = { title: "Your company" };
 
@@ -12,7 +13,7 @@ export default async function CompanyPage({ searchParams }: { searchParams: Prom
   const session = await getSession();
   // ?new=1 creates another workspace for someone who already has one.
   const adding = (await searchParams).new === "1";
-  if (session && !adding) redirect(session.org.onboardingCompletedAt ? "/" : session.org.onboardingStep === "connect" ? "/onboarding/connect" : "/onboarding/about");
+  if (session && !adding) redirect(session.org.onboardingCompletedAt ? "/" : onboardingPath(session.org.onboardingStep));
   const user = await getUser();
   const job = user ? await latestJob({ userId: user.id, organizationId: null, kind: "website_profile", includeDone: !adding }) : null;
   return (

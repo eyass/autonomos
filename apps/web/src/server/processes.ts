@@ -28,6 +28,7 @@ import { DEPARTMENTS, DiscoveredProcessSchema, normalizeIndustry, tidyTitle, typ
 import { z } from "zod";
 import { activity, audit, recordUsage, track } from "@/lib/audit";
 import { adminDb, HttpError, isAdmin, type Session } from "@/lib/session";
+import { addDocumentSource, knowledgeText } from "@/server/knowledge";
 
 export async function companyContext(session: Session): Promise<CompanyContext> {
   const { data } = await adminDb().from("integration_connections").select("integration_key, integrations(name)").eq("organization_id", session.org.id).eq("status", "connected");
@@ -37,6 +38,7 @@ export async function companyContext(session: Session): Promise<CompanyContext> 
     description: session.org.description,
     summary: session.org.companySummary,
     connectedSystems: (data ?? []).map((c) => (c.integrations as unknown as { name: string } | null)?.name ?? c.integration_key),
+    knowledge: await knowledgeText(session.org.id),
   };
 }
 
@@ -681,6 +683,7 @@ export async function importDocument(session: Session, input: z.infer<typeof Doc
     .select("id")
     .single();
   if (error || !doc) throw new Error(`document: ${error?.message}`);
+  await addDocumentSource(session, { documentId: doc.id, title: input.title, content, paste: input.source === "paste" }).catch((e) => console.error("document knowledge", e));
   await track(session, "process_discovery_started", { method: "document" });
   const processes = await extractProcessesFromDocument({ company: await companyContext(session), title: input.title, content, onUsage: usageSink(session) });
   const ids = await saveDiscoveredProcesses(session, processes, "document", { documentId: doc.id });

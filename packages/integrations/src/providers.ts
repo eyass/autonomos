@@ -1,6 +1,7 @@
 import { Composio } from "@composio/core";
 import { ToolError, classifyHttpStatus } from "./errors";
-import { authPlan } from "./directory";
+import { classifyFailure, isTransient, safeToRetryWrite, withRetry } from "./heal";
+import { authPlan, toolkitFor } from "./directory";
 import { getTool, type ToolDefinition } from "./tools";
 import { checkWarehouseSql, WAREHOUSE_ROW_LIMIT } from "./warehouse";
 
@@ -305,9 +306,38 @@ export function getComposio(): Composio {
   if (!process.env.COMPOSIO_API_KEY) throw new ToolError("not_connected", "COMPOSIO_API_KEY is not configured");
   if (!composioClient) {
     const toolkitVersions = { ...COMPOSIO_TOOLKIT_VERSIONS, ...(safeJson<Record<string, string>>(process.env.COMPOSIO_TOOLKIT_VERSIONS) ?? {}) };
-    composioClient = new Composio({ apiKey: process.env.COMPOSIO_API_KEY, toolkitVersions });
+    composioClient = guardToolkitVersions(new Composio({ apiKey: process.env.COMPOSIO_API_KEY, toolkitVersions }));
   }
   return composioClient;
+}
+
+type ExecuteBody = { version?: string; dangerouslySkipVersionCheck?: boolean } & Record<string, unknown>;
+
+// Composio refuses to run a tool by hand ("Toolkit version not specified") when no version is
+// passed and none is pinned for its toolkit. Every execution through this client gets a version:
+// the one passed, else the toolkit's pinned one, else the current one. The skip flag only applies
+// when the version would resolve to "latest", so pinned toolkits keep their pinned version.
+export function withToolkitVersion<B extends ExecuteBody>(body: B): B {
+  return body.version ? body : { ...body, dangerouslySkipVersionCheck: true };
+}
+
+function guardToolkitVersions(client: Composio): Composio {
+  const execute = client.tools.execute.bind(client.tools);
+  client.tools.execute = ((slug: string, body: ExecuteBody, ...rest: unknown[]) =>
+    (execute as (...a: unknown[]) => ReturnType<typeof execute>)(slug, withToolkitVersion(body ?? {}), ...rest)) as typeof client.tools.execute;
+  return client;
+}
+
+// Composio's catalogue reports this placeholder for tools listed before toolkits were versioned.
+export const LEGACY_TOOLKIT_VERSION = "00000000_00";
+
+// The version option for running a Composio action by hand, which Composio requires. Toolkits
+// pinned in the client run their pinned version. Others run the version the tool was listed
+// with (stored in the agent version's tool snapshot), or the current one when none was stored.
+export function composioVersionOption(toolkit: string, version?: string | null): { version: string } | { dangerouslySkipVersionCheck: true } | Record<string, never> {
+  const pinned = { ...COMPOSIO_TOOLKIT_VERSIONS, ...(safeJson<Record<string, string>>(process.env.COMPOSIO_TOOLKIT_VERSIONS) ?? {}) };
+  if (pinned[toolkit]) return {};
+  return version && version !== LEGACY_TOOLKIT_VERSION ? { version } : { dangerouslySkipVersionCheck: true };
 }
 
 async function runComposio(def: ToolDefinition, args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<unknown> {
@@ -316,13 +346,21 @@ async function runComposio(def: ToolDefinition, args: Record<string, unknown>, c
   if (!mapping) throw new ToolError("not_connected", `${def.key} cannot be connected to a live account yet`);
   if (!ctx.connection?.externalAccountId) throw new ToolError("not_connected", `${def.integration} has no connected account`);
   try {
-    const response = await getComposio().tools.execute(mapping.slug, {
-      userId: ctx.organizationId,
-      connectedAccountId: ctx.connection.externalAccountId,
-      arguments: stripUndefined(mapping.toArgs({ ...args, __idempotency_key: ctx.idempotencyKey })),
-    });
-    const r = response as { successful?: boolean; error?: string | null; data?: unknown };
-    if (r.successful === false) throw new ToolError("invalid_data", r.error ?? `${mapping.slug} failed`);
+    // Temporary failures are retried with backoff: any of them for a read, only a rate limit
+    // (refused before it ran) for an action that changes something, so nothing happens twice.
+    const r = await withRetry(
+      async () => {
+        const response = (await getComposio().tools.execute(mapping.slug, {
+          userId: ctx.organizationId,
+          connectedAccountId: ctx.connection!.externalAccountId!,
+          arguments: stripUndefined(mapping.toArgs({ ...args, __idempotency_key: ctx.idempotencyKey })),
+          ...composioVersionOption(toolkitFor(def.integration), def.version),
+        })) as { successful?: boolean; error?: string | null; data?: unknown };
+        if (response.successful === false) throw new ToolError(classifyFailure({ message: response.error }), response.error ?? `${mapping.slug} failed`);
+        return response;
+      },
+      { when: def.access === "read" ? isTransient : safeToRetryWrite },
+    );
     return mapping.fromResult ? mapping.fromResult(r.data, args) : r.data;
   } catch (error) {
     if (error instanceof ToolError) throw error;
@@ -437,4 +475,18 @@ function safeJson<T>(raw: string | undefined): T | null {
 
 function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
+
+// The live state of a connected account at Composio: ACTIVE, or EXPIRED, INACTIVE, FAILED when
+// the sign-in no longer works. null when Composio cannot be asked right now (try later).
+export async function connectedAccountStatus(externalAccountId: string): Promise<string | null> {
+  try {
+    const a = (await withRetry(() => getComposio().connectedAccounts.get(externalAccountId))) as unknown as { status?: string };
+    return a.status ?? null;
+  } catch (e) {
+    const name = (e as Error)?.name ?? "";
+    if (/NotFound/i.test(name) || /not found/i.test(String((e as Error)?.message))) return "DELETED";
+    console.error("connected account status unavailable", e);
+    return null;
+  }
 }

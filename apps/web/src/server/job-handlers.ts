@@ -1,8 +1,7 @@
 import "server-only";
-import { SAMPLE_TICKETS } from "@autonomos/integrations";
 import { z } from "zod";
 import { adminDb, HttpError, type Session } from "@/lib/session";
-import { createAgent, startTestRun, startTestRunWithSample } from "@/server/agents";
+import { createAgent, startRealTest } from "@/server/agents";
 import { analyseWebsite, refreshWebsiteProfile } from "@/server/company-profile";
 import { createSampleWorkspace } from "@/server/demo";
 import type { JobKind } from "@/server/jobs";
@@ -87,8 +86,15 @@ export const HANDLERS: Record<JobKind, (ctx: Context) => Promise<Result>> = {
     const { opportunity, config } = await defaultAgentConfig(session, opportunityId);
     if (!config.tools.length) throw new HttpError(409, "Connect the systems this agent needs first");
     agentId ??= await createAgent(session, { processId: opportunity.process_id, opportunityId: opportunity.id, config });
-    const runId = config.tools.includes("zendesk.read_ticket") ? await startTestRunWithSample(session, agentId, SAMPLE_TICKETS[0]!.key) : await startTestRun(session, agentId, {});
-    return { agentId, runId, href: `/activity/${runId}?built=1` };
+    // The first test runs on the workspace's newest record. When there is nothing to test on yet,
+    // the agent page says what is missing (a system to connect, a first record).
+    try {
+      const runId = await startRealTest(session, agentId);
+      return { agentId, runId, href: `/activity/${runId}?built=1` };
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 409) return { agentId, runId: null, href: `/agents/${agentId}?test=${encodeURIComponent(e.message)}#test` };
+      throw e;
+    }
   },
 
   // Switching to the new workspace needs the person's request (it sets a cookie), so the

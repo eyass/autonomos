@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { toolkitFor } from "./directory";
-import { composioConfigured, getComposio } from "./providers";
+import { composioConfigured, getComposio, LEGACY_TOOLKIT_VERSION } from "./providers";
 import { registerTool, type RiskTag, type ToolDefinition } from "./tools";
 
 // Every third-party system an agent works in goes through Composio. For the few systems with a
@@ -20,6 +20,8 @@ export type ToolSnapshot = {
   reversible: boolean;
   jsonSchema: Record<string, unknown>;
   amountField?: string;
+  // Toolkit version the tool was listed with; absent in snapshots stored before versions were kept.
+  version?: string;
 };
 
 type RawComposioTool = {
@@ -29,6 +31,7 @@ type RawComposioTool = {
   tags?: string[];
   inputParameters?: { properties?: Record<string, { type?: string }>; required?: string[] } & Record<string, unknown>;
   isDeprecated?: boolean;
+  version?: string;
 };
 
 // Risk from what the action does. Composio's own hints decide read or write and deletion; the
@@ -60,6 +63,7 @@ export function snapshotFromComposio(raw: RawComposioTool, integration: string):
     reversible: read || (!destructive && !riskTags.some((t) => t === "outbound_message" || t === "financial" || t === "contract")),
     jsonSchema: (raw.inputParameters ?? { type: "object", properties: {} }) as Record<string, unknown>,
     ...(amountField && !read ? { amountField } : {}),
+    ...(raw.version && raw.version !== LEGACY_TOOLKIT_VERSION ? { version: raw.version } : {}),
   };
 }
 
@@ -83,6 +87,7 @@ export function definitionFromSnapshot(s: ToolSnapshot): ToolDefinition {
     ...(s.amountField ? { amountField: s.amountField } : {}),
     source: "composio",
     jsonSchema: s.jsonSchema,
+    ...(s.version ? { version: s.version } : {}),
   };
 }
 
@@ -104,6 +109,7 @@ export function snapshotOf(def: ToolDefinition | undefined): ToolSnapshot | null
     reversible: def.reversible,
     jsonSchema: def.jsonSchema,
     ...(def.amountField ? { amountField: def.amountField } : {}),
+    ...(def.version ? { version: def.version } : {}),
   };
 }
 

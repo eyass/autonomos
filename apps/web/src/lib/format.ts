@@ -57,3 +57,27 @@ export const FREQUENCY_LABEL: Record<string, string> = {
   monthly: "Monthly",
   event_driven: "When it happens",
 };
+
+// A connected system's key as people read it: "google_drive" → "Google drive".
+export function systemName(key: string) {
+  const s = key.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// A run's error as people read it. Technical text from a connected system or the model is
+// translated by kind; anything already plain is kept.
+export function friendlyRunError(error: string, kind: string): string {
+  switch (kind) {
+    case "rate_limited":
+      return `A connected system asked AutonomOS to slow down, and the retries it made by itself did not get through. (${error.slice(0, 160)})`;
+    case "timeout":
+    case "network":
+    case "upstream_unavailable":
+      return `A connected system did not answer, also after AutonomOS retried by itself. It is usually back within minutes. (${error.slice(0, 160)})`;
+    case "not_connected":
+    case "permission_denied":
+      return `A connected system refused access: its sign-in may have expired or lacks a permission. Reconnect it on the Integrations page. (${error.slice(0, 160)})`;
+    default:
+      return error;
+  }
+}

@@ -1,3 +1,4 @@
+import { addKnowledge } from "./knowledge-step";
 import { expect, test } from "@playwright/test";
 
 // A site administrator drafts a tool-neutral playbook with AI, edits and publishes it; a
@@ -16,6 +17,7 @@ test("ready-made playbooks: studio to agent", async ({ page }) => {
   await page.getByRole("button", { name: "Read my website" }).click();
   await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");
   await page.getByRole("button", { name: "Create company" }).click();
+  await addKnowledge(page);
   const zendesk = page.getByTestId("integration-zendesk");
   await zendesk.getByRole("button", { name: "Connect" }).click();
   await zendesk.getByRole("button", { name: "Use sandbox data" }).click();

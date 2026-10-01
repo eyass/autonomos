@@ -19,6 +19,8 @@ export type CompanyContext = {
   description?: string | null;
   summary?: string | null;
   connectedSystems: string[];
+  // What the company's knowledge says about how it works (policies, tone, offering), compact.
+  knowledge?: string | null;
 };
 
 export type InterviewMessage = { role: "assistant" | "user"; content: string };

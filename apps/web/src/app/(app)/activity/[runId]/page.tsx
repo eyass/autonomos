@@ -1,5 +1,5 @@
 import { modeOf } from "@autonomos/schemas";
-import { getTool } from "@autonomos/integrations";
+import { classifyFailure, getTool } from "@autonomos/integrations";
 import { registerWorkspaceTools } from "@/server/tool-catalog";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { Activity, ChevronDown, CircleCheck, CircleDot, CircleSlash, Hand, Play, ShieldCheck, Sparkles, TriangleAlert, UserRound, Wrench, Zap, type LucideIcon } from "lucide-react";
@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
 import { OutcomeBadge, StatusBadge } from "@/components/domain";
-import { dateTime, hours, time, aiMoney } from "@/lib/format";
+import { dateTime, friendlyRunError, hours, time, aiMoney } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -143,10 +143,12 @@ export default async function RunPage({ params, searchParams }: { params: Promis
         </Alert>
       ) : null}
       {run.error ? (
-        <Alert variant="destructive" className="mb-4">
+        // "Retrying" only while the run can still retry; a settled run says what happened plainly.
+        <Alert variant={run.error_retryable && (run.status === "queued" || run.status === "running") ? "warning" : "destructive"} className="mb-4">
           <AlertDescription>
-            {run.error_retryable ? "Temporary error, retrying: " : "Error: "}
-            {run.error}
+            {run.error_retryable && (run.status === "queued" || run.status === "running")
+              ? `A temporary problem; AutonomOS is retrying by itself. ${run.error}`
+              : friendlyRunError(run.error, classifyFailure({ message: run.error }))}
           </AlertDescription>
         </Alert>
       ) : null}

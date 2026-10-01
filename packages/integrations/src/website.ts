@@ -206,7 +206,7 @@ async function readCapped(res: Response): Promise<string> {
   return new TextDecoder("utf-8", { fatal: false }).decode(Buffer.concat(chunks));
 }
 
-type FetchOpts = Required<Pick<CrawlOptions, "timeoutMs" | "allowPrivate">> & { fetchImpl: typeof fetch };
+type FetchOpts = Required<Pick<CrawlOptions, "timeoutMs" | "allowPrivate">> & { fetchImpl: typeof fetch; userAgent?: string };
 
 async function fetchResource(start: string, opts: FetchOpts, want: { accept: string; type: RegExp; label: string }) {
   let url = new URL(start);
@@ -215,7 +215,7 @@ async function fetchResource(start: string, opts: FetchOpts, want: { accept: str
     const res = await opts.fetchImpl(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(opts.timeoutMs),
-      headers: { "user-agent": USER_AGENT, accept: want.accept },
+      headers: { "user-agent": opts.userAgent ?? USER_AGENT, accept: want.accept },
     });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
@@ -236,6 +236,12 @@ const fetchHtml = (url: string, opts: FetchOpts) => fetchResource(url, opts, { a
 const fetchXml = (url: string, opts: FetchOpts) => fetchResource(url, opts, { accept: "application/xml,text/xml", type: /xml|text\/plain/i, label: "a sitemap" });
 const fetchScript = (url: string, opts: FetchOpts) =>
   fetchResource(url, opts, { accept: "application/javascript,text/javascript,*/*", type: /javascript|ecmascript|text\/plain|octet-stream/i, label: "a script" });
+
+// For other readers of public pages (the knowledge site reader): the same guards, redirects
+// and size cap, with their own user agent.
+export type PageFetchOptions = FetchOpts;
+export const fetchPage = fetchHtml;
+export const fetchPlain = (url: string, opts: FetchOpts) => fetchResource(url, opts, { accept: "text/plain,application/xml,text/xml", type: /text\/plain|xml/i, label: "a text file" });
 
 // The site's sitemap (from robots.txt or /sitemap.xml), one level of sitemap index deep.
 async function sitemapLinks(origin: string, opts: FetchOpts): Promise<Array<{ href: string; text: string }>> {

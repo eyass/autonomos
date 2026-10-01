@@ -21,6 +21,7 @@ function listChange(label: string, before: unknown, after: unknown, name: (s: st
 function triggerText(t: Json) {
   if (t.type === "schedule") return `schedule ${t.cron} (${t.timezone})`;
   if (t.type === "integration_event") return `event ${t.event}`;
+  if (t.type === "new_record") return `each new record in ${t.integration}`;
   return "manual";
 }
 

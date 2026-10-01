@@ -1,3 +1,4 @@
+import { addKnowledge } from "./knowledge-step";
 import { expect, test, type Page } from "@playwright/test";
 
 // The PRD section 128 demo, end to end: create company → connect → discover → review →
@@ -47,6 +48,7 @@ test("demo loop", async ({ page }) => {
   await expect(page.getByRole("checkbox", { name: "Customer Support" })).toBeChecked();
   await shot(page, "onboarding-company");
   await page.getByRole("button", { name: "Create company" }).click();
+  await addKnowledge(page);
 
   // Connect: the tools found on the website come first
   await expect(page.getByText("Found on your website")).toBeVisible();

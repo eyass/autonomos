@@ -17,6 +17,8 @@ export const maxDuration = 300;
 export default async function ConnectPage() {
   const session = await getSession();
   if (!session) redirect("/onboarding/company");
+  // The knowledge step comes first and is required.
+  if (!session.org.onboardingCompletedAt && session.org.onboardingStep === "knowledge") redirect("/onboarding/knowledge");
   const [categories, tools, detected, connected] = await Promise.all([
     browseCategories(session),
     browseTools(session, "popular"),
@@ -30,7 +32,7 @@ export default async function ConnectPage() {
   };
   return (
     <>
-      <Steps current={1} />
+      <Steps current={2} />
       <h1 className="mb-1 text-xl font-semibold">Connect systems</h1>
       <p className="mb-6 text-sm text-muted-foreground">Connect the tools you use. Nothing is required; agents only get the specific actions you allow later.</p>
       {/* Wider than the other onboarding steps: a category menu next to a grid of tools. */}

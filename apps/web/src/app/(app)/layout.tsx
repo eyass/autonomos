@@ -12,10 +12,11 @@ import { listWorkspaces, planUsage } from "@/server/platform";
 import { signOutAction, markNotificationsRead, switchWorkspaceAction } from "./shell-actions";
 import { Logo } from "@/components/brand/logo";
 import { isPlatformAdmin } from "@/server/playbooks";
+import { onboardingPath } from "@/app/onboarding/steps";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
-  if (!session.org.onboardingCompletedAt) redirect(session.org.onboardingStep === "connect" ? "/onboarding/connect" : "/onboarding/about");
+  if (!session.org.onboardingCompletedAt) redirect(onboardingPath(session.org.onboardingStep));
   const supabase = await createClient();
   const [{ count: pending }, { count: handoffs }, { data: notifications }, { data: connections }] = await Promise.all([
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id).eq("status", "pending"),

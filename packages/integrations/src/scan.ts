@@ -1,7 +1,8 @@
 import { ToolError } from "./errors";
+import { classifyFailure, withRetry } from "./heal";
 import { readOnlyTools, toolkitFor, type ToolMeta } from "./directory";
 import type { InventoryReader, SystemInventory } from "./inventory";
-import { getComposio, type ConnectionInfo, type SandboxRecord, type SandboxStore } from "./providers";
+import { composioVersionOption, getComposio, LEGACY_TOOLKIT_VERSION, type ConnectionInfo, type SandboxRecord, type SandboxStore } from "./providers";
 
 // Reads a recent sample of real data from a connected system so discovery can propose the
 // work it shows. Only what is needed to recognise recurring work is kept: subjects, short
@@ -276,26 +277,22 @@ async function scanSandbox(integration: string, s: SandboxStore, limit: ScanLimi
   return paymentsScan("sandbox", payments, refunds, limit, now);
 }
 
-const LEGACY_VERSION = "00000000_00";
-
-// Toolkits whose versions are pinned in the Composio client; others are read with the
-// version the tool catalogue reports (reads only, so a newer version is safe).
-const PINNED = new Set(["zendesk", "stripe", "slack", "gmail"]);
+const LEGACY_VERSION = LEGACY_TOOLKIT_VERSION;
 
 export async function exec(ctx: Pick<ScanContext, "organizationId" | "connection">, slug: string, args: Record<string, unknown>, version?: string | null): Promise<Record<string, unknown>> {
   if (!ctx.connection.externalAccountId) throw new ToolError("not_connected", "No connected account");
   const toolkit = toolkitFor(ctx.connection.integration);
-  const r = (await getComposio().tools.execute(slug, {
-    userId: ctx.organizationId,
-    connectedAccountId: ctx.connection.externalAccountId,
-    arguments: args,
-    ...(PINNED.has(toolkit) ? {} : version && version !== LEGACY_VERSION ? { version } : { dangerouslySkipVersionCheck: true }),
-  })) as {
-    successful?: boolean;
-    error?: string | null;
-    data?: unknown;
-  };
-  if (r.successful === false) throw new ToolError("invalid_data", r.error ?? `${slug} failed`);
+  // Reads only: any temporary failure is retried with backoff before it counts.
+  const r = await withRetry(async () => {
+    const res = (await getComposio().tools.execute(slug, {
+      userId: ctx.organizationId,
+      connectedAccountId: ctx.connection.externalAccountId!,
+      arguments: args,
+      ...composioVersionOption(toolkit, version),
+    })) as { successful?: boolean; error?: string | null; data?: unknown };
+    if (res.successful === false) throw new ToolError(classifyFailure({ message: res.error }), res.error ?? `${slug} failed`);
+    return res;
+  });
   let d = (r.data ?? {}) as Record<string, unknown>;
   // Composio sometimes wraps the upstream payload once more.
   if (d.response_data && typeof d.response_data === "object") d = d.response_data as Record<string, unknown>;
@@ -601,8 +598,9 @@ function curatedReads(toolkit: string, sinceIso: string, max: number): Read[] | 
     case "jira":
       return [{ slug: "JIRA_SEARCH_FOR_ISSUES_USING_JQL_GET", args: { jql: `created >= -${days}d ORDER BY created DESC`, max_results: max, fields: "summary,status,issuetype,created" } }];
     case "freshdesk":
-      // Freshdesk takes the timestamp without milliseconds.
-      return [{ slug: "FRESHDESK_GET_TICKETS", args: { per_page: Math.min(max, 100), created_since: sinceIso.replace(/\.\d{3}Z$/, "Z"), sort_by: "created_at", sort_order: "desc" } }];
+      // Newest first by default. Through Composio its sort and since parameters fail validation,
+      // so the lookback is applied to the returned dates instead.
+      return [{ slug: "FRESHDESK_GET_TICKETS", args: { per_page: Math.min(max, 100) } }];
     case "intercom":
       return [{ slug: "INTERCOM_LIST_CONVERSATIONS", args: { per_page: Math.min(max, 150) } }];
     case "googlesheets":

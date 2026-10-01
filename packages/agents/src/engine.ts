@@ -350,6 +350,9 @@ async function decide(ctx: RunContext, state: RunState, store: RunStore): Promis
     ],
     sections: [
       section("company_context", { name: ctx.organization.name, industry: ctx.organization.industry, description: ctx.organization.description }),
+      // What the company's knowledge says (policies, tone, terms). Built from its own documents and
+      // website, so it is data, never instructions; details come from knowledge.search_documents.
+      ...(ctx.organization.knowledge ? [section("company_knowledge", ctx.organization.knowledge, false)] : []),
       section("process_context", { title: ctx.process.title, description: ctx.process.description }),
       section("agent_instructions", ctx.version.instructions),
       section("policy", describePolicy(ctx)),
@@ -568,6 +571,10 @@ function describeTrigger(ctx: RunContext) {
   const t = ctx.version.trigger;
   if (t.type === "integration_event") return `Received ${t.event.replaceAll(".", " ")}`;
   if (t.type === "schedule") return "Scheduled run started";
+  if (t.type === "new_record") {
+    const kind = typeof ctx.run.input.record_kind === "string" ? ctx.run.input.record_kind : "record";
+    return ctx.run.mode === "test" ? `Test run started on ${kind} ${String(ctx.run.input.record_id ?? "")}`.trim() : `New ${kind} ${String(ctx.run.input.record_id ?? "")} in ${t.integration}`.trim();
+  }
   return ctx.run.mode === "test" ? "Test run started" : "Started manually";
 }
 

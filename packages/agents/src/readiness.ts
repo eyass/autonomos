@@ -62,7 +62,7 @@ export type ToolInfo = { key: string; access: "read" | "write"; integration: str
 
 // The agent must be able to see the work: at least one tool that reads a real system, and,
 // when a system's event starts it, a tool of that same system to read the record it is about.
-export function toolGate(tools: ToolInfo[], trigger: { type: string; event?: string }): { ok: boolean; detail: string } {
+export function toolGate(tools: ToolInfo[], trigger: { type: string; event?: string; integration?: string }): { ok: boolean; detail: string } {
   const reads = tools.filter((t) => t.access === "read" && t.integration !== "knowledge");
   if (!reads.length) return { ok: false, detail: "It has no tool that reads data, so it would work blind. Add a read tool for the system the work lives in." };
   if (trigger.type === "integration_event") {
@@ -70,6 +70,9 @@ export function toolGate(tools: ToolInfo[], trigger: { type: string; event?: str
     if (source && !tools.some((t) => t.integration === source)) {
       return { ok: false, detail: `It starts on a ${source} event but has no ${source} tool to read that record. Add one, or change the trigger.` };
     }
+  }
+  if (trigger.type === "new_record" && trigger.integration && !tools.some((t) => t.integration === trigger.integration)) {
+    return { ok: false, detail: `It starts on each new ${trigger.integration} record but has no ${trigger.integration} tool to read it. Add one, or change the trigger.` };
   }
   return { ok: true, detail: `Reads from ${[...new Set(reads.map((t) => t.integration))].join(", ")}.` };
 }
