@@ -45,9 +45,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return recordTitle("agents", (await params).id, "Agent");
 }
 
-export default async function AgentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+export default async function AgentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; test?: string }> }) {
   const { id } = await params;
-  const { created } = await searchParams;
+  const { created, test: testNotice } = await searchParams;
   const session = await requireSession();
   await registerWorkspaceTools(session.org.id);
   await reconcileStuckRuns(session.org.id);
@@ -111,19 +111,11 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
   // What a test will run into, said before it runs rather than discovered from an escalation.
   const readTools = config.tools.map((t) => getTool(t)).filter((d) => d?.access === "read" && d.integration !== "knowledge");
   const integrationsCheck = readiness.checks.find((c) => c.key === "integrations");
-  const testWarnings = [
-    ...(!ticketDriven && !readTools.length ? ["It has no tools that read data, so it only has what the input contains. With an empty input it hands the run to a person."] : []),
-    ...(integrationsCheck && !integrationsCheck.ok ? [integrationsCheck.detail] : []),
-  ];
-  const recordSource = ticketDriven ? null : recordSourceFor(config, new Set(connOf.keys()));
-  const sampleInput =
-    config.trigger.type === "new_record"
-      ? { source: config.trigger.integration, record_kind: "ticket", record_id: "123", ticket_id: "123", title: "Describe the record", record: { subject: "…", description: "…" } }
-      : config.trigger.type === "schedule"
-      ? { period: lastWeek(), note: "The run covers this period." }
-      : config.trigger.type === "integration_event"
-        ? { event: (config.trigger as { event: string }).event, data: { id: "sample-1", summary: "Describe the record the event is about" } }
-        : { request: `A typical request for ${agent.name}`, details: "Add the facts the agent needs, e.g. ids, amounts, dates" };
+  // Tests run on the workspace's own data; unconnected systems are the first step.
+  const connectFirst = integrationsCheck && !integrationsCheck.ok ? integrationsCheck.detail : null;
+  const testWarnings = !readTools.length && !ticketDriven ? ["It has no tools that read data, so it would work blind."] : [];
+  const sandboxTickets = ticketDriven && connOf.get("zendesk")?.provider === "sandbox";
+  const recordSource = recordSourceFor(config, new Set(connOf.keys()));
   const hasCompletedTest = (runs ?? []).some((r) => r.mode === "test" && r.status === "completed");
 
   return (
@@ -241,7 +233,17 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
               </CardContent>
             </Card>
           ) : null}
-          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} blockedReason={state.testBlockedReason} warnings={testWarnings} sampleInput={JSON.stringify(sampleInput, null, 2)} recordSource={recordSource} />
+          <TestPanel
+            agentId={id}
+            sandboxTickets={sandboxTickets}
+            samples={samples}
+            blockedReason={state.testBlockedReason}
+            connectFirst={connectFirst}
+            warnings={testWarnings}
+            recordSource={recordSource}
+            scheduled={config.trigger.type === "schedule"}
+            notice={testNotice ?? null}
+          />
           {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
           <Card id="autonomy">
             <CardHeader>
@@ -408,9 +410,3 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
   );
 }
 
-// The last seven days as dates, for a scheduled agent's sample test input.
-function lastWeek() {
-  const day = (d: Date) => d.toISOString().slice(0, 10);
-  const now = new Date();
-  return { from: day(new Date(now.getTime() - 7 * 86_400_000)), to: day(now) };
-}

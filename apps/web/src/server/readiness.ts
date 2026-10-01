@@ -147,8 +147,8 @@ export async function agentState(session: Session, agent: AgentForReadiness & { 
     live: others.length ? ["Needs attention", "Live, but something it depends on is missing."] : ["Live", "Everything this agent needs is in place."],
     paused: ["Paused", "Ready to go live again whenever you activate it."],
     blocked: ["Before going live", `${others.length} thing${others.length === 1 ? "" : "s"} to fix first.`],
-    needs_test: ["Test it next", "Activate unlocks once the latest test on this version passes on a sample record."],
-    ready: ["Ready to go live", "Its systems are connected, it can read the work, and its latest test passed on a sample record."],
+    needs_test: ["Test it next", "Activate unlocks once the latest test on this version passes on your own data."],
+    ready: ["Ready to go live", "Its systems are connected, it can read the work, and its latest test passed on your own data."],
   };
   const [title, description] = words[phase];
   return { phase, title, description, canActivate: agent.status !== "active" && failing.length === 0, testBlockedReason, readiness };

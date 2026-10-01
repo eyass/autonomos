@@ -224,15 +224,34 @@ export async function testRecordsFor(session: Session, agentId: string): Promise
   return { integration, records: read.records.map(({ id, kind, title, date }) => ({ id, kind, title, date })), unsupported: read.records.length ? undefined : read.unsupported };
 }
 
-// A test on one real record, with the same input the "new record" trigger gives a live run.
+// Every test runs on the workspace's own data. Systems the agent uses are connected first; a
+// record-driven agent tests on one of its system's latest records (the one picked, else the
+// newest), with the same input the "new record" trigger gives a live run; a scheduled agent tests
+// on the last seven days. A sandbox system holds no real data, so it gets a sample ticket.
 // Changes the agent would make are simulated, as in every test.
-export async function startTestRunWithRecord(session: Session, agentId: string, recordId: string) {
-  const { config } = await loadAgentConfig(session, agentId);
+export async function startRealTest(session: Session, agentId: string, recordId?: string | null) {
+  const { agent, version, config } = await loadAgentConfig(session, agentId);
+  const readiness = await agentReadiness(session, { id: agentId, versionId: version.id }, config, "test");
+  const unconnected = readiness.checks.find((c) => c.key === "integrations" && !c.ok);
+  if (unconnected) throw new HttpError(409, `${unconnected.detail} Tests always run on your own data, so this comes first.`);
+  if (config.trigger.type === "schedule") {
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    const now = new Date();
+    return startTestRun(session, agentId, { period: { from: day(new Date(now.getTime() - 7 * 86_400_000)), to: day(now) } }, { type: "schedule", test: true });
+  }
+  const db = adminDb();
   const integration = recordSourceFor(config, new Set(await connectedIntegrationKeys(session)));
-  if (!integration) throw new HttpError(409, "Connect the system this agent works in first");
-  const read = await recentRecordsFor(adminDb(), session.org.id, integration, 50);
-  const record = read.records.find((r) => r.id === recordId);
-  if (!record) throw new HttpError(404, "That record is no longer among the latest ones. Pick another.");
+  if (!integration) throw new HttpError(409, `${agent.name} has no tool that reads one of your systems, so there is no data to test on. Add a read tool first.`);
+  const { data: conn } = await db.from("integration_connections").select("provider").eq("organization_id", session.org.id).eq("integration_key", integration).eq("status", "connected").maybeSingle();
+  if (conn?.provider === "sandbox" && integration === "zendesk" && !recordId) return startTestRunWithSample(session, agentId, SAMPLE_TICKETS[0]!.key);
+  const read = await recentRecordsFor(db, session.org.id, integration, recordId ? 50 : 20);
+  const record = recordId ? read.records.find((r) => r.id === recordId) : read.records[0];
+  if (!record) {
+    throw new HttpError(
+      409,
+      recordId ? "That record is no longer among the latest ones. Pick another." : `No recent records came back from ${integration}${read.unsupported ? ` (${read.unsupported})` : ""}. Add one there, then test again.`,
+    );
+  }
   return startTestRun(session, agentId, recordInput(integration, record), { type: "new_record", integration, record_id: record.id, test: true });
 }
 
