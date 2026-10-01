@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./website": "./src/website.ts"
+    "./website": "./src/website.ts",
+    "./site-reader": "./src/site-reader.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

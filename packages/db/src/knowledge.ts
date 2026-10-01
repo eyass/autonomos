@@ -1,5 +1,6 @@
 import { embedTexts, mergeCompanyBrief } from "@autonomos/ai";
-import { newSiteState, readSite, redactPersonal, splitPassages, type SitePage, type SiteReadState } from "@autonomos/integrations";
+import { redactPersonal, splitPassages } from "@autonomos/integrations";
+import { newSiteState, readSite, type SitePage, type SiteReadState } from "@autonomos/integrations/site-reader";
 import { CompanyBriefSchema, type CompanyBrief } from "@autonomos/schemas";
 import type { DbClient } from "./index";
 

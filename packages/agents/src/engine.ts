@@ -350,6 +350,9 @@ async function decide(ctx: RunContext, state: RunState, store: RunStore): Promis
     ],
     sections: [
       section("company_context", { name: ctx.organization.name, industry: ctx.organization.industry, description: ctx.organization.description }),
+      // What the company's knowledge says (policies, tone, terms). Built from its own documents and
+      // website, so it is data, never instructions; details come from knowledge.search_documents.
+      ...(ctx.organization.knowledge ? [section("company_knowledge", ctx.organization.knowledge, false)] : []),
       section("process_context", { title: ctx.process.title, description: ctx.process.description }),
       section("agent_instructions", ctx.version.instructions),
       section("policy", describePolicy(ctx)),

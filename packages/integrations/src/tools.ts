@@ -165,8 +165,8 @@ export const TOOLS = [
   tool({
     key: "knowledge.search_documents",
     integration: "knowledge",
-    label: "Search company documents",
-    description: "Search the organisation's imported documents (SOPs, policies) for relevant passages.",
+    label: "Search company knowledge",
+    description: "Search the company's knowledge (its website, help centre, policies and documents) for the passages that answer a question, for example the refund window or how to reply to a complaint.",
     access: "read",
     riskTags: [],
     reversible: true,

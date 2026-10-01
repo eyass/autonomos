@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { parse, type HTMLElement } from "node-html-parser";
 import { isScriptRendered, sitemapUrls } from "./website-extras";
-import { fetchPage, fetchPlain, type PageFetchOptions } from "./website";
+import { fetchPage, fetchPlain, normalizeWebsite, type PageFetchOptions } from "./website";
+
+export { normalizeWebsite };
 
 // Reads a whole public website (or its help centre) into company knowledge.
 //
@@ -317,4 +319,18 @@ export async function readSite(state: SiteReadState, options: ReadSiteOptions): 
   state.hashes = [...hashes];
   state.done = state.queue.length === 0;
   return state;
+}
+
+// Every link on a site's home page, as absolute addresses (to find its help centre).
+export async function homeLinks(home: string, opts: Omit<PageFetchOptions, "userAgent">): Promise<string[]> {
+  const page = await fetchPage(home, { ...opts, userAgent: USER_AGENT });
+  return parse(page.html)
+    .querySelectorAll("a[href]")
+    .flatMap((a) => {
+      try {
+        return [new URL(a.getAttribute("href") ?? "", page.url).toString()];
+      } catch {
+        return [];
+      }
+    });
 }

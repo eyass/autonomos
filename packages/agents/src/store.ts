@@ -78,7 +78,8 @@ export type RunContext = {
     departmentId: string | null;
     estimatedMinutesPerOccurrence: number | null;
   };
-  organization: { id: string; name: string; description: string | null; industry: string | null; paused: boolean };
+  // knowledge: the company brief as compact text (policies, tone, terms), when there is one.
+  organization: { id: string; name: string; description: string | null; industry: string | null; paused: boolean; knowledge?: string | null };
 };
 
 export type StepRecord = {

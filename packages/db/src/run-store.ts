@@ -1,4 +1,4 @@
-import { searchKnowledge } from "./knowledge";
+import { briefText, searchKnowledge } from "./knowledge";
 import { isPaused } from "./services";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { emptyRunState, type ActionRecord, type ApprovalRecord, type RunContext, type RunState, type RunStore, type StepRecord } from "@autonomos/agents";
@@ -38,7 +38,7 @@ export class SupabaseRunStore implements RunStore {
       this.db.from("agent_versions").select("*").eq("organization_id", org).eq("id", run.agent_version_id).single(),
       this.db.from("agent_tools").select("tool_key, definition").eq("organization_id", org).eq("agent_version_id", run.agent_version_id),
       this.db.from("processes").select("id, title, description, department_id, estimated_minutes_per_occurrence").eq("organization_id", org).eq("id", run.process_id).single(),
-      this.db.from("organizations").select("id, name, description, industry, agents_paused, agents_paused_until").eq("id", org).single(),
+      this.db.from("organizations").select("id, name, description, industry, agents_paused, agents_paused_until, company_brief").eq("id", org).single(),
     ]);
     // Composio tools run with the definition stored on this version.
     registerSnapshots(must(tools, "load tools").map((t) => t.definition as unknown as ToolSnapshot | null));
@@ -83,7 +83,7 @@ export class SupabaseRunStore implements RunStore {
         departmentId: p.department_id,
         estimatedMinutesPerOccurrence: p.estimated_minutes_per_occurrence === null ? null : Number(p.estimated_minutes_per_occurrence),
       },
-      organization: { id: o.id, name: o.name, description: o.description, industry: o.industry, paused: isPaused(o) },
+      organization: { id: o.id, name: o.name, description: o.description, industry: o.industry, paused: isPaused(o), knowledge: briefText(o.company_brief, 2000) },
     };
   }
 
