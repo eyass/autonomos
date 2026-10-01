@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { runTitle } from "@/lib/titles";
 
 const STEP_TONE: Record<string, string> = {
   succeeded: "bg-success-soft text-success",
@@ -44,6 +45,10 @@ const STEP_KIND: Record<string, { label: string; icon: LucideIcon }> = {
   failed: { label: "Error", icon: TriangleAlert },
   cancelled: { label: "Cancelled", icon: CircleSlash },
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ runId: string }> }) {
+  return runTitle((await params).runId);
+}
 
 export default async function RunPage({ params, searchParams }: { params: Promise<{ runId: string }>; searchParams: Promise<{ built?: string }> }) {
   const { runId } = await params;
@@ -168,8 +173,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
           </CardHeader>
           <CardContent>
             <ol className="relative space-y-4 before:absolute before:top-3 before:bottom-3 before:left-[13px] before:w-px before:bg-border">
-              {(steps ?? []).map((s) => {
-                const decision = s.type === "decision" ? (s.output as { reasoningSummary?: string; confidence?: number; proposedTool?: string }) : null;
+              {timelineRows(steps ?? []).map(({ step: s, decision, title }) => {
                 const kind = STEP_KIND[s.type] ?? { label: s.type.replaceAll("_", " "), icon: CircleDot };
                 return (
                   <li key={s.id} className="relative flex gap-3">
@@ -184,10 +188,10 @@ export default async function RunPage({ params, searchParams }: { params: Promis
                     </span>
                     <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex flex-wrap items-baseline gap-2 text-sm">
-                      <span className="eyebrow text-[10px] text-muted-foreground">{kind.label}</span>
+                      <span className="eyebrow text-[11px] text-muted-foreground">{kind.label}</span>
                       <span className="tabular-nums text-xs text-muted-foreground">{time(s.created_at)}</span>
-                      <span className="min-w-0 font-medium break-words">{s.description}</span>
-                      {s.tool && (getTool(s.tool)?.label ?? s.tool) !== s.description ? <Badge variant="secondary">{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
+                      <span className="min-w-0 font-medium break-words">{title}</span>
+                      {s.tool && (getTool(s.tool)?.label ?? s.tool) !== title ? <Badge variant="secondary">{getTool(s.tool)?.label ?? s.tool}</Badge> : null}
                       {s.status === "simulated" ? <Badge variant="info">simulated</Badge> : null}
                     </div>
                     {s.type === "approval_requested" ? (
@@ -197,7 +201,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
                         ))}
                       </ul>
                     ) : null}
-                    {decision?.reasoningSummary && decision.reasoningSummary !== s.description ? (
+                    {decision?.reasoningSummary && decision.reasoningSummary !== title ? (
                       <p className="mt-1 text-sm text-muted-foreground">
                         {decision.reasoningSummary}
                         {decision.confidence !== undefined ? ` (confidence ${Math.round(decision.confidence * 100)}%)` : ""}
@@ -205,7 +209,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
                     ) : null}
                     {s.type !== "decision" && (s.input || s.output) ? (
                       <Collapsible className="mt-1 text-xs">
-                        <CollapsibleTrigger className="group inline-flex items-center gap-1 text-muted-foreground">
+                        <CollapsibleTrigger className="group -my-1 inline-flex min-h-7 items-center gap-1 text-muted-foreground hover:text-foreground">
                           Data
                           <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
                         </CollapsibleTrigger>
@@ -266,7 +270,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
               ) : null}
               {!interventions?.length && run.outcome !== "escalated" ? <p className="text-muted-foreground">None</p> : null}
               <Collapsible className="pt-2 text-xs">
-                <CollapsibleTrigger className="group inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                <CollapsibleTrigger className="group -my-1 inline-flex min-h-7 items-center gap-1 text-muted-foreground hover:text-foreground">
                   Run input
                   <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
                 </CollapsibleTrigger>
@@ -297,4 +301,25 @@ export default async function RunPage({ params, searchParams }: { params: Promis
 function isStuck(run: { status: string; queued_at: string; started_at: string | null }) {
   const idle = Date.now() - new Date(run.started_at ?? run.queued_at).getTime();
   return (run.status === "queued" && idle > 3 * 60_000) || (run.status === "running" && idle > 15 * 60_000);
+}
+
+// The agent decides, then acts: a decision followed straight away by the tool call, action or
+// approval it chose is shown as one row, titled with what the agent set out to do and carrying
+// its reasoning. Decisions that lead to nothing further (the final answer) keep their own row.
+type Decision = { reasoningSummary?: string; confidence?: number; proposedTool?: string };
+const ACTS = new Set(["tool", "action", "approval_requested"]);
+
+function timelineRows<S extends { type: string; description: string; output: unknown }>(steps: S[]) {
+  const rows: Array<{ step: S; decision: Decision | null; title: string }> = [];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const next = steps[i + 1];
+    if (s.type === "decision" && next && ACTS.has(next.type)) {
+      rows.push({ step: next, decision: s.output as Decision, title: s.description || next.description });
+      i++;
+      continue;
+    }
+    rows.push({ step: s, decision: s.type === "decision" ? (s.output as Decision) : null, title: s.description });
+  }
+  return rows;
 }

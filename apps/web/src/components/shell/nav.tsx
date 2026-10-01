@@ -62,7 +62,7 @@ function PlanUsage({ planName, runs, runsPerMonth, activeAgents, agentLimit, onN
       className="mx-2 mb-1 block rounded-xl border border-sidebar-border bg-card p-3 text-xs shadow-[0_1px_2px_rgb(18_24_22/0.04)] transition-colors hover:border-primary/30 group-data-[collapsible=icon]:hidden"
     >
       <span className="flex items-center justify-between gap-2">
-        <span className="eyebrow text-[10px] text-muted-foreground">{planName} plan</span>
+        <span className="eyebrow text-[11px] text-muted-foreground">{planName} plan</span>
         <span className="text-[11px] font-medium text-primary">Billing</span>
       </span>
       {rows.map((r) => {
@@ -120,7 +120,7 @@ export function AppSidebar({
   const router = useRouter();
   const group = (items: NavItem[], title?: string) => (
     <SidebarGroup>
-      {title ? <SidebarGroupLabel className="eyebrow text-[10px] text-muted-foreground/80">{title}</SidebarGroupLabel> : null}
+      {title ? <SidebarGroupLabel className="eyebrow text-[11px] text-muted-foreground/80">{title}</SidebarGroupLabel> : null}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {

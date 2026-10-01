@@ -18,10 +18,29 @@ const SITE_PATHS = [
   "/sitemap.xml",
   "/opengraph-image",
   "/apple-icon",
+  "/not-found",
 ];
 // Public, but they need Supabase to do anything useful.
 const AUTH_PATHS = ["/auth", "/api/webhooks", "/api/integrations/callback"];
 const LANDING = "/landing";
+// Signed-in areas. A signed-out visitor is sent to sign in only for these; any other unknown
+// address shows the public site's "not found" page instead of a login form.
+const APP_PATHS = [
+  "/approvals",
+  "/processes",
+  "/opportunities",
+  "/discover",
+  "/playbooks",
+  "/agents",
+  "/activity",
+  "/integrations",
+  "/settings",
+  "/workspaces",
+  "/admin",
+  "/onboarding",
+  "/api",
+];
+const NOT_FOUND = "/not-found";
 
 const matches = (path: string, list: string[]) => list.some((p) => path === p || path.startsWith(`${p}/`));
 
@@ -78,6 +97,7 @@ export async function proxy(request: NextRequest) {
   const isPublic = isSite || apiKey || matches(path, AUTH_PATHS);
   if (!user && !isPublic) {
     if (path.startsWith("/api/")) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+    if (!matches(path, APP_PATHS)) return NextResponse.rewrite(new URL(NOT_FOUND, request.url), { status: 404 });
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.searchParams.set("next", path);

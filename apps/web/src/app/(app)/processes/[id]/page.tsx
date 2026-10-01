@@ -21,8 +21,13 @@ import { LifecycleHelp } from "@/components/app/lifecycle-help";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { recordTitle } from "@/lib/titles";
 
 const SOURCE_LABEL = { interview: "AI interview", document: "Imported document", integration: "Connected systems", manual: "Added manually", website: "Drafted from your website" } as const;
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("processes", (await params).id, "Process");
+}
 
 export default async function ProcessPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; ideas?: string }> }) {
   const { id } = await params;

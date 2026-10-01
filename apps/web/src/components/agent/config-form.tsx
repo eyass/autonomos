@@ -111,7 +111,7 @@ export function AgentConfigForm({
               <span
                 aria-hidden
                 className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold",
+                  "flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold",
                   i < step ? "bg-primary text-primary-foreground" : i === step ? "bg-highlight text-white" : "border border-border bg-card",
                 )}
               >

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DOCS, type DocPage } from "./docs";
 import { PageIntro, Prose } from "./site";
+import { OnThisPage } from "./on-this-page";
 
 export function docMetadata(doc: DocPage): Metadata {
   const title = doc.slug ? `${doc.title} · Docs` : "Docs";
@@ -20,27 +21,32 @@ export function DocArticle({ doc }: { doc: DocPage }) {
   const next = DOCS[index + 1];
   const Body = doc.body;
   return (
-    <article>
-      <PageIntro eyebrow="Docs" title={doc.title}>
-        {doc.description}
-      </PageIntro>
-      <Prose>
-        <Body />
-      </Prose>
-      <nav aria-label="Pagination" className="mt-12 flex flex-col gap-3 border-t border-border pt-6 text-sm sm:flex-row sm:justify-between">
-        {prev ? (
-          <Link href={prev.href} className="text-muted-foreground hover:text-foreground">
-            Previous: {prev.title}
-          </Link>
-        ) : (
-          <span />
-        )}
-        {next ? (
-          <Link href={next.href} className="text-muted-foreground hover:text-foreground sm:text-right">
-            Next: {next.title}
-          </Link>
-        ) : null}
-      </nav>
-    </article>
+    <div className="grid gap-12 xl:grid-cols-[minmax(0,1fr)_12rem]">
+      <article className="min-w-0 max-w-3xl">
+        <PageIntro eyebrow="Docs" title={doc.title}>
+          {doc.description}
+        </PageIntro>
+        <Prose data-toc>
+          <Body />
+        </Prose>
+        <nav aria-label="Pagination" className="mt-12 grid gap-3 border-t border-border pt-6 text-sm sm:grid-cols-2">
+          {prev ? (
+            <Link href={prev.href} className="group rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-primary/40">
+              <span className="eyebrow text-muted-foreground">Previous</span>
+              <span className="mt-1 block font-medium group-hover:text-primary">{prev.title}</span>
+            </Link>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
+          {next ? (
+            <Link href={next.href} className="group rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-primary/40 sm:text-right">
+              <span className="eyebrow text-muted-foreground">Next</span>
+              <span className="mt-1 block font-medium group-hover:text-primary">{next.title}</span>
+            </Link>
+          ) : null}
+        </nav>
+      </article>
+      <OnThisPage key={doc.href} />
+    </div>
   );
 }

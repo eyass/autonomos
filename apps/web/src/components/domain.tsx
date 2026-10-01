@@ -17,7 +17,7 @@ export function AutonomyLadder({ current, target, size = "md" }: { current: numb
             title={`${l.code} ${l.name}: ${l.short}`}
             className={cn(
               "inline-flex items-center justify-center rounded font-semibold tabular-nums",
-              size === "sm" ? "h-5 w-6 text-[10px]" : "h-6 w-8 text-xs",
+              size === "sm" ? "h-5 w-6 text-[11px]" : "h-6 w-8 text-xs",
               isCurrent ? "text-white" : reached ? "bg-brand-soft text-brand-strong" : "bg-muted text-muted-foreground",
               isTarget && "ring-2 ring-primary ring-offset-1 ring-offset-surface text-primary bg-primary/10",
             )}

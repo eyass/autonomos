@@ -82,13 +82,13 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
       <CardContent className="space-y-3 text-sm">
         {a.reason ? (
           <div>
-            <div className="eyebrow text-[10px] text-muted-foreground">Why the agent wants to do this</div>
+            <div className="eyebrow text-[11px] text-muted-foreground">Why the agent wants to do this</div>
             <p className="mt-1">{a.reason}</p>
           </div>
         ) : null}
         {a.evidence.length ? (
           <div>
-            <div className="eyebrow text-[10px] text-muted-foreground">Based on</div>
+            <div className="eyebrow text-[11px] text-muted-foreground">Based on</div>
             <ul className="mt-1.5 space-y-1 rounded-lg border border-border bg-muted/40 p-2.5">
               {a.evidence.slice(0, 3).map((e, i) => (
                 <li key={i}>

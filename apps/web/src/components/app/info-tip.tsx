@@ -9,7 +9,7 @@ export function InfoTip({ label, children }: { label: string; children: ReactNod
   return (
     <Popover>
       <PopoverTrigger
-        className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="-m-0.5 inline-flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         aria-label={label}
       >
         <Info className="size-3.5" />
