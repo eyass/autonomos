@@ -1,3 +1,4 @@
+import { addKnowledge } from "./knowledge-step";
 import { expect, test } from "@playwright/test";
 
 // Sample workspace, workspace switching, approval limits and API keys.
@@ -14,6 +15,7 @@ test("sample workspace, approval limits and API keys", async ({ page, request })
   await page.getByRole("button", { name: "Read my website" }).click();
   await expect(page.getByLabel("Company name")).toHaveValue("Acme Furniture");
   await page.getByRole("button", { name: "Create company" }).click();
+  await addKnowledge(page);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Work" })).toBeVisible();
   await page.goto("/");

@@ -66,12 +66,16 @@ export const AboutSchema = z.object({
   areas: z.array(z.enum(DEPARTMENTS)).min(1, "Pick at least one area"),
 });
 
-export async function saveAbout(session: Session, input: z.infer<typeof AboutSchema>) {
+// Returns the step onboarding continues with: only ever forward, so going back to edit the
+// company info never repeats a step already done.
+export async function saveAbout(session: Session, input: z.infer<typeof AboutSchema>): Promise<string> {
   const db = adminDb();
-  await db.from("organizations").update({ company_summary: input.summary, improvement_areas: input.areas, onboarding_step: "knowledge" }).eq("id", session.org.id);
+  const next = session.org.onboardingStep === "about" ? "knowledge" : session.org.onboardingStep;
+  await db.from("organizations").update({ company_summary: input.summary, improvement_areas: input.areas, onboarding_step: next }).eq("id", session.org.id);
   for (const name of input.areas) {
     await db.from("departments").upsert({ organization_id: session.org.id, name }, { onConflict: "organization_id,name", ignoreDuplicates: true });
   }
+  return next;
 }
 
 export async function completeOnboarding(session: Session) {

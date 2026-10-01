@@ -166,7 +166,7 @@ function AddSources({ onAdded }: { onAdded: () => Promise<void> }) {
           >
             <Label htmlFor="knowledge-paste-title">Paste text</Label>
             <Input id="knowledge-paste-title" value={paste.title} onChange={(e) => setPaste((p) => ({ ...p, title: e.target.value }))} placeholder="Title, for example Refund policy" />
-            <Textarea aria-label="Text" value={paste.text} onChange={(e) => setPaste((p) => ({ ...p, text: e.target.value }))} rows={6} placeholder="Paste the text" />
+            <Textarea aria-label="Text to add" value={paste.text} onChange={(e) => setPaste((p) => ({ ...p, text: e.target.value }))} rows={6} placeholder="Paste the text" />
             <div className="flex gap-2">
               <Button type="submit" disabled={pending || paste.text.trim().length < 40}>
                 Add text

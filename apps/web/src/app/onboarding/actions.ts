@@ -4,6 +4,7 @@ import { runAction } from "@/lib/actions";
 import { requireSessionOrThrow } from "@/lib/session";
 import { saveWebsiteProfile, WebsiteAnalysisSchema } from "@/server/company-profile";
 import { AboutSchema, completeOnboarding, CreateOrgSchema, createOrganization, saveAbout } from "@/server/org";
+import { onboardingPath } from "./steps";
 
 export async function createCompanyAction(_: unknown, form: FormData) {
   const result = await runAction(async () => {
@@ -36,7 +37,7 @@ export async function createCompanyAction(_: unknown, form: FormData) {
 export async function saveAboutAction(_: unknown, form: FormData) {
   const result = await runAction(async () => saveAbout(await requireSessionOrThrow(), AboutSchema.parse({ summary: form.get("summary"), areas: form.getAll("areas") })));
   if (!result.ok) return result;
-  redirect("/onboarding/knowledge");
+  redirect(onboardingPath(result.data));
 }
 
 export async function finishKnowledgeAction() {
