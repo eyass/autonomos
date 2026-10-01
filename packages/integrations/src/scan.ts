@@ -597,8 +597,9 @@ function curatedReads(toolkit: string, sinceIso: string, max: number): Read[] | 
     case "jira":
       return [{ slug: "JIRA_SEARCH_FOR_ISSUES_USING_JQL_GET", args: { jql: `created >= -${days}d ORDER BY created DESC`, max_results: max, fields: "summary,status,issuetype,created" } }];
     case "freshdesk":
-      // Freshdesk takes the timestamp without milliseconds.
-      return [{ slug: "FRESHDESK_GET_TICKETS", args: { per_page: Math.min(max, 100), created_since: sinceIso.replace(/\.\d{3}Z$/, "Z"), sort_by: "created_at", sort_order: "desc" } }];
+      // Newest first by default. Through Composio its sort and since parameters fail validation,
+      // so the lookback is applied to the returned dates instead.
+      return [{ slug: "FRESHDESK_GET_TICKETS", args: { per_page: Math.min(max, 100) } }];
     case "intercom":
       return [{ slug: "INTERCOM_LIST_CONVERSATIONS", args: { per_page: Math.min(max, 150) } }];
     case "googlesheets":

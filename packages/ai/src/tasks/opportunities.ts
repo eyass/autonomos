@@ -81,6 +81,7 @@ export async function generateAgentDraft(input: {
       "Write instructions as operating procedure: objective, business context, must-follow rules, expected steps, when to escalate, how completion is determined.",
       "Escalation conditions must include missing data, ambiguous policy and suspected fraud where relevant.",
       'Use plain business language, not agent jargon. Name the agent after the work it does, for example "Refund handling", never with words like Agent, Bot, Ops or AI.',
+      'Choose the trigger by how the work arrives. When each piece of work starts from one new item in a connected system (a ticket, an email, a lead, an order), use { "type": "new_record", "integration": <the integration of the tool that reads that item> }, so every new item gets its own run. Use a schedule only for periodic work such as reports and reviews. Use manual when a person starts it.',
     ],
     sections: [section("company_context", input.company), section("process", input.process), section("opportunity", input.opportunity), section("available_tools", input.availableTools)],
     task: "Draft the agent configuration for this opportunity.",
@@ -88,7 +89,11 @@ export async function generateAgentDraft(input: {
     onUsage: input.onUsage,
   });
   const allowed = new Set(input.availableTools.map((t) => t.key));
-  return { ...object, suggestedTools: object.suggestedTools.filter((t) => allowed.has(t)) };
+  const suggestedTools = object.suggestedTools.filter((t) => allowed.has(t));
+  // A new-record trigger must watch a system the agent can read; otherwise a person starts it.
+  const t = object.suggestedTrigger;
+  const watched = t.type === "new_record" && input.availableTools.some((x) => x.integration === t.integration && suggestedTools.includes(x.key));
+  return { ...object, suggestedTools, suggestedTrigger: t.type === "new_record" && !watched ? { type: "manual" } : t };
 }
 
 // ---------------------------------------------------------------------------

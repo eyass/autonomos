@@ -1,7 +1,7 @@
 import "server-only";
 import { applyGuardrails, guardrailsFor, policyForTools } from "@autonomos/agents";
-import { createRun, RunNotAllowedError } from "@autonomos/db";
-import { buildSandboxTicket, getTool, registerSnapshots, SAMPLE_TICKETS, snapshotOf, type ToolSnapshot } from "@autonomos/integrations";
+import { createRun, recentRecordsFor, RunNotAllowedError } from "@autonomos/db";
+import { buildSandboxTicket, getTool, recordInput, registerSnapshots, SAMPLE_TICKETS, snapshotOf, type ToolSnapshot } from "@autonomos/integrations";
 import { AgentConfigSchema, modeOf, PolicyConfigSchema, type AgentConfig, type PolicyConfig } from "@autonomos/schemas";
 import { deactivateAgentSchedule, TriggerNotConfiguredError, upsertAgentSchedule } from "@autonomos/workflows";
 import { sandboxStore } from "@autonomos/db";
@@ -182,12 +182,12 @@ async function syncSchedule(session: Session, agentId: string, config: AgentConf
   }
 }
 
-export async function startTestRun(session: Session, agentId: string, input: Record<string, unknown>) {
+export async function startTestRun(session: Session, agentId: string, input: Record<string, unknown>, trigger: Record<string, unknown> = { type: "manual", test: true }) {
   const db = adminDb();
   const { agent } = await loadAgentConfig(session, agentId);
   if (agent.status === "draft") await db.from("agents").update({ status: "testing" }).eq("organization_id", session.org.id).eq("id", agentId);
   try {
-    const { runId } = await createRun(db, { organizationId: session.org.id, agentId, mode: "test", trigger: { type: "manual", test: true }, input, startedBy: session.user.id });
+    const { runId } = await createRun(db, { organizationId: session.org.id, agentId, mode: "test", trigger, input, startedBy: session.user.id });
     // A test that cannot start is recorded as failed, so it shows on its run page and in Activity.
     await enqueueOrFail(session.org.id, runId);
     await track(session, "agent_test_started", { agent_id: agentId, run_id: runId });
@@ -204,6 +204,36 @@ export async function startTestRunWithSample(session: Session, agentId: string, 
   const ticket = buildSandboxTicket(sample);
   await sandboxStore(adminDb(), session.org.id).put("zendesk", "ticket", { ...ticket, test: true });
   return startTestRun(session, agentId, { ticket_id: ticket.id });
+}
+
+// The system a test can take a real record from: the one a "new record" trigger watches, else
+// the first connected system the agent's tools read.
+export function recordSourceFor(config: AgentConfig, connected: Set<string>): string | null {
+  if (config.trigger.type === "new_record") return config.trigger.integration;
+  const reads = config.tools.map((t) => getTool(t)).filter((d) => d?.access === "read" && d.integration !== "knowledge" && connected.has(d.integration));
+  return reads[0]?.integration ?? null;
+}
+
+export type TestRecords = { integration: string | null; records: Array<{ id: string; kind: string; title: string; date: string | null }>; unsupported?: string };
+
+export async function testRecordsFor(session: Session, agentId: string): Promise<TestRecords> {
+  const { config } = await loadAgentConfig(session, agentId);
+  const integration = recordSourceFor(config, new Set(await connectedIntegrationKeys(session)));
+  if (!integration) return { integration: null, records: [], unsupported: "None of its systems is connected, so there are no records to pick." };
+  const read = await recentRecordsFor(adminDb(), session.org.id, integration, 20);
+  return { integration, records: read.records.map(({ id, kind, title, date }) => ({ id, kind, title, date })), unsupported: read.records.length ? undefined : read.unsupported };
+}
+
+// A test on one real record, with the same input the "new record" trigger gives a live run.
+// Changes the agent would make are simulated, as in every test.
+export async function startTestRunWithRecord(session: Session, agentId: string, recordId: string) {
+  const { config } = await loadAgentConfig(session, agentId);
+  const integration = recordSourceFor(config, new Set(await connectedIntegrationKeys(session)));
+  if (!integration) throw new HttpError(409, "Connect the system this agent works in first");
+  const read = await recentRecordsFor(adminDb(), session.org.id, integration, 50);
+  const record = read.records.find((r) => r.id === recordId);
+  if (!record) throw new HttpError(404, "That record is no longer among the latest ones. Pick another.");
+  return startTestRun(session, agentId, recordInput(integration, record), { type: "new_record", integration, record_id: record.id, test: true });
 }
 
 export async function startProductionRun(session: Session, agentId: string, input: Record<string, unknown>) {

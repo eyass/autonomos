@@ -1,8 +1,9 @@
 "use client";
 import { AUTONOMY_LEVELS } from "@autonomos/schemas";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { changeAutonomyAction, runNowAction, simulateTicketAction, testRunAction, testRunSampleAction } from "../actions";
+import { useEffect, useState, useTransition } from "react";
+import { changeAutonomyAction, runNowAction, simulateTicketAction, testRecordsAction, testRunAction, testRunRecordAction, testRunSampleAction } from "../actions";
+import { relative, systemName } from "@/lib/format";
 import { FormField } from "@/components/app/form-field";
 import { checkTestInput } from "@/lib/test-input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +23,7 @@ export function TestPanel({
   blockedReason,
   warnings = [],
   sampleInput = "{}",
+  recordSource = null,
 }: {
   agentId: string;
   ticketDriven: boolean;
@@ -29,15 +31,30 @@ export function TestPanel({
   blockedReason?: string | null;
   warnings?: string[];
   sampleInput?: string;
+  // The connected system a test can take a real record from, if any.
+  recordSource?: string | null;
 }) {
   const [sample, setSample] = useState(samples[0]?.key ?? "");
   const [json, setJson] = useState("{}");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [acknowledged, setAcknowledged] = useState(false);
-  const check = ticketDriven ? null : checkTestInput(json);
+  const [mode, setMode] = useState<"record" | "json">(recordSource && !ticketDriven ? "record" : "json");
+  const [records, setRecords] = useState<{ items: Array<{ id: string; kind: string; title: string; date: string | null }>; note?: string } | null>(null);
+  const [record, setRecord] = useState("");
+  useEffect(() => {
+    if (mode !== "record" || records) return;
+    testRecordsAction(agentId).then((r) => {
+      if (!r.ok) return setRecords({ items: [], note: r.error });
+      setRecords({ items: r.data.records, note: r.data.unsupported });
+      setRecord(r.data.records[0]?.id ?? "");
+    });
+  }, [mode, records, agentId]);
+  const useRecord = mode === "record" && !ticketDriven;
+  const check = ticketDriven || useRecord ? null : checkTestInput(json);
   const errors = check?.errors ?? [];
-  const preflight = [...warnings, ...(check?.warnings ?? [])];
+  const preflight = useRecord ? warnings.filter((w) => !/empty input/.test(w)) : [...warnings, ...(check?.warnings ?? [])];
+  const kind = records?.items[0]?.kind ?? "record";
   // Running despite a warning is a decision, so it is asked for, not implied by a button label.
   const needsAck = preflight.length > 0;
   const run = () =>
@@ -47,7 +64,10 @@ export function TestPanel({
       if (needsAck && !acknowledged) return setError('Tick "Run the test with these warnings" to run it anyway, or fix them first.');
       let r;
       if (ticketDriven) r = await testRunSampleAction(agentId, sample);
-      else {
+      else if (useRecord) {
+        if (!record) return setError(`Pick a ${kind} to test on.`);
+        r = await testRunRecordAction(agentId, record);
+      } else {
         if (!check?.value) return setError(errors.join(" "));
         r = await testRunAction(agentId, check.value, acknowledged);
       }
@@ -70,8 +90,35 @@ export function TestPanel({
               ))}
             </NativeSelect>
           </FormField>
+        ) : useRecord ? (
+          <div>
+            <FormField label={`Test on a recent ${kind} from ${systemName(recordSource ?? "")}`}>
+              {records === null ? (
+                <p className="text-sm text-muted-foreground">Loading the latest {systemName(recordSource ?? "")} records…</p>
+              ) : records.items.length ? (
+                <NativeSelect value={record} onChange={(e) => setRecord(e.target.value)} aria-label={`Recent ${kind}`}>
+                  {records.items.map((r) => (
+                    <NativeSelectOption key={r.id} value={r.id}>
+                      {`#${r.id} · ${r.title}${r.date ? ` · ${relative(r.date)}` : ""}`}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              ) : (
+                <p className="text-sm text-muted-foreground">{records.note ?? "No recent records came back."} You can write the input yourself.</p>
+              )}
+            </FormField>
+            <p className="mt-1 text-xs text-muted-foreground">The agent gets this {kind} exactly as a live run would. Changes it would make are simulated.</p>
+            <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => setMode("json")}>
+              Write the input yourself
+            </Button>
+          </div>
         ) : (
           <div>
+            {recordSource ? (
+              <Button type="button" variant="link" size="sm" className="mb-1 h-auto px-0 text-xs" onClick={() => setMode("record")}>
+                Test on a recent record from {systemName(recordSource)} instead
+              </Button>
+            ) : null}
             <FormField label="Input (JSON)">
               <Textarea
                 value={json}

@@ -1004,6 +1004,28 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"agent_record_watches": {
+                  Row: {
+                    "agent_id": string,"checked_at": string | null,"integration": string,"last_error": string | null,"organization_id": string,"started_at": string
+                  }
+                  Insert: {
+                    "agent_id": string,"checked_at"?: string | null,"integration": string,"last_error"?: string | null,"organization_id": string,"started_at"?: string
+                  }
+                  Update: {
+                    "agent_id"?: string,"checked_at"?: string | null,"integration"?: string,"last_error"?: string | null,"organization_id"?: string,"started_at"?: string
+                  }
+                  Relationships: []
+                },"agent_seen_records": {
+                  Row: {
+                    "agent_id": string,"agent_run_id": string | null,"organization_id": string,"record_id": string,"seen_at": string
+                  }
+                  Insert: {
+                    "agent_id": string,"agent_run_id"?: string | null,"organization_id": string,"record_id": string,"seen_at"?: string
+                  }
+                  Update: {
+                    "agent_id"?: string,"agent_run_id"?: string | null,"organization_id"?: string,"record_id"?: string,"seen_at"?: string
+                  }
+                  Relationships: []
                 },"rejected_processes": {
                   Row: {
                     "created_at": string,"department": string | null,"id": string,"organization_id": string,"rejected_by": string | null,"title": string

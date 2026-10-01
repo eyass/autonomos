@@ -13,7 +13,7 @@ import { AutonomyLadder, ModeBadge, OutcomeBadge, StatusBadge } from "@/componen
 import { dateTime, hours, money, pct, relative, aiMoney } from "@/lib/format";
 import { adminDb, HttpError, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { loadAgentConfig } from "@/server/agents";
+import { loadAgentConfig, recordSourceFor } from "@/server/agents";
 import { agentState } from "@/server/readiness";
 import { diffVersions, type VersionSnapshot } from "@/lib/version-diff";
 import { ReadinessChecklist } from "@/components/app/readiness-checklist";
@@ -105,7 +105,9 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
       ? "Run manually"
       : config.trigger.type === "schedule"
         ? `On a schedule: ${config.trigger.cron} (${config.trigger.timezone})`
-        : `When: ${INTEGRATION_EVENTS.find((e) => e.key === (config.trigger as { event: string }).event)?.label ?? (config.trigger as { event: string }).event}`;
+        : config.trigger.type === "new_record"
+          ? `Each new record in ${systemName(config.trigger.integration)}`
+          : `When: ${INTEGRATION_EVENTS.find((e) => e.key === (config.trigger as { event: string }).event)?.label ?? (config.trigger as { event: string }).event}`;
   // What a test will run into, said before it runs rather than discovered from an escalation.
   const readTools = config.tools.map((t) => getTool(t)).filter((d) => d?.access === "read" && d.integration !== "knowledge");
   const integrationsCheck = readiness.checks.find((c) => c.key === "integrations");
@@ -113,8 +115,11 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
     ...(!ticketDriven && !readTools.length ? ["It has no tools that read data, so it only has what the input contains. With an empty input it hands the run to a person."] : []),
     ...(integrationsCheck && !integrationsCheck.ok ? [integrationsCheck.detail] : []),
   ];
+  const recordSource = ticketDriven ? null : recordSourceFor(config, new Set(connOf.keys()));
   const sampleInput =
-    config.trigger.type === "schedule"
+    config.trigger.type === "new_record"
+      ? { source: config.trigger.integration, record_kind: "ticket", record_id: "123", ticket_id: "123", title: "Describe the record", record: { subject: "…", description: "…" } }
+      : config.trigger.type === "schedule"
       ? { period: lastWeek(), note: "The run covers this period." }
       : config.trigger.type === "integration_event"
         ? { event: (config.trigger as { event: string }).event, data: { id: "sample-1", summary: "Describe the record the event is about" } }
@@ -236,7 +241,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
               </CardContent>
             </Card>
           ) : null}
-          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} blockedReason={state.testBlockedReason} warnings={testWarnings} sampleInput={JSON.stringify(sampleInput, null, 2)} />
+          <TestPanel agentId={id} ticketDriven={ticketDriven} samples={samples} blockedReason={state.testBlockedReason} warnings={testWarnings} sampleInput={JSON.stringify(sampleInput, null, 2)} recordSource={recordSource} />
           {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
           <Card id="autonomy">
             <CardHeader>

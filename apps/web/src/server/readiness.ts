@@ -71,7 +71,7 @@ export async function executionReadiness(session: Session): Promise<Readiness> {
 // Readiness for one agent: can it be tested, and can it go live? Every rule is decided here
 // on the server (activation re-checks it), never only by what the page shows.
 type AgentForReadiness = { id: string; versionId: string | null };
-type ConfigForReadiness = { tools: string[]; trigger: { type: string; event?: string } };
+type ConfigForReadiness = { tools: string[]; trigger: { type: string; event?: string; integration?: string } };
 
 export async function agentReadiness(session: Session, agent: AgentForReadiness, config: ConfigForReadiness, purpose: "test" | "activate"): Promise<Readiness> {
   const base = await executionReadiness(session);
@@ -79,7 +79,9 @@ export async function agentReadiness(session: Session, agent: AgentForReadiness,
   const { data: conns } = await db.from("integration_connections").select("integration_key").eq("organization_id", session.org.id).eq("status", "connected");
   const connected = new Set([...(conns ?? []).map((c) => c.integration_key), "knowledge"]);
   const tools = config.tools.map((t) => getTool(t)).filter((d): d is NonNullable<typeof d> => Boolean(d));
-  const missing = [...new Set(tools.map((t) => t.integration).filter((i) => !connected.has(i)))];
+  // The system a new-record trigger watches must be connected too, even if no tool names it.
+  const watched = config.trigger.type === "new_record" && config.trigger.integration ? [config.trigger.integration] : [];
+  const missing = [...new Set([...tools.map((t) => t.integration), ...watched].filter((i) => !connected.has(i)))];
   const checks = base.checks.filter((c) => c.key !== "integrations" && (purpose === "activate" || c.key !== "approvers"));
   checks.push({
     key: "integrations",
