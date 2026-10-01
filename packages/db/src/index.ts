@@ -14,5 +14,6 @@ export function createServiceClient(): DbClient {
   return createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 export * from "./services";
+export { briefText, ingestSource, rebuildBrief, searchKnowledge, type IngestResult, type KnowledgeHit } from "./knowledge";
 export { checkRecordWatches, connectionContext, recentRecordsFor, type WatchResult } from "./record-watch";
 export { healConnections, healInventories, healRuns, healSchedules, takeInventory, INVENTORY_STALE_MS, type Enqueue, type HealReport, type ScheduleOps } from "./heal";

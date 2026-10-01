@@ -1,3 +1,4 @@
+import { searchKnowledge } from "./knowledge";
 import { isPaused } from "./services";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { emptyRunState, type ActionRecord, type ApprovalRecord, type RunContext, type RunState, type RunStore, type StepRecord } from "@autonomos/agents";
@@ -370,9 +371,13 @@ export function sandboxStore(db: Client, organizationId: string): SandboxStore {
   };
 }
 
+// Company knowledge (passages by meaning and keyword); documents from before knowledge
+// existed are searched as before until they have been read into passages.
 export function knowledgeSearch(db: Client, organizationId: string): KnowledgeSearch {
   return {
     async search(query) {
+      const hits = await searchKnowledge(db, organizationId, query, 6);
+      if (hits.length) return hits.map((h) => ({ title: h.heading && h.heading !== h.title ? `${h.title}: ${h.heading}` : h.title, excerpt: h.excerpt, ...(h.url ? { url: h.url } : {}) }));
       const { data, error } = await db.from("documents").select("title, content").eq("organization_id", organizationId).textSearch("search", query, { type: "websearch", config: "english" }).limit(5);
       if (error) throw new Error(`knowledge search: ${error.message}`);
       return (data ?? []).map((d) => ({ title: d.title, excerpt: excerpt(d.content, query) }));
