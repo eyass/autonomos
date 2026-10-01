@@ -28,10 +28,16 @@ Onboarding keeps its quick 6-page read for the profile (so the profile still app
    - help subdomains (`help.`, `support.`, `docs.`, `faq.`, `kb.`);
    - hosted help centres the site links to (Zendesk `*.zendesk.com/hc`, Intercom `intercom.help`, Freshdesk `*.freshdesk.com/support`, HelpScout `*.helpscoutdocs.com`, Notion and GitBook pages);
    - the help-desk script detection the crawler already does (a Zendesk or Intercom widget means a help centre likely exists).
-3. **Read politely**: respect `robots.txt` disallow rules for our user agent; 4 requests at a time per host; the crawler's existing guards (public addresses only, size and time caps per page); skip assets, login, cart, checkout, account and search pages, tracking parameters and duplicates (canonical URL, identical text); one language version when the site has several (the one matching the home page).
-4. **Keep what says something**: pages with real text after removing navigation and footers; script-rendered pages that return no text are counted and listed as "could not be read" rather than silently dropped.
-5. **Rounds**: a read can run past the 5-minute job limit, so each round reads up to 4 minutes or 150 pages, saves its frontier and visited set on the source (`crawl`), and queues the next round. Progress (pages found, read, skipped) shows on the source.
-6. **Caps**: website 1,000 pages and help centre 2,000 articles per source (so a large site is still read in full in most cases); anything beyond is listed as not read.
+3. **Breadth first, then deeper where it pays** (agreed): every level-1 page (the home page's links and every sitemap URL one path segment deep) is read before anything deeper. The frontier is then ordered by a score:
+   - high: help, support, FAQ, docs, guides, policies (returns, refunds, shipping, terms of service, privacy), pricing, about, how-it-works, product and service overviews;
+   - normal: other content pages;
+   - never: login, sign-up, account, password, cart, checkout, basket, search results, tag, archive and pagination pages, calendar/date archives, print and share links, file downloads that are not documents, and anything `robots.txt` disallows.
+   - **Large repeated sections are sampled, not read in full**: when one path pattern has many pages that differ only by an id or slug (`/listings/123`, `/product/blue-sofa-42`, `/blog/2024/...`), up to 10 representative pages are read and the rest counted ("4,312 listing pages, 10 sampled"). Help-centre articles are the exception and are read in full.
+   - Speed: 8 requests at a time per host, a 6-second timeout per page, HTML only, no retries for 4xx.
+4. **Read politely**: respect `robots.txt` disallow rules for our user agent; the crawler's existing guards (public addresses only, size and time caps per page); skip assets, login, cart, checkout, account and search pages, tracking parameters and duplicates (canonical URL, identical text); one language version when the site has several (the one matching the home page).
+5. **Keep what says something**: pages with real text after removing navigation and footers; script-rendered pages that return no text are counted and listed as "could not be read" rather than silently dropped.
+6. **Rounds**: a read can run past the 5-minute job limit, so each round reads up to 4 minutes or 150 pages, saves its frontier and visited set on the source (`crawl`), and queues the next round. Progress (pages found, read, skipped) shows on the source.
+7. **Caps**: website 1,000 pages and help centre 2,000 articles per source (so a large site is still read in full in most cases); anything beyond is listed as not read.
 
 A help-centre address typed in by hand uses the same reader, starting from that address.
 
