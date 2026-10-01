@@ -6,6 +6,7 @@ import { reconcileStuckRuns } from "@/server/run-health";
 import { agentStates } from "@/server/readiness";
 import { CircleCheck } from "lucide-react";
 import Link from "next/link";
+import { TONE, toneFor } from "@/components/app/area";
 import { hours, money, num, pct, aiMoney } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +28,7 @@ export default async function OverviewPage() {
   // Recompute and store today's snapshot so the trend always includes today.
   const m = await snapshotMetrics(db, session.org.id);
   const supabase = await createClient();
-  const [{ data: trend }, { data: movers }, { data: top }] = await Promise.all([
+  const [{ data: trend }, { data: movers }, { data: top }, { count: ideasEver }] = await Promise.all([
     supabase.from("metrics").select("period, metric, value").eq("organization_id", session.org.id).in("metric", ["autonomy_score", "autonomy_live"]).eq("dimension", "").order("period").limit(730),
     // What moves the score: agents going live, changing level or pausing, and newly mapped work.
     supabase
@@ -44,6 +45,8 @@ export default async function OverviewPage() {
       .in("status", ["suggested", "reviewing", "approved"])
       .order("opportunity_score", { ascending: false })
       .limit(5),
+    // Any idea at all, so an empty list can say whether ideas are still to come or all handled.
+    supabase.from("automation_opportunities").select("id", { count: "exact", head: true }).eq("organization_id", session.org.id),
   ]);
 
   // The path to a first live agent, shown until it is walked. Each step links to where it is done.
@@ -107,6 +110,11 @@ export default async function OverviewPage() {
         <CardDescription>
           {playbook.filter((p) => p.done).length} of {playbook.length} done. Next: {next.title.toLowerCase()}.
         </CardDescription>
+        <div aria-hidden className="mt-2 flex max-w-xs gap-1">
+          {playbook.map((p) => (
+            <span key={p.title} className={`h-1.5 flex-1 rounded-full ${p.done ? "bg-brand" : p === next ? "bg-highlight" : "bg-muted"}`} />
+          ))}
+        </div>
         <CardAction>
           <ButtonLink href={next.href} size="sm">
             {next.cta}
@@ -117,15 +125,25 @@ export default async function OverviewPage() {
         <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {playbook.map((p, i) => (
             <li key={p.title}>
-              <Link href={p.href} className={`flex items-start gap-3 rounded-lg border p-3 text-sm hover:bg-accent ${p === next ? "border-primary/50 bg-primary/5" : ""}`}>
+              <Link
+                href={p.href}
+                className={`flex h-full items-start gap-3 rounded-xl border p-3.5 text-sm transition-colors hover:bg-accent ${p === next ? "border-primary/40 bg-brand-soft/60 ring-1 ring-primary/20" : p.done ? "bg-muted/40" : "bg-card"}`}
+              >
                 {p.done ? (
                   <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
                 ) : (
-                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border text-[10px] tabular-nums">{i + 1}</span>
+                  <span
+                    className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold tabular-nums ${p === next ? "bg-primary text-primary-foreground" : "border"}`}
+                  >
+                    {i + 1}
+                  </span>
                 )}
-                <span>
-                  <span className={`block font-medium ${p.done ? "text-muted-foreground line-through" : ""}`}>{p.title}</span>
-                  {!p.done ? <span className="block text-xs text-muted-foreground">{p.detail}</span> : null}
+                <span className="min-w-0">
+                  <span className={`flex items-center gap-2 font-medium ${p.done ? "text-muted-foreground" : ""}`}>
+                    {p.title}
+                    {p === next ? <span className="eyebrow rounded bg-highlight-soft px-1.5 py-0.5 text-[11px] text-highlight-strong">Next</span> : null}
+                  </span>
+                  {!p.done ? <span className="mt-0.5 block text-xs text-muted-foreground">{p.detail}</span> : null}
                 </span>
               </Link>
             </li>
@@ -146,7 +164,7 @@ export default async function OverviewPage() {
   if (!m.processesMapped) {
     return (
       <>
-        <PageHeader title="Home" description="How autonomous is your company?" />
+        <PageHeader title="Home" description="How much of your work runs on agents" />
         {playbookCard}
       </>
     );
@@ -175,7 +193,7 @@ export default async function OverviewPage() {
       <div className="mb-4 grid gap-4 lg:mb-6 lg:grid-cols-3">
         {/* Two meters, not one: what already runs on the company's own software, and what
             AutonomOS agents add (0% until one is live). */}
-        <Card className={chart.length > 1 ? "" : "lg:col-span-3"}>
+        <Card className={`bg-gradient-to-br from-brand-soft to-card to-70% ${chart.length > 1 ? "" : "lg:col-span-3"}`}>
           <CardContent className={`grid gap-5 ${chart.length > 1 ? "" : "sm:grid-cols-2"}`}>
             <div data-testid="autonomy-live">
               <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -237,9 +255,10 @@ export default async function OverviewPage() {
       <StatStrip
         className="mb-4 lg:mb-6"
         items={[
-          { label: "Active agents", value: num(m.activeAgents), hint: `${m.processesAutomated} of ${m.processesMapped} processes` },
+          { label: "Active agents", tone: "brand", value: num(m.activeAgents), hint: `${m.processesAutomated} of ${m.processesMapped} processes` },
           {
             label: "Hours saved",
+            tone: "green",
             value: hours(m.minutesSaved),
             // Measured: counted from finished live runs. Each run is credited with its process's
             // estimated minutes, so the number is only as good as that estimate.
@@ -247,9 +266,10 @@ export default async function OverviewPage() {
               ? `Measured over ${num(m.productionRuns)} live run${m.productionRuns === 1 ? "" : "s"}, at each process's estimated minutes; ${money(m.valueCreated, m.currency)} this month${m.roi !== null ? `, ${m.roi >= 100 ? Math.round(m.roi) : m.roi.toFixed(1)}× AI cost` : ""}`
               : "Measured from live runs only; none yet",
           },
-          { label: "Tasks done", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
+          { label: "Tasks done", tone: "blue", value: num(m.tasksExecuted), hint: m.productionRuns ? `${num(m.humanInterventions)} needed a human` : undefined },
           {
             label: "AI spend this month",
+            tone: "amber",
             value: (
               <span className="inline-flex items-center gap-1">
                 {aiMoney(m.aiCost, m.currency)}
@@ -304,7 +324,19 @@ export default async function OverviewPage() {
             </div>
           ) : (
             <CardContent>
-              <p className="text-sm text-muted-foreground">Approve a process to see what to automate next.</p>
+              <p className="text-sm text-muted-foreground">
+                {ideasEver ? (
+                  <>
+                    Every idea so far has an agent or a decision.{" "}
+                    <Link href="/processes" className="font-medium text-primary underline-offset-4 hover:underline">
+                      Find more ideas on a process
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  "Approve a process to see what to automate next."
+                )}
+              </p>
             </CardContent>
           )}
         </Card>
@@ -313,17 +345,22 @@ export default async function OverviewPage() {
             <CardTitle>Work on agents by department</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Each department keeps its colour everywhere (from its name). */}
             {m.departmentAutonomy
+              .map((d) => ({ ...d, tone: toneFor(d.name) }))
               .filter((d) => d.processes > 0)
               .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
               .map((d) => (
                 <Link key={d.departmentId ?? "none"} href={d.departmentId ? `/processes?department=${d.departmentId}` : "/processes"} className="block">
                   <div className="mb-1 flex justify-between gap-2 text-sm">
-                    <span className="truncate">{d.name}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden className={`size-2 shrink-0 rounded-full ${TONE[d.tone].bar}`} />
+                      <span className="truncate">{d.name}</span>
+                    </span>
                     <span className="tabular-nums text-muted-foreground">{pct(d.score)}</span>
                   </div>
                   <div className="h-2 rounded-full bg-muted">
-                    <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(2, (d.score ?? 0) * 100)}%` }} />
+                    <div className={`h-2 rounded-full ${TONE[d.tone].bar}`} style={{ width: `${Math.max(2, (d.score ?? 0) * 100)}%` }} />
                   </div>
                 </Link>
               ))}

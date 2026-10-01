@@ -1,4 +1,5 @@
 import { modeOf } from "@autonomos/schemas";
+import { Workflow } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
@@ -21,8 +22,13 @@ import { LifecycleHelp } from "@/components/app/lifecycle-help";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { recordTitle } from "@/lib/titles";
 
 const SOURCE_LABEL = { interview: "AI interview", document: "Imported document", integration: "Connected systems", manual: "Added manually", website: "Drafted from your website" } as const;
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("processes", (await params).id, "Process");
+}
 
 export default async function ProcessPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; ideas?: string }> }) {
   const { id } = await params;
@@ -96,6 +102,8 @@ export default async function ProcessPage({ params, searchParams }: { params: Pr
     <>
       <PageHeader
         back={{ href: "/processes", label: "Work" }}
+        icon={Workflow}
+        tone="blue"
         title={p.title}
         description={
           <span className="flex flex-wrap items-center gap-2">

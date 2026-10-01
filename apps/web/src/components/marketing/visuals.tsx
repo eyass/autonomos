@@ -133,7 +133,7 @@ const OUTCOMES = [
 
 export function PolicyFlow() {
   return (
-    <figure className="rounded-2xl border border-border bg-background p-4 sm:p-6">
+    <figure className="rounded-2xl border border-border bg-background p-4 text-foreground shadow-2xl shadow-black/30 sm:p-6">
       <figcaption className="sr-only">
         How the policy engine decides: an agent proposes a €72 refund. The tool is allowed, the emergency stop is off, it is under the €500 hard limit and over the €50 approval threshold, so it waits
         for a person.

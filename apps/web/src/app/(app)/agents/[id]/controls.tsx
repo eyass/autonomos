@@ -147,7 +147,7 @@ export function LivePanel({ agentId, samples, ticketDriven, sandbox }: { agentId
       <CardContent className="space-y-3">
         {ticketDriven ? (
           sandbox ? (
-            <NativeSelect value={sample} onChange={(e) => setSample(e.target.value)}>
+            <NativeSelect value={sample} onChange={(e) => setSample(e.target.value)} aria-label="Sample ticket to send">
               {samples.map((s) => (
                 <NativeSelectOption key={s.key} value={s.key}>
                   {s.label}

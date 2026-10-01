@@ -40,7 +40,7 @@ export function SettingsSection({
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
       <Card id={id} className={cn("scroll-mt-32 lg:scroll-mt-20", tone === "warning" && "border-warning", tone === "danger" && "border-destructive/50")}>
-        <CardHeader>
+        <CardHeader className="md:border-b md:border-border/70 md:pb-5">
           {/* On phones the action sits under the description so long labels never push the card wider than the screen. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div className="min-w-0 space-y-1.5">

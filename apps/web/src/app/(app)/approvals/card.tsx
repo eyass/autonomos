@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Hand } from "lucide-react";
 import Link from "next/link";
 import { FormField } from "@/components/app/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -57,16 +57,24 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
   const approvalReasons = a.checks.filter((c) => c.effect === "require_approval");
 
   return (
-    <Card data-testid="approval-card">
+    <Card data-testid="approval-card" className="relative overflow-hidden">
+      <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-highlight" />
       <CardHeader>
-        <CardTitle className="text-base">{a.title}</CardTitle>
-        <CardDescription>
-          Agent:{" "}
-          <Link className="hover:underline" href={`/agents/${a.agentId}`}>
-            {a.agentName}
-          </Link>
-        </CardDescription>
-        <CardAction className="flex flex-wrap justify-end gap-1.5">
+        <div className="flex items-start gap-3">
+          <span aria-hidden className="hidden size-10 shrink-0 items-center justify-center rounded-xl bg-highlight-soft text-highlight-strong sm:flex">
+            <Hand className="size-[18px]" />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="text-base sm:text-lg">{a.title}</CardTitle>
+            <CardDescription>
+              Agent:{" "}
+              <Link className="hover:underline" href={`/agents/${a.agentId}`}>
+                {a.agentName}
+              </Link>
+            </CardDescription>
+          </div>
+        </div>
+        <CardAction className="flex flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end">
           {a.confidence !== null ? <Badge variant={a.confidence >= 0.9 ? "success" : "warning"}>Confidence {pct(a.confidence)}</Badge> : null}
           {a.risk ? <Badge variant={a.risk >= 4 ? "danger" : "secondary"}>Risk {a.risk}/5</Badge> : null}
         </CardAction>
@@ -74,14 +82,14 @@ export function ApprovalCard({ a, canApprove }: { a: ApprovalView; canApprove: b
       <CardContent className="space-y-3 text-sm">
         {a.reason ? (
           <div>
-            <div className="text-xs font-medium text-muted-foreground">Why the agent wants to do this</div>
-            <p className="mt-0.5">{a.reason}</p>
+            <div className="eyebrow text-[11px] text-muted-foreground">Why the agent wants to do this</div>
+            <p className="mt-1">{a.reason}</p>
           </div>
         ) : null}
         {a.evidence.length ? (
           <div>
-            <div className="text-xs font-medium text-muted-foreground">Based on</div>
-            <ul className="mt-0.5 space-y-0.5">
+            <div className="eyebrow text-[11px] text-muted-foreground">Based on</div>
+            <ul className="mt-1.5 space-y-1 rounded-lg border border-border bg-muted/40 p-2.5">
               {a.evidence.slice(0, 3).map((e, i) => (
                 <li key={i}>
                   <Badge variant="secondary">{e.source}</Badge> {e.description}

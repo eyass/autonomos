@@ -1,4 +1,5 @@
 "use client";
+import { LINE_TAB } from "@/components/app/link-tabs";
 import Link from "next/link";
 import { Component, useState, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -30,11 +31,15 @@ export function DiscoverTabs({ initial, panels }: { initial: DiscoverTab; panels
   };
   return (
     <>
-      <Tabs value={tab} onValueChange={choose} className="mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <TabsList className="max-w-full overflow-x-auto">
+      <Tabs value={tab} onValueChange={choose} className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border">
+          <TabsList variant="line" className="h-10 max-w-full gap-5 overflow-x-auto">
             {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} className="data-[state=active]:text-brand">
+              <TabsTrigger
+                key={t.value}
+                value={t.value}
+                className={LINE_TAB}
+              >
                 {t.label}
               </TabsTrigger>
             ))}

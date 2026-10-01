@@ -8,12 +8,15 @@ import { requestJob } from "@/components/app/job";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogoMark, Wordmark } from "@/components/brand/logo";
+import { AREA, TONE, type Tone } from "@/components/app/area";
+import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -25,14 +28,15 @@ import {
 
 // The loop: see where you stand, answer what waits for you, map the work and what to automate
 // (or start from a ready-made playbook), run agents, look back. Each item says what it holds.
-type NavItem = { href: string; label: string; hint?: string; icon: typeof LayoutDashboard; also?: string[] };
+type NavItem = { href: string; label: string; hint?: string; icon: typeof LayoutDashboard; also?: string[]; tone?: Tone };
+// Each main area wears its colour (components/app/area.ts) on its icon tile.
 const MAIN: NavItem[] = [
-  { href: "/", label: "Home", hint: "How autonomous you are", icon: LayoutDashboard },
-  { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox },
-  { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"] },
-  { href: "/playbooks", label: "Playbooks", hint: "Templates to start from", icon: BookOpen },
-  { href: "/agents", label: "Agents", hint: "Doing the work for you", icon: Bot },
-  { href: "/activity", label: "History", hint: "Everything that happened", icon: Activity },
+  { href: "/", label: "Home", hint: "How much work runs on agents", icon: LayoutDashboard, tone: AREA.home },
+  { href: "/approvals", label: "Inbox", hint: "Waiting for a person", icon: Inbox, tone: AREA.inbox },
+  { href: "/processes", label: "Work", hint: "Processes and automation ideas", icon: Workflow, also: ["/opportunities", "/discover"], tone: AREA.work },
+  { href: "/playbooks", label: "Playbooks", hint: "Templates to start from", icon: BookOpen, tone: AREA.playbooks },
+  { href: "/agents", label: "Agents", hint: "Doing the work for you", icon: Bot, tone: AREA.agents },
+  { href: "/activity", label: "History", hint: "Everything that happened", icon: Activity, tone: AREA.history },
 ];
 const ADMIN: NavItem[] = [
   { href: "/integrations", label: "Integrations", icon: Plug },
@@ -43,6 +47,45 @@ const ADMIN: NavItem[] = [
 function isActive(path: string, item: NavItem) {
   if (item.href === "/") return path === "/";
   return [item.href, ...(item.also ?? [])].some((h) => path === h || path.startsWith(`${h}/`));
+}
+
+type Usage = { planName: string; runs: number; runsPerMonth: number; activeAgents: number; agentLimit: number };
+
+// Plan usage at a glance, as the billing page counts it. Hidden when the sidebar is icons only.
+function PlanUsage({ planName, runs, runsPerMonth, activeAgents, agentLimit, onNavigate }: Usage & { onNavigate: () => void }) {
+  const rows = [
+    { label: "Runs this month", used: runs, limit: runsPerMonth },
+    { label: "Live agents", used: activeAgents, limit: agentLimit },
+  ];
+  return (
+    <Link
+      href="/settings#billing"
+      onClick={onNavigate}
+      aria-label={`${planName} plan usage: ${runs.toLocaleString("en")} of ${runsPerMonth.toLocaleString("en")} runs this month. Open billing.`}
+      className="mx-2 mb-1 block rounded-xl border border-sidebar-border bg-card p-3 text-xs shadow-[0_1px_2px_rgb(18_24_22/0.04)] transition-colors hover:border-primary/30 group-data-[collapsible=icon]:hidden"
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="eyebrow text-[11px] text-muted-foreground">{planName} plan</span>
+        <span className="text-[11px] font-medium text-primary">Billing</span>
+      </span>
+      {rows.map((r) => {
+        const pct = r.limit ? Math.min(100, Math.round((r.used / r.limit) * 100)) : 0;
+        return (
+          <span key={r.label} className="mt-2.5 block">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="text-sidebar-foreground">{r.label}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {r.used.toLocaleString("en")} / {r.limit.toLocaleString("en")}
+              </span>
+            </span>
+            <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-muted">
+              <span className={`block h-full rounded-full ${pct >= 90 ? "bg-highlight" : "bg-brand"}`} style={{ width: `${Math.max(pct, r.used ? 4 : 0)}%` }} />
+            </span>
+          </span>
+        );
+      })}
+    </Link>
+  );
 }
 
 // The application sidebar, following the shadcn sidebar-07 block: collapses to icons on
@@ -59,6 +102,7 @@ export function AppSidebar({
   switchWorkspace,
   signOut,
   platformAdmin = false,
+  usage,
 }: {
   pendingApprovals: number;
   orgName: string;
@@ -70,36 +114,37 @@ export function AppSidebar({
   signOut: () => Promise<unknown>;
   // Site administrators also see the studio where ready-made playbooks are made.
   platformAdmin?: boolean;
+  // This month's production runs and live agents against the plan, shown above settings.
+  usage?: Usage;
 }) {
   const path = usePathname();
   const [pending, start] = useTransition();
   const { setOpenMobile } = useSidebar();
   const router = useRouter();
-  const group = (items: NavItem[]) => (
+  const group = (items: NavItem[], title?: string) => (
     <SidebarGroup>
+      {title ? <SidebarGroupLabel className="eyebrow text-[11px] text-muted-foreground/80">{title}</SidebarGroupLabel> : null}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {
-            const { href, label, hint, icon: Icon } = item;
+            const { href, label, hint, icon: Icon, tone } = item;
             return (
               <SidebarMenuItem key={href}>
                 <SidebarMenuButton
                   asChild
                   isActive={isActive(path, item)}
                   tooltip={hint ? `${label}: ${hint}` : label}
-                  size={hint ? "lg" : "default"}
-                  className="relative data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-highlight"
+                  className="relative h-9 text-[13.5px] text-sidebar-foreground/85 hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-highlight [&>svg]:size-[17px]"
                 >
-                  <Link href={href} onClick={() => setOpenMobile(false)}>
-                    <Icon />
-                    {hint ? (
-                      <span className="flex min-w-0 flex-col leading-tight">
-                        <span>{label}</span>
-                        <span className="truncate text-xs font-normal text-muted-foreground">{hint}</span>
+                  <Link href={href} title={hint} onClick={() => setOpenMobile(false)}>
+                    {tone ? (
+                      <span aria-hidden className={cn("-ml-1 flex size-6 shrink-0 items-center justify-center rounded-md border group-data-[collapsible=icon]:ml-0", TONE[tone].tile)}>
+                        <Icon className="size-3.5" />
                       </span>
                     ) : (
-                      <span>{label}</span>
+                      <Icon />
                     )}
+                    <span>{label}</span>
                   </Link>
                 </SidebarMenuButton>
                 {href === "/approvals" && pendingApprovals > 0 ? (
@@ -138,8 +183,11 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {group(MAIN)}
-        <div className="mt-auto">{group(platformAdmin ? [{ href: "/admin/playbooks", label: "Playbook studio", icon: Sparkles }, ...ADMIN] : ADMIN)}</div>
+        {group(MAIN, "Workspace")}
+        <div className="mt-auto">
+          {usage ? <PlanUsage {...usage} onNavigate={() => setOpenMobile(false)} /> : null}
+          {group(platformAdmin ? [{ href: "/admin/playbooks", label: "Playbook studio", icon: Sparkles }, ...ADMIN] : ADMIN)}
+        </div>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>

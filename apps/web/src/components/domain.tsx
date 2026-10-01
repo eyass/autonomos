@@ -20,7 +20,7 @@ export function AutonomyLadder({ current, target, size = "md" }: { current: numb
             title={`${l.name}: ${l.short}`}
             className={cn(
               "inline-flex items-center justify-center rounded px-1.5 font-semibold",
-              size === "sm" ? "h-5 text-[10px]" : "h-6 text-xs",
+              size === "sm" ? "h-5 text-[11px]" : "h-6 text-xs",
               isCurrent ? "text-white" : reached ? "bg-brand-soft text-brand-strong" : "bg-muted text-muted-foreground",
               isTarget && "ring-2 ring-primary ring-offset-1 ring-offset-surface text-primary bg-primary/10",
             )}
@@ -67,7 +67,7 @@ export function ScorePill({ value, kind }: { value: number | null | undefined; k
   return (
     <span
       className={cn(
-        "inline-flex h-6 min-w-8 items-center justify-center rounded px-1.5 text-xs font-semibold tabular-nums",
+        "inline-flex h-6 min-w-8 items-center justify-center rounded-md px-1.5 text-xs font-semibold tabular-nums",
         good ? "bg-success-soft text-success" : bad ? (kind === "risk" ? "bg-destructive-soft text-destructive" : "bg-warning-soft text-warning") : "bg-muted text-foreground",
       )}
       title={`${kind} ${value} of 5`}
@@ -78,7 +78,39 @@ export function ScorePill({ value, kind }: { value: number | null | undefined; k
 }
 
 // Value, difficulty and risk together, labelled, so the numbers read without a legend.
-export function Scores({ value, difficulty, risk, className }: { value: number | null | undefined; difficulty: number | null | undefined; risk: number | null | undefined; className?: string }) {
+// `dense` keeps the three on one line in tables, with short labels spelled out on hover.
+export function Scores({
+  value,
+  difficulty,
+  risk,
+  className,
+  dense = false,
+}: {
+  value: number | null | undefined;
+  difficulty: number | null | undefined;
+  risk: number | null | undefined;
+  className?: string;
+  dense?: boolean;
+}) {
+  if (dense) {
+    return (
+      <div className={cn("flex items-center gap-1.5 whitespace-nowrap text-[11px] text-muted-foreground", className)}>
+        {(
+          [
+            ["V", "Value", "value", value],
+            ["D", "Difficulty", "difficulty", difficulty],
+            ["R", "Risk", "risk", risk],
+          ] as const
+        ).map(([short, long, kind, v]) => (
+          <span key={kind} className="inline-flex items-center gap-0.5" title={`${long}${v ? ` ${v} of 5` : ""}`}>
+            <span aria-hidden>{short}</span>
+            <span className="sr-only">{long}</span>
+            <ScorePill kind={kind} value={v} />
+          </span>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground", className)}>
       <span className="inline-flex items-center gap-1">

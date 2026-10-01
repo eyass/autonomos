@@ -99,7 +99,8 @@ Discover → "From your systems" reads a recent sample from every connected syst
 
 - **Product copy never names the stack.** Screens, errors, docs and the security page describe what happens ("runs keep going through restarts", "our connection partner holds sign-in tokens") without naming vendors. The one exception is the subprocessor table on the privacy and security pages, which is a legal disclosure.
 
-- **Brand teal `#0E5E5A`** (`--brand`, also `--primary`): logo, primary buttons, links, focus rings, active navigation, the autonomy score.
+- **Brand teal `#0F766E`** (`--brand`, also `--primary`): logo, primary buttons, links, focus rings, active navigation, the autonomy score.
+- **Area colours** (`--area-green|blue|violet|amber|rose`, each with `-soft` and `-strong`): one per part of the product so each is recognisable at a glance: Home green, Work blue, Playbooks amber, History violet, Agents brand teal, Inbox signal orange. Used for icon tiles, tinted stat tiles, department bars and chart series, never for buttons or text links. `components/app/area.ts` holds the class sets.
 - **Signal orange `#E8552D`** (`--highlight`): agent and AI activity and anything that needs attention: the pending-approvals count, AI-drafted alerts (`<Alert variant="agent">`), running and live states (`<Badge variant="agent">`), agent entries in Activity. Use `--highlight-strong` (`#B53D17`) for orange text on light backgrounds. Keep it rare so it keeps its meaning.
 - **Type:** Bricolage Grotesque for headings, card titles and big numbers (`font-display`); Instrument Sans for text; JetBrains Mono for IDs and code.
 - **Mark:** `components/brand/logo.tsx`, a teal tile with an open "A" and an orange signal dot.

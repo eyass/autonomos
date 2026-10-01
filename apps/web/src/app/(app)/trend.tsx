@@ -3,7 +3,7 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { type ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const config = {
-  baseline: { label: "Already on your software", color: "var(--chart-3)" },
+  baseline: { label: "Already on your software", color: "var(--chart-4)" },
   live: { label: "AutonomOS live", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
@@ -44,13 +44,23 @@ export function AutonomyTrend({ data }: { data: Point[] }) {
       </table>
       <ChartContainer config={config} className="aspect-auto h-52 w-full" aria-hidden="true">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+          <defs>
+            <linearGradient id="trend-baseline" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-baseline)" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="var(--color-baseline)" stopOpacity={0.04} />
+            </linearGradient>
+            <linearGradient id="trend-live" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-live)" stopOpacity={0.55} />
+              <stop offset="100%" stopColor="var(--color-live)" stopOpacity={0.06} />
+            </linearGradient>
+          </defs>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="period" tickLine={false} axisLine={false} tickMargin={8} minTickGap={24} />
           <YAxis tickFormatter={(v) => `${Math.round(v * 100)}%`} tickLine={false} axisLine={false} width={48} domain={[0, (max: number) => Math.max(0.1, Math.ceil(max * 10) / 10)]} />
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" formatter={(v, name) => `${config[name as keyof typeof config]?.label ?? name}: ${asPct(Number(v))}`} />} />
           <ChartLegend content={<ChartLegendContent />} />
-          <Area type="monotone" dataKey="baseline" stackId="a" stroke="var(--color-baseline)" strokeWidth={1.5} fill="var(--color-baseline)" fillOpacity={0.15} />
-          <Area type="monotone" dataKey="live" stackId="a" stroke="var(--color-live)" strokeWidth={2} fill="var(--color-live)" fillOpacity={0.35} />
+          <Area type="monotone" dataKey="baseline" stackId="a" stroke="var(--color-baseline)" strokeWidth={1.5} fill="url(#trend-baseline)" />
+          <Area type="monotone" dataKey="live" stackId="a" stroke="var(--color-live)" strokeWidth={2} fill="url(#trend-live)" />
         </AreaChart>
       </ChartContainer>
     </figure>

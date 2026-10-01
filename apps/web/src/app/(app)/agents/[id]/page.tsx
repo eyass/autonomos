@@ -4,7 +4,7 @@ import { reconcileStuckRuns } from "@/server/run-health";
 import { computeOrgMetrics } from "@autonomos/db";
 import { getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
 import { INTEGRATION_EVENTS, modeOf } from "@autonomos/schemas";
-import { ChevronDown } from "lucide-react";
+import { Bot, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
@@ -26,6 +26,7 @@ import { StatStrip } from "@/components/app/stat-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { recordTitle } from "@/lib/titles";
 
 // Test runs execute on this server after the response, so give them room to finish.
 export const maxDuration = 300;
@@ -38,6 +39,10 @@ function snapshot(v: { autonomy_level: number; instructions: unknown; trigger_co
     policy_config: v.policy_config as VersionSnapshot["policy_config"],
     tools: ((v.agent_tools as Array<{ tool_key: string }> | null) ?? []).map((t) => t.tool_key).sort(),
   };
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("agents", (await params).id, "Agent");
 }
 
 export default async function AgentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
@@ -120,6 +125,8 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
     <>
       <PageHeader
         back={{ href: "/agents", label: "Agents" }}
+        icon={Bot}
+        tone={agent.status === "active" ? "agent" : "brand"}
         title={agent.name}
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

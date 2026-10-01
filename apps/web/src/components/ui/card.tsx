@@ -6,7 +6,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-4 rounded-xl border bg-card py-4 text-card-foreground shadow-xs sm:gap-6 sm:py-6",
+        "flex flex-col gap-4 rounded-2xl border border-border/80 bg-card py-4 text-card-foreground shadow-[0_1px_2px_rgb(18_24_22/0.04),0_4px_12px_-4px_rgb(18_24_22/0.05)] sm:gap-6 sm:py-6",
         className
       )}
       {...props}
@@ -27,9 +27,11 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+// A heading, so card sections are reachable by heading navigation: h2 under a page's h1 by
+// default; `as` sets the level where a card sits deeper (or is the page's own title).
+function CardTitle({ className, as: Tag = "h2", ...props }: React.ComponentProps<"h2"> & { as?: "h1" | "h2" | "h3" | "h4" | "div" }) {
   return (
-    <div
+    <Tag
       data-slot="card-title"
       className={cn("leading-none font-semibold", className)}
       {...props}

@@ -19,7 +19,7 @@
   --card-foreground: #121816;
   --popover: #ffffff;
   --popover-foreground: #121816;
-  --primary: #0f4c47;
+  --primary: #0f766e;
   --primary-foreground: #ffffff;
   --secondary: #eef0ec;
   --secondary-foreground: #161a19;
@@ -30,29 +30,29 @@
   --destructive: #b3261e;
   --border: #e2e1da;
   --input: #d8d7cf;
-  --ring: #0f4c47;
+  --ring: #0f766e;
 
-  --brand: #0f4c47;
-  --brand-strong: #0a3330;
-  --brand-soft: #e2eeea;
+  --brand: #0f766e;
+  --brand-strong: #0b4f4a;
+  --brand-soft: #d6f1eb;
   --highlight: #f0561f;
   --highlight-strong: #b53f10;
   --highlight-soft: #fde9de;
   --highlight-foreground: #ffffff;
 
-  --chart-1: #0f4c47;
+  --chart-1: #0f766e;
   --chart-2: #f0561f;
-  --chart-3: #5e9e97;
-  --chart-4: #f2a07f;
-  --chart-5: #2e4e7e;
+  --chart-3: #7c4dde;
+  --chart-4: #2f6fe0;
+  --chart-5: #d98a0b;
   --sidebar: #fbfaf7;
   --sidebar-foreground: #3a3e3c;
-  --sidebar-primary: #0f4c47;
+  --sidebar-primary: #0f766e;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e2eeea;
-  --sidebar-accent-foreground: #0a3330;
+  --sidebar-accent: #d6f1eb;
+  --sidebar-accent-foreground: #0b4f4a;
   --sidebar-border: #e2e1da;
-  --sidebar-ring: #0f4c47;
+  --sidebar-ring: #0f766e;
 
   --success: #1f6b45;
   --success-soft: #e2f1e8;
@@ -62,10 +62,29 @@
   --info-soft: #e6ecf5;
   --destructive-soft: #f9e4e1;
   --level-1: #c9c4b6;
-  --level-2: #9fc2bb;
-  --level-3: #52918a;
-  --level-4: #266b64;
-  --level-5: #0f4c47;
+  --level-2: #8fd3c5;
+  --level-3: #34a893;
+  --level-4: #158a7d;
+  --level-5: #0f766e;
+  /* Area colours: one per part of the product, so each area is recognisable at a glance
+     (sidebar, page icons, stat tiles, charts). Soft is the tint behind, strong the text and
+     icon colour on that tint; both pass contrast on white and on the soft tint. Orange stays
+     reserved for agents and attention (--highlight). */
+  --area-green: #1e9e57;
+  --area-green-soft: #dcf5e6;
+  --area-green-strong: #146b3c;
+  --area-blue: #2f6fe0;
+  --area-blue-soft: #dfe9fd;
+  --area-blue-strong: #1d4fb3;
+  --area-violet: #7c4dde;
+  --area-violet-soft: #ece4fd;
+  --area-violet-strong: #5a2fb8;
+  --area-amber: #d98a0b;
+  --area-amber-soft: #fcefd2;
+  --area-amber-strong: #8a5504;
+  --area-rose: #dc3d6a;
+  --area-rose-soft: #fde3ea;
+  --area-rose-strong: #a3214a;
   /* The dark brand surface: hero, auth panel, share images. */
   --ink: #0a1f1d;
   --ink-foreground: #f5f3ee;
@@ -125,6 +144,21 @@
   --color-highlight-soft: var(--highlight-soft);
   --color-highlight-foreground: var(--highlight-foreground);
   --color-ink: var(--ink);
+  --color-area-green: var(--area-green);
+  --color-area-green-soft: var(--area-green-soft);
+  --color-area-green-strong: var(--area-green-strong);
+  --color-area-blue: var(--area-blue);
+  --color-area-blue-soft: var(--area-blue-soft);
+  --color-area-blue-strong: var(--area-blue-strong);
+  --color-area-violet: var(--area-violet);
+  --color-area-violet-soft: var(--area-violet-soft);
+  --color-area-violet-strong: var(--area-violet-strong);
+  --color-area-amber: var(--area-amber);
+  --color-area-amber-soft: var(--area-amber-soft);
+  --color-area-amber-strong: var(--area-amber-strong);
+  --color-area-rose: var(--area-rose);
+  --color-area-rose-soft: var(--area-rose-soft);
+  --color-area-rose-strong: var(--area-rose-strong);
   --color-ink-foreground: var(--ink-foreground);
 }
 
@@ -174,7 +208,7 @@
 }
 
 @utility bg-grid-light {
-  background-image: linear-gradient(to right, rgb(15 76 71 / 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgb(15 76 71 / 0.06) 1px, transparent 1px);
+  background-image: linear-gradient(to right, rgb(15 118 110 / 0.06) 1px, transparent 1px), linear-gradient(to bottom, rgb(15 118 110 / 0.06) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -195,4 +229,28 @@
   .signal-pulse {
     animation: none;
   }
+}
+
+/* The logo strip under the hero: one slow loop, paused on hover and for reduced motion. The
+   list is rendered twice so the loop has no seam. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@utility marquee {
+  animation: marquee 48s linear infinite;
+  &:hover {
+    animation-play-state: paused;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+  }
+}
+
+/* The soft light behind dark brand surfaces. */
+@utility bg-ink-glow {
+  background-image: radial-gradient(60rem 30rem at 50% -10%, rgb(240 86 31 / 0.2), transparent 60%), radial-gradient(50rem 30rem at 100% 40%, rgb(20 184 166 / 0.22), transparent 60%), radial-gradient(45rem 28rem at 0% 70%, rgb(124 77 222 / 0.2), transparent 60%);
 }

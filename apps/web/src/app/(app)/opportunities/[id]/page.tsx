@@ -1,5 +1,5 @@
 import { modeOf } from "@autonomos/schemas";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
@@ -18,8 +18,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { recordTitle } from "@/lib/titles";
 
 type FutureStep = { title: string; actor: "agent" | "human" | "system"; approval?: boolean };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  return recordTitle("automation_opportunities", (await params).id, "Automation idea");
+}
 
 export default async function OpportunityPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ found?: string }> }) {
   const { id } = await params;
@@ -86,6 +91,8 @@ export default async function OpportunityPage({ params, searchParams }: { params
     <>
       <PageHeader
         back={{ href: "/opportunities", label: "Automation ideas" }}
+        icon={Target}
+        tone="amber"
         title={o.title}
         description={
           <span className="flex flex-wrap items-center gap-2">

@@ -76,9 +76,14 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                 {list.map((o) => {
                   const proc = o.processes as unknown as { id: string; title: string } | null;
                   return (
-                    <TableRow key={o.id} className="hover:bg-muted/50">
+                    // The title link covers the whole row, so the row opens on a tap, click or Enter.
+                    <TableRow key={o.id} className="relative hover:bg-muted/50 focus-within:bg-muted/50">
                       <TableCell className="w-full max-w-0 whitespace-normal">
-                        <Link href={`/opportunities/${o.id}`} title={o.title} className="line-clamp-2 font-medium break-words hover:underline">
+                        <Link
+                          href={`/opportunities/${o.id}`}
+                          title={o.title}
+                          className="line-clamp-2 font-medium break-words outline-none after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+                        >
                           {o.title}
                         </Link>
                         <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground">
@@ -94,7 +99,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                         <div className="text-xs text-muted-foreground">{money(Number(o.estimated_cost_saved_monthly ?? 0), session.org.currency)}</div>
                       </TableCell>
                       <TableCell className="hidden @4xl:table-cell">
-                        <Scores value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} />
+                        <Scores dense value={o.business_value_score} difficulty={o.automation_difficulty_score} risk={o.risk_score} />
                       </TableCell>
                       <TableCell className="hidden @2xl:table-cell">
                         <LevelChange from={o.current_autonomy_level} to={o.target_autonomy_level} />

@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { BookOpen, Check } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState } from "@/components/app/empty-state";
@@ -73,9 +73,9 @@ export default async function PlaybooksPage({ searchParams }: { searchParams: Pr
         </nav>
       ) : null}
       {!all.length ? (
-        <EmptyState title="No playbooks yet" description="Ready-made playbooks appear here as they are published." />
+        <EmptyState icon={BookOpen} tone="amber" title="No playbooks yet" description="Ready-made playbooks appear here as they are published." />
       ) : !shown.length ? (
-        <EmptyState title="No playbooks here yet" description="Try another department or show all industries." />
+        <EmptyState icon={BookOpen} tone="amber" title="No playbooks here yet" description="Try another department or show all industries." />
       ) : (
         <div className="space-y-6">
           {ready.length ? <Section title="Ready with your tools" items={ready} /> : null}

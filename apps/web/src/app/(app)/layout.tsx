@@ -41,9 +41,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         platformAdmin={isPlatformAdmin(session)}
         email={session.user.email}
         name={`${session.user.firstName} ${session.user.lastName}`.trim()}
+        usage={{ planName: usage.plan.name, runs: usage.runs, runsPerMonth: usage.plan.runsPerMonth, activeAgents: usage.activeAgents, agentLimit: usage.plan.activeAgents }}
       />
       <SidebarInset className="min-w-0">
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 sm:px-6">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border/70 bg-background/85 px-4 backdrop-blur-md sm:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
           <Link href="/" className="md:hidden" aria-label="AutonomOS home">
