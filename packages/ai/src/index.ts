@@ -5,3 +5,5 @@ export * from "./tasks/discovery";
 export * from "./tasks/opportunities";
 export * from "./tasks/company";
 export * from "./tasks/playbooks";
+export * from "./embeddings";
+export * from "./tasks/brief";
