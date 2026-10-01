@@ -146,6 +146,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"agent_record_watches": {
+                  Row: {
+                    "agent_id": string,"checked_at": string | null,"integration": string,"last_error": string | null,"organization_id": string,"started_at": string
+                  }
+                  Insert: {
+                    "agent_id": string,"checked_at"?: string | null,"integration": string,"last_error"?: string | null,"organization_id": string,"started_at"?: string
+                  }
+                  Update: {
+                    "agent_id"?: string,"checked_at"?: string | null,"integration"?: string,"last_error"?: string | null,"organization_id"?: string,"started_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agent_record_watches_agent_id_fkey"
+      columns: ["agent_id"]
+isOneToOne: true
+      referencedRelation: "agents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agent_record_watches_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"agent_run_steps": {
                   Row: {
                     "agent_run_id": string,"cost": number,"created_at": string,"description": string,"duration_ms": number | null,"id": string,"input": Json | null,"model": string | null,"organization_id": string,"output": Json | null,"sequence": number,"status": string,"tool": string | null,"type": string
@@ -173,13 +198,13 @@ isOneToOne: false
                   ]
                 },"agent_runs": {
                   Row: {
-                    "agent_id": string,"agent_version_id": string,"baseline_minutes": number | null,"error": string | null,"error_retryable": boolean | null,"estimated_minutes_saved": number | null,"execution_cost": number,"external_job_id": string | null,"heartbeat_at": string | null,"recovery_attempts": number,"finished_at": string | null,"handled_at": string | null,"handled_by": string | null,"human_minutes": number,"id": string,"input": NonNullable<Json>,"input_tokens": number,"mode": Database["public"]['Enums']["run_mode"],"model": string | null,"model_cost": number,"organization_id": string,"outcome": string | null,"output": Json | null,"output_tokens": number,"process_id": string,"queued_at": string,"started_at": string | null,"started_by": string | null,"state": NonNullable<Json>,"status": Database["public"]['Enums']["run_status"],"success": boolean | null,"summary": string | null,"trigger": NonNullable<Json>
+                    "agent_id": string,"agent_version_id": string,"baseline_minutes": number | null,"error": string | null,"error_retryable": boolean | null,"estimated_minutes_saved": number | null,"execution_cost": number,"external_job_id": string | null,"finished_at": string | null,"handled_at": string | null,"handled_by": string | null,"heartbeat_at": string | null,"human_minutes": number,"id": string,"input": NonNullable<Json>,"input_tokens": number,"mode": Database["public"]['Enums']["run_mode"],"model": string | null,"model_cost": number,"organization_id": string,"outcome": string | null,"output": Json | null,"output_tokens": number,"process_id": string,"queued_at": string,"recovery_attempts": number,"started_at": string | null,"started_by": string | null,"state": NonNullable<Json>,"status": Database["public"]['Enums']["run_status"],"success": boolean | null,"summary": string | null,"trigger": NonNullable<Json>
                   }
                   Insert: {
-                    "agent_id": string,"agent_version_id": string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"heartbeat_at"?: string | null,"recovery_attempts"?: number,"finished_at"?: string | null,"handled_at"?: string | null,"handled_by"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode": Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id": string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id": string,"queued_at"?: string,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger": NonNullable<Json>
+                    "agent_id": string,"agent_version_id": string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"finished_at"?: string | null,"handled_at"?: string | null,"handled_by"?: string | null,"heartbeat_at"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode": Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id": string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id": string,"queued_at"?: string,"recovery_attempts"?: number,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger": NonNullable<Json>
                   }
                   Update: {
-                    "agent_id"?: string,"agent_version_id"?: string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"heartbeat_at"?: string | null,"recovery_attempts"?: number,"finished_at"?: string | null,"handled_at"?: string | null,"handled_by"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode"?: Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id"?: string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id"?: string,"queued_at"?: string,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger"?: NonNullable<Json>
+                    "agent_id"?: string,"agent_version_id"?: string,"baseline_minutes"?: number | null,"error"?: string | null,"error_retryable"?: boolean | null,"estimated_minutes_saved"?: number | null,"execution_cost"?: number,"external_job_id"?: string | null,"finished_at"?: string | null,"handled_at"?: string | null,"handled_by"?: string | null,"heartbeat_at"?: string | null,"human_minutes"?: number,"id"?: string,"input"?: NonNullable<Json>,"input_tokens"?: number,"mode"?: Database["public"]['Enums']["run_mode"],"model"?: string | null,"model_cost"?: number,"organization_id"?: string,"outcome"?: string | null,"output"?: Json | null,"output_tokens"?: number,"process_id"?: string,"queued_at"?: string,"recovery_attempts"?: number,"started_at"?: string | null,"started_by"?: string | null,"state"?: NonNullable<Json>,"status"?: Database["public"]['Enums']["run_status"],"success"?: boolean | null,"summary"?: string | null,"trigger"?: NonNullable<Json>
                   }
                   Relationships: [
                     {
@@ -217,6 +242,37 @@ isOneToOne: false
       columns: ["started_by"]
 isOneToOne: false
       referencedRelation: "users"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"agent_seen_records": {
+                  Row: {
+                    "agent_id": string,"agent_run_id": string | null,"organization_id": string,"record_id": string,"seen_at": string
+                  }
+                  Insert: {
+                    "agent_id": string,"agent_run_id"?: string | null,"organization_id": string,"record_id": string,"seen_at"?: string
+                  }
+                  Update: {
+                    "agent_id"?: string,"agent_run_id"?: string | null,"organization_id"?: string,"record_id"?: string,"seen_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agent_seen_records_agent_id_fkey"
+      columns: ["agent_id"]
+isOneToOne: false
+      referencedRelation: "agents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agent_seen_records_agent_run_id_fkey"
+      columns: ["agent_run_id"]
+isOneToOne: false
+      referencedRelation: "agent_runs"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agent_seen_records_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
       referencedColumns: ["id"]
     }
                   ]
@@ -711,6 +767,62 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"knowledge_passages": {
+                  Row: {
+                    "content": string,"created_at": string,"embedding": string | null,"heading": string | null,"id": string,"ordinal": number,"organization_id": string,"search": unknown,"source_id": string,"url": string | null
+                  }
+                  Insert: {
+                    "content": string,"created_at"?: string,"embedding"?: string | null,"heading"?: string | null,"id"?: string,"ordinal": number,"organization_id": string,"search"?: never,"source_id": string,"url"?: string | null
+                  }
+                  Update: {
+                    "content"?: string,"created_at"?: string,"embedding"?: string | null,"heading"?: string | null,"id"?: string,"ordinal"?: number,"organization_id"?: string,"search"?: never,"source_id"?: string,"url"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "knowledge_passages_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "knowledge_passages_source_id_fkey"
+      columns: ["source_id"]
+isOneToOne: false
+      referencedRelation: "knowledge_sources"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"knowledge_sources": {
+                  Row: {
+                    "added_by": string | null,"bytes": number | null,"chars": number,"content": string | null,"crawl": Json | null,"created_at": string,"document_id": string | null,"error": string | null,"file_path": string | null,"id": string,"kind": string,"mime": string | null,"organization_id": string,"pages": number,"passages": number,"processed_at": string | null,"status": string,"summary": string | null,"title": string,"url": string | null
+                  }
+                  Insert: {
+                    "added_by"?: string | null,"bytes"?: number | null,"chars"?: number,"content"?: string | null,"crawl"?: Json | null,"created_at"?: string,"document_id"?: string | null,"error"?: string | null,"file_path"?: string | null,"id"?: string,"kind": string,"mime"?: string | null,"organization_id": string,"pages"?: number,"passages"?: number,"processed_at"?: string | null,"status"?: string,"summary"?: string | null,"title": string,"url"?: string | null
+                  }
+                  Update: {
+                    "added_by"?: string | null,"bytes"?: number | null,"chars"?: number,"content"?: string | null,"crawl"?: Json | null,"created_at"?: string,"document_id"?: string | null,"error"?: string | null,"file_path"?: string | null,"id"?: string,"kind"?: string,"mime"?: string | null,"organization_id"?: string,"pages"?: number,"passages"?: number,"processed_at"?: string | null,"status"?: string,"summary"?: string | null,"title"?: string,"url"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "knowledge_sources_added_by_fkey"
+      columns: ["added_by"]
+isOneToOne: false
+      referencedRelation: "users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "knowledge_sources_document_id_fkey"
+      columns: ["document_id"]
+isOneToOne: false
+      referencedRelation: "documents"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "knowledge_sources_organization_id_fkey"
+      columns: ["organization_id"]
+isOneToOne: false
+      referencedRelation: "organizations"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"metrics": {
                   Row: {
                     "computed_at": string,"dimension": string,"id": string,"metric": string,"organization_id": string,"period": string,"value": number
@@ -832,13 +944,13 @@ isOneToOne: false
                   ]
                 },"organizations": {
                   Row: {
-                    "agents_paused": boolean,"agents_paused_at": string | null,"agents_paused_by": string | null,"agents_paused_until": string | null,"billing_customer_id": string | null,"company_summary": string | null,"country": string | null,"created_at": string,"created_by": string | null,"currency": string,"default_hourly_cost": number,"description": string | null,"detected_tools": (string)[],"employee_count": string | null,"id": string,"improvement_areas": (string)[],"industry": string | null,"initial_inventory": Json | null,"is_demo": boolean,"name": string,"onboarding_completed_at": string | null,"onboarding_step": string,"plan": string,"subscription_status": string,"updated_at": string,"website": string | null,"website_profile": Json | null,"website_profiled_at": string | null
+                    "agents_paused": boolean,"agents_paused_at": string | null,"agents_paused_by": string | null,"agents_paused_until": string | null,"billing_customer_id": string | null,"company_brief": Json | null,"company_brief_at": string | null,"company_summary": string | null,"country": string | null,"created_at": string,"created_by": string | null,"currency": string,"default_hourly_cost": number,"description": string | null,"detected_tools": (string)[],"employee_count": string | null,"id": string,"improvement_areas": (string)[],"industry": string | null,"initial_inventory": Json | null,"is_demo": boolean,"name": string,"onboarding_completed_at": string | null,"onboarding_step": string,"plan": string,"subscription_status": string,"updated_at": string,"website": string | null,"website_profile": Json | null,"website_profiled_at": string | null
                   }
                   Insert: {
-                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"agents_paused_until"?: string | null,"billing_customer_id"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"detected_tools"?: (string)[],"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"initial_inventory"?: Json | null,"is_demo"?: boolean,"name": string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null,"website_profile"?: Json | null,"website_profiled_at"?: string | null
+                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"agents_paused_until"?: string | null,"billing_customer_id"?: string | null,"company_brief"?: Json | null,"company_brief_at"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"detected_tools"?: (string)[],"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"initial_inventory"?: Json | null,"is_demo"?: boolean,"name": string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null,"website_profile"?: Json | null,"website_profiled_at"?: string | null
                   }
                   Update: {
-                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"agents_paused_until"?: string | null,"billing_customer_id"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"detected_tools"?: (string)[],"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"initial_inventory"?: Json | null,"is_demo"?: boolean,"name"?: string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null,"website_profile"?: Json | null,"website_profiled_at"?: string | null
+                    "agents_paused"?: boolean,"agents_paused_at"?: string | null,"agents_paused_by"?: string | null,"agents_paused_until"?: string | null,"billing_customer_id"?: string | null,"company_brief"?: Json | null,"company_brief_at"?: string | null,"company_summary"?: string | null,"country"?: string | null,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"default_hourly_cost"?: number,"description"?: string | null,"detected_tools"?: (string)[],"employee_count"?: string | null,"id"?: string,"improvement_areas"?: (string)[],"industry"?: string | null,"initial_inventory"?: Json | null,"is_demo"?: boolean,"name"?: string,"onboarding_completed_at"?: string | null,"onboarding_step"?: string,"plan"?: string,"subscription_status"?: string,"updated_at"?: string,"website"?: string | null,"website_profile"?: Json | null,"website_profiled_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -1004,28 +1116,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"agent_record_watches": {
-                  Row: {
-                    "agent_id": string,"checked_at": string | null,"integration": string,"last_error": string | null,"organization_id": string,"started_at": string
-                  }
-                  Insert: {
-                    "agent_id": string,"checked_at"?: string | null,"integration": string,"last_error"?: string | null,"organization_id": string,"started_at"?: string
-                  }
-                  Update: {
-                    "agent_id"?: string,"checked_at"?: string | null,"integration"?: string,"last_error"?: string | null,"organization_id"?: string,"started_at"?: string
-                  }
-                  Relationships: []
-                },"agent_seen_records": {
-                  Row: {
-                    "agent_id": string,"agent_run_id": string | null,"organization_id": string,"record_id": string,"seen_at": string
-                  }
-                  Insert: {
-                    "agent_id": string,"agent_run_id"?: string | null,"organization_id": string,"record_id": string,"seen_at"?: string
-                  }
-                  Update: {
-                    "agent_id"?: string,"agent_run_id"?: string | null,"organization_id"?: string,"record_id"?: string,"seen_at"?: string
-                  }
-                  Relationships: []
                 },"rejected_processes": {
                   Row: {
                     "created_at": string,"department": string | null,"id": string,"organization_id": string,"rejected_by": string | null,"title": string
@@ -1103,6 +1193,11 @@ isOneToOne: false
                            },
 "is_org_member":
 { Args: { "org": string }; Returns: boolean
+                           },
+"match_knowledge":
+{ Args: { "match_count"?: number,"org": string,"query_embedding": string,"query_text": string }; Returns: {
+              "content": string,"heading": string,"id": string,"score": number,"source_id": string,"url": string
+            }[]
                            }
           }
           Enums: {
