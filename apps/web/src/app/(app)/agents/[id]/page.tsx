@@ -1,16 +1,15 @@
-import { LevelMeter } from "@/components/brand/logo";
 import { registerWorkspaceTools } from "@/server/tool-catalog";
 import { autonomyRecommendation } from "@autonomos/agents";
 import { reconcileStuckRuns } from "@/server/run-health";
 import { computeOrgMetrics } from "@autonomos/db";
 import { getTool, SAMPLE_TICKETS } from "@autonomos/integrations";
-import { INTEGRATION_EVENTS } from "@autonomos/schemas";
+import { INTEGRATION_EVENTS, modeOf } from "@autonomos/schemas";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/action-button";
-import { AutonomyLadder, OutcomeBadge, StatusBadge } from "@/components/domain";
+import { AutonomyLadder, ModeBadge, OutcomeBadge, StatusBadge } from "@/components/domain";
 import { dateTime, hours, money, pct, relative, aiMoney } from "@/lib/format";
 import { adminDb, HttpError, isAdmin, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -125,9 +124,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <StatusBadge status={agent.status} />
-            <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold" title={`Autonomy L${agent.autonomy_level}`}>
-              <LevelMeter level={agent.autonomy_level} className="h-3" />L{agent.autonomy_level}
-            </span>
+            <ModeBadge level={agent.autonomy_level} className="text-xs" />
             <span>·</span>
             <Link className="hover:underline" href={`/processes/${process?.id}`}>
               {process?.title}
@@ -155,9 +152,9 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                   <>
                     <p>
                       {liveSystems.length
-                        ? "These are live accounts. From now on this agent acts on real customers and data within its autonomy level."
+                        ? "These are live accounts. From now on this agent acts on real customers and data within its mode and limits."
                         : "Only sandbox systems are connected, so nothing real changes."}{" "}
-                      It runs at L{agent.autonomy_level}.
+                      It runs in {modeOf(agent.autonomy_level).name} mode: {modeOf(agent.autonomy_level).short.charAt(0).toLowerCase() + modeOf(agent.autonomy_level).short.slice(1)}.
                     </p>
                     {writeScopes.length ? (
                       <div>
@@ -203,7 +200,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
             <div className="font-medium">{recommendation.message}</div>
             <div className="mt-1 text-xs">{recommendation.evidence.join(" · ")}</div>
             <a href="#autonomy" className="mt-2 inline-block text-xs font-medium underline">
-              Review autonomy
+              Review the mode
             </a>
           </AlertDescription>
         </Alert>
@@ -236,7 +233,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
           {agent.status === "active" ? <LivePanel agentId={id} samples={samples} ticketDriven={ticketDriven} sandbox={zendesk?.provider === "sandbox"} /> : null}
           <Card id="autonomy">
             <CardHeader>
-              <CardTitle>Autonomy</CardTitle>
+              <CardTitle>Mode</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="mb-4">
@@ -317,7 +314,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                   <div>
                     <div className="mb-1 text-xs font-medium text-muted-foreground">Needs your approval when</div>
                     <ul className="list-inside list-disc">
-                      {config.autonomyLevel <= 3 ? <li>Any action (L{config.autonomyLevel})</li> : null}
+                      {config.autonomyLevel <= 3 ? <li>Any action ({modeOf(config.autonomyLevel).name} mode)</li> : null}
                       {(config.autonomyLevel >= 4 ? config.policy.approvalRequiredFor : []).map((t) => (
                         <li key={t}>{getTool(t)?.label ?? t}</li>
                       ))}
@@ -372,7 +369,7 @@ export default async function AgentPage({ params, searchParams }: { params: Prom
                         <div className="min-w-0">
                           <div>{v.change_note ?? "No note"}</div>
                           <div className="text-xs text-muted-foreground">
-                            L{v.autonomy_level} · {by ? `${by.first_name} ${by.last_name}` : "–"} · {dateTime(v.created_at)}
+                            {modeOf(v.autonomy_level).name} · {by ? `${by.first_name} ${by.last_name}` : "–"} · {dateTime(v.created_at)}
                           </div>
                           {prev ? (
                             changes.length ? (

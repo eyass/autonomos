@@ -23,21 +23,21 @@ function ctx(overrides: Partial<PolicyContext> = {}): PolicyContext {
 }
 
 describe("policy engine", () => {
-  it("L3 requires approval for every refund, even €1", () => {
+  it("Approve mode requires approval for every refund, even €1", () => {
     const e = evaluatePolicy("stripe.create_refund", refund(1), ctx({ autonomyLevel: 3 }));
     expect(e.outcome).toBe("require_approval");
   });
 
-  it("L3 requires approval for a customer reply too", () => {
+  it("Approve mode requires approval for a customer reply too", () => {
     const e = evaluatePolicy("zendesk.send_reply", { ticket_id: "1", body: "hi", public: true }, ctx({ autonomyLevel: 3 }));
     expect(e.outcome).toBe("require_approval");
   });
 
-  it("L4 executes a refund at or below the limit", () => {
+  it("Auto executes a refund at or below the limit", () => {
     expect(evaluatePolicy("stripe.create_refund", refund(100), ctx()).outcome).toBe("allow");
   });
 
-  it("L4 asks for approval above the limit", () => {
+  it("Auto asks for approval above the limit", () => {
     const e = evaluatePolicy("stripe.create_refund", refund(100.01), ctx());
     expect(e.outcome).toBe("require_approval");
     expect(e.reasons.join()).toMatch(/above the limit/);
@@ -90,11 +90,11 @@ describe("policy engine", () => {
     expect(evaluatePolicy("zendesk.read_ticket", { ticket_id: "1" }, ctx({ mode: "test" })).outcome).toBe("allow");
   });
 
-  it("L2 turns writes into drafts for a human", () => {
+  it("Draft mode turns writes into drafts for a human", () => {
     expect(evaluatePolicy("stripe.create_refund", refund(1), ctx({ autonomyLevel: 2, policy: refundPolicy(2) })).outcome).toBe("draft");
   });
 
-  it("L1 never lets the agent act", () => {
+  it("Manual mode never lets the agent act", () => {
     expect(evaluatePolicy("zendesk.read_ticket", { ticket_id: "1" }, ctx({ autonomyLevel: 1 })).outcome).toBe("deny");
   });
 

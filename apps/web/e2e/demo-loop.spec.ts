@@ -227,7 +227,7 @@ test("demo loop", async ({ page }) => {
   const runUrl = page.url();
   await expect(page.getByText(/Waiting for approval/)).toBeVisible();
 
-  // Approve: refund, reply and ticket update each stop at L3
+  // Approve: refund, reply and ticket update each stop in Approve mode
   const approved = await approveAll(page);
   expect(approved).toBeGreaterThanOrEqual(1);
   await page.goto(runUrl);

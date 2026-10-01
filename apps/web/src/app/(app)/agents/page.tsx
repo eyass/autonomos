@@ -2,6 +2,7 @@ import { computeOrgMetrics } from "@autonomos/db";
 import Link from "next/link";
 import { ActionButton } from "@/components/action-button";
 import { AutonomyLadder, StatusBadge } from "@/components/domain";
+import { modeOf } from "@autonomos/schemas";
 import { hours, pct, aiMoney } from "@/lib/format";
 import { adminDb, requireSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -43,7 +44,7 @@ export default async function AgentsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Agent</TableHead>
-              <TableHead className="hidden @2xl:table-cell">Autonomy</TableHead>
+              <TableHead className="hidden @2xl:table-cell">Mode</TableHead>
               <TableHead className="hidden @lg:table-cell">Live runs</TableHead>
               <TableHead className="hidden @2xl:table-cell">Success</TableHead>
               <TableHead className="hidden @4xl:table-cell">Hours saved</TableHead>
@@ -69,7 +70,7 @@ export default async function AgentsPage() {
                     </Link>
                     <div className="mt-0.5 meta-dots flex flex-wrap gap-x-2 text-xs text-muted-foreground">
                       <span>{proc?.title}</span>
-                      <span className="@2xl:hidden">L{a.autonomy_level}</span>
+                      <span className="@2xl:hidden">{modeOf(a.autonomy_level).name}</span>
                       <span className="@lg:hidden">
                         {s?.runs ?? 0} run{s?.runs === 1 ? "" : "s"}
                       </span>
@@ -115,7 +116,7 @@ export default async function AgentsPage() {
                         action={activateAction.bind(null, a.id)}
                         confirm={`Activate ${a.name}?`}
                         confirmLabel="Activate"
-                        confirmDetail="It starts acting in the connected systems within its autonomy level. Open the agent to see exactly which systems are live and what it can change."
+                        confirmDetail="It starts acting in the connected systems within its mode and limits. Open the agent to see exactly which systems are live and what it can change."
                       >
                         Activate
                       </ActionButton>

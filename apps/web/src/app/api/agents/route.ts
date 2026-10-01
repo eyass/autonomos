@@ -2,7 +2,7 @@ import { requireApiSession } from "@/lib/api-auth";
 import { handle } from "@/lib/actions";
 import { adminDb } from "@/lib/session";
 
-// GET /api/agents: the organisation's agents with status and autonomy level.
+// GET /api/agents: the organisation's agents with status and autonomy level (1 Manual, 2 Draft, 3 Approve, 4 Auto).
 export async function GET(request: Request) {
   return handle(async () => {
     const session = await requireApiSession(request);

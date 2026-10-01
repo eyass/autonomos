@@ -183,20 +183,20 @@ export function LivePanel({ agentId, samples, ticketDriven, sandbox }: { agentId
 }
 
 export function AutonomyControl({ agentId, level, hasMoney, threshold, canChange }: { agentId: string; level: number; hasMoney: boolean; threshold: number | null; canChange: boolean }) {
-  const [next, setNext] = useState(level);
+  const [next, setNext] = useState(Math.min(level, 4));
   const [limit, setLimit] = useState<string>(threshold === null ? "" : String(threshold));
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
-  if (!canChange) return <p className="text-sm text-muted-foreground">Only admins can change autonomy.</p>;
+  if (!canChange) return <p className="text-sm text-muted-foreground">Only admins can change the mode.</p>;
   return (
     <div className="space-y-3">
       <div className="grid gap-3">
-        <FormField label="Autonomy level">
+        <FormField label="Mode">
           <NativeSelect value={next} onChange={(e) => setNext(Number(e.target.value))}>
             {AUTONOMY_LEVELS.filter((l) => l.level > 1).map((l) => (
               <NativeSelectOption key={l.level} value={l.level}>
-                {l.code} · {l.name}
+                {l.name}: {l.short.charAt(0).toLowerCase() + l.short.slice(1)}
               </NativeSelectOption>
             ))}
           </NativeSelect>
@@ -225,7 +225,7 @@ export function AutonomyControl({ agentId, level, hasMoney, threshold, canChange
           })
         }
       >
-        {pending ? "Saving…" : "Change autonomy"}
+        {pending ? "Saving…" : "Change mode"}
       </Button>
       <p className="text-xs text-muted-foreground">Never changes automatically. Each change is a new version.</p>
     </div>

@@ -31,11 +31,10 @@ const STEPS = [
 ];
 
 const LEVELS = [
-  { level: "L1", name: "Human only", body: "People do it." },
-  { level: "L2", name: "Agent assists", body: "It drafts, you act." },
-  { level: "L3", name: "Agent proposes", body: "You approve each action." },
-  { level: "L4", name: "Agent executes", body: "You handle exceptions." },
-  { level: "L5", name: "Autonomous", body: "It runs within its limits." },
+  { name: "Manual", body: "Your team does the work." },
+  { name: "Draft", body: "The agent prepares it, you check and send." },
+  { name: "Approve", body: "The agent acts once you approve each step." },
+  { name: "Auto", body: "The agent acts, you handle the exceptions." },
 ];
 
 const CONTROLS = [
@@ -94,8 +93,8 @@ export default function LandingPage() {
               </ButtonLink>
             </div>
             <p className="mt-10 flex items-center gap-2 font-mono text-xs text-white/55">
-              <LevelMeter level={5} tone="inverted" className="h-3" />
-              {TOOL_COUNT} tools · L1 to L5 · every write checked in code
+              <LevelMeter level={4} tone="inverted" className="h-3" />
+              {TOOL_COUNT} tools · Draft, Approve or Auto · every write checked in code
             </p>
           </div>
           <div className="flex justify-center pb-8 lg:justify-end">
@@ -194,20 +193,21 @@ export default function LandingPage() {
       {/* Control plane */}
       <section id="control" className="scroll-mt-16 border-b border-border bg-card">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <SectionHeading eyebrow="Control" title="Raise autonomy one level at a time" />
-          <ol className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+          <SectionHeading eyebrow="Control" title="Hand over work one step at a time">
+            Every agent starts where you are comfortable and moves up as it earns your trust. Limits apply in every mode.
+          </SectionHeading>
+          <ol className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
             {LEVELS.map((l, i) => (
-              <li key={l.level} className="flex flex-col rounded-lg border border-border bg-background p-4 lg:min-h-[var(--h)]" style={{ "--h": `${7.5 + i * 2}rem` } as React.CSSProperties}>
+              <li key={l.name} className="flex flex-col rounded-lg border border-border bg-background p-4 lg:min-h-[var(--h)]" style={{ "--h": `${7.5 + i * 2}rem` } as React.CSSProperties}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs font-bold" style={{ color: `var(--level-${Math.max(i + 1, 3)})` }}>
-                    {l.level}
+                  <span className="text-sm font-semibold" style={{ color: `var(--level-${Math.max(i + 2, 3)})` }}>
+                    {l.name}
                   </span>
-                  <LevelMeter level={i + 1} tone={i === 4 ? "signal" : "levels"} />
+                  <LevelMeter level={i + 1} tone={i === 3 ? "signal" : "levels"} />
                 </div>
-                <span className="mt-3 text-sm font-semibold">{l.name}</span>
                 <p className="mt-1 text-sm text-muted-foreground">{l.body}</p>
                 <span aria-hidden className="mt-auto block pt-4">
-                  <span className="block h-1 rounded-full" style={{ background: i === 4 ? "var(--highlight)" : `var(--level-${i + 1})` }} />
+                  <span className="block h-1 rounded-full" style={{ background: i === 3 ? "var(--highlight)" : `var(--level-${i + 2})` }} />
                 </span>
               </li>
             ))}
@@ -303,8 +303,8 @@ export default function LandingPage() {
       <section className="bg-grid-light">
         <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-16 sm:px-6 sm:py-20 md:flex-row md:items-center md:justify-between">
           <div className="flex gap-3">
-            <LevelMeter level={5} tone="signal" className="mt-1.5 h-5" />
-            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">How autonomous is your company?</h2>
+            <LevelMeter level={4} tone="signal" className="mt-1.5 h-5" />
+            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">How much of your work could agents do?</h2>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <ButtonLink href="/signup" size="lg">

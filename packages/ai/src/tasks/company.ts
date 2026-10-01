@@ -73,7 +73,7 @@ export async function draftProcessInventory(input: {
       "Be specific to this company: name its customers, products, marketplace or channels in the title and description, e.g. 'Breeder listing verification' rather than 'Content moderation'. If a process could be copied unchanged to any company, it is too generic; leave it out.",
       "Every process is inferred, so confidence must be 0.6 or lower unless connected-system evidence confirms it, and missingInformation must list what a person should confirm (volume, minutes per occurrence, who does it).",
       "Steps describe how the work is typically done by hand today. Estimate frequency and minutes conservatively.",
-      "Autonomy levels: 1 human only, 2 agent assists, 3 agent proposes and a human approves, 4 agent executes with exceptions, 5 autonomous. Current level is usually 1.",
+      "Autonomy levels: 1 Manual (people do it), 2 Draft (the agent prepares, a person sends), 3 Approve (a person approves each action), 4 Auto (the agent acts, people handle exceptions). Never use 5. Current level is usually 1.",
       "Scores are 1 to 5. businessValue: frequency, time, labour cost, customer and revenue impact. automationDifficulty: systems, steps, unstructured data, judgement, API availability. riskLevel: financial, customer and legal consequence, reversibility, data sensitivity.",
     ],
     sections: [section("company_context", input.company), section("company_profile", input.profile), section("connected_system_evidence", input.evidence.length ? input.evidence : "none yet")],

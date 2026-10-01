@@ -9,21 +9,31 @@ export type AutonomyLevel = 1 | 2 | 3 | 4 | 5;
 
 export const Score = z.number().int().min(1).max(5);
 
+// How much of the work an agent does, named for what the person does (never shown as numbers).
+// Stored as 1 to 4; an older 5 means Auto.
 export const AUTONOMY_LEVELS = [
-  { level: 1, code: "L1", name: "Human only", short: "Humans do the work" },
-  { level: 2, code: "L2", name: "Agent assists", short: "Agent researches and drafts, humans act" },
-  { level: 3, code: "L3", name: "Agent proposes", short: "Agent prepares the action, humans approve" },
-  { level: 4, code: "L4", name: "Agent executes with exceptions", short: "Agent acts, humans handle exceptions" },
-  { level: 5, code: "L5", name: "Autonomous", short: "Agent runs the process, humans monitor" },
+  { level: 1, code: "manual", name: "Manual", short: "Your team does the work" },
+  { level: 2, code: "draft", name: "Draft", short: "The agent prepares the work, you check and send it" },
+  { level: 3, code: "approve", name: "Approve", short: "The agent asks you before each change" },
+  { level: 4, code: "auto", name: "Auto", short: "The agent acts on its own and hands you exceptions" },
 ] as const;
+export type AutonomyMode = (typeof AUTONOMY_LEVELS)[number];
+export const MAX_AUTONOMY_LEVEL = 4;
 
-// PRD section 49. Coefficients used by the company autonomy score.
+// The mode a stored level means (5, from before Auto merged two levels, is Auto).
+export function modeOf(level: number | null | undefined): AutonomyMode {
+  const l = Math.min(MAX_AUTONOMY_LEVEL, Math.max(1, Math.round(level ?? 1)));
+  return AUTONOMY_LEVELS[l - 1]!;
+}
+
+// The share of a process's time an agent takes over in each mode: the company figure "work on
+// agents" is the time-weighted sum of these (PRD section 49).
 export const AUTONOMY_COEFFICIENTS: Record<AutonomyLevel, number> = {
   1: 0,
   2: 0.2,
   3: 0.4,
-  4: 0.75,
-  5: 1,
+  4: 0.8,
+  5: 0.8,
 };
 
 export const ProcessFrequency = z.enum(["ad_hoc", "daily", "weekly", "monthly", "event_driven"]);

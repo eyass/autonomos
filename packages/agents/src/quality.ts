@@ -57,9 +57,9 @@ export function sensitiveAreas(text: string): string[] {
 
 // Guardrails a regulated area puts on any agent for the process, applied in code (never only in
 // its instructions) when the agent is created or changed.
-//  - Debt collection, personal data and consent, legal, financial reporting: at most L3 (the agent
+//  - Debt collection, personal data and consent, legal, financial reporting: at most Approve (the agent
 //    proposes, a person approves) and every action that changes something needs approval.
-//  - Refunds and payments: at most L4, money moves above a small amount need approval, and a hard
+//  - Refunds and payments: at most Auto, money moves above a small amount need approval, and a hard
 //    ceiling applies per action.
 export const MONEY_APPROVAL_ABOVE = 50;
 export const MONEY_HARD_LIMIT = 500;
@@ -148,8 +148,8 @@ export function guardrailsFor(
   const approvalAbove = filled(policy.approvalAbove) ? Math.min(MONEY_APPROVAL_ABOVE, num(policy.approvalAbove)) : MONEY_APPROVAL_ABOVE;
   const hardLimit = filled(policy.maxPerAction) ? Math.min(MONEY_HARD_LIMIT, num(policy.maxPerAction)) : MONEY_HARD_LIMIT;
   const rules: string[] = [];
-  if (strict) rules.push("At most L3: the agent proposes, a person approves", "Every action that changes something needs approval");
-  else if (money) rules.push("At most L4");
+  if (strict) rules.push("At most Approve: the agent proposes, a person approves", "Every action that changes something needs approval");
+  else if (money) rules.push("At most Auto, with approval above the money limit");
   if (money) rules.push(`Money over ${approvalAbove} per action needs approval`, `No single money action above ${hardLimit}`);
   rules.push(...policyRules(areas, policy).rules, ...policyRules(areas, policy).escalations);
   return { maxLevel: strict ? 3 : money ? 4 : 5, approveAllWrites: strict, moneyLimits: money, approvalAbove, hardLimit, rules };

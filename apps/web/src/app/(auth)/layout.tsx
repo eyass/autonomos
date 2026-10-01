@@ -14,13 +14,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </Link>
         <div className="relative mt-auto max-w-sm">
           <p className="text-3xl font-semibold leading-tight tracking-[-0.02em]">Agents you can trust with real actions.</p>
-          <p className="mt-3 text-sm text-white/65">Every agent runs at an explicit level. You raise it when its record earns it.</p>
+          <p className="mt-3 text-sm text-white/65">Every agent runs in a clear mode. You hand over more when its record earns it.</p>
           <ol className="mt-8 space-y-2.5">
             {AUTONOMY_LEVELS.map((l, i) => (
-              <li key={l.code} className="flex items-center gap-3 font-mono text-xs text-white/70">
+              <li key={l.code} className="flex items-center gap-3 text-xs text-white/70">
                 <LevelMeter level={i + 1} tone="inverted" className="h-3" />
-                <span className={i === 4 ? "font-bold text-highlight" : "font-bold text-white"}>{l.code}</span>
-                <span>{l.name}</span>
+                <span className={i === 3 ? "w-14 font-bold text-highlight" : "w-14 font-bold text-white"}>{l.name}</span>
+                <span>{l.short}</span>
               </li>
             ))}
           </ol>

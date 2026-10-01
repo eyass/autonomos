@@ -1,4 +1,4 @@
-import { AgentDecisionSchema, type AgentDecision } from "@autonomos/schemas";
+import { AgentDecisionSchema, modeOf, type AgentDecision } from "@autonomos/schemas";
 import { generateStructured, section, StructuredOutputError } from "@autonomos/ai";
 import { executeTool, getTool, ToolError } from "@autonomos/integrations";
 import { z } from "zod";
@@ -574,7 +574,7 @@ function describeTrigger(ctx: RunContext) {
 function describePolicy(ctx: RunContext) {
   const p = ctx.version.policy;
   return {
-    autonomy_level: `L${ctx.version.autonomyLevel}`,
+    mode: modeOf(ctx.version.autonomyLevel).name,
     confidence_threshold: p.confidenceThreshold,
     approval_required_for: p.approvalRequiredFor,
     amount_limits_without_approval: p.amountThresholds,

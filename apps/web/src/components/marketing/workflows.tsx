@@ -1,5 +1,6 @@
 import { ArrowRight, Hand, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { modeOf } from "@autonomos/schemas";
 import { LevelMeter } from "@/components/brand/logo";
 import { TOOLS, ToolLogo, type ToolSlug } from "./tools";
 
@@ -81,8 +82,8 @@ export function WorkflowChains({ flows = LANDING_FLOWS }: { flows?: Flow[] }) {
         <figure key={f.title} className="rounded-2xl border border-border bg-background p-4 sm:p-5" aria-label={`${f.title}: ${f.steps.map((s) => s.action).join(", then ")}`}>
           <figcaption className="mb-3 flex items-center justify-between gap-3">
             <span className="text-sm font-semibold">{f.title}</span>
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-brand-strong">
-              <LevelMeter level={f.level} className="h-3" /> L{f.level}
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-strong">
+              <LevelMeter level={f.level} className="h-3" /> {modeOf(f.level).name}
             </span>
           </figcaption>
           <ol

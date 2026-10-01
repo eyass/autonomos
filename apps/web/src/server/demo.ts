@@ -1,4 +1,5 @@
 import "server-only";
+import { modeOf } from "@autonomos/schemas";
 import { triggerConfigured } from "@autonomos/workflows";
 import { activity, audit } from "@/lib/audit";
 import { adminDb, HttpError, sessionFor, type Session } from "@/lib/session";
@@ -34,7 +35,7 @@ export async function createSampleWorkspace(session: Session) {
     // Sample workspace only: go live without waiting for the test, so the tickets below run.
     await db.from("agents").update({ status: "active" }).eq("organization_id", organizationId).eq("id", agentId);
     await db.from("automation_opportunities").update({ status: "live" }).eq("organization_id", organizationId).eq("id", opportunityId);
-    await activity(demo, { actionType: "agent_activated", title: `${config.name} is live at L${config.autonomyLevel} (sample workspace)`, agentId, processId, status: "success" });
+    await activity(demo, { actionType: "agent_activated", title: `${config.name} is live in ${modeOf(config.autonomyLevel).name} mode (sample workspace)`, agentId, processId, status: "success" });
     for (const key of ["routine", "large", "injection"]) {
       const { runIds } = (await simulateSandboxTicket(demo, key)) ?? { runIds: [] };
       runs += runIds.length;

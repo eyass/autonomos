@@ -27,7 +27,7 @@ export default function TermsPage() {
 
         <h2>2. The service</h2>
         <p>
-          AutonomOS helps you map recurring work, choose what to automate, and run AI agents that act in your connected systems under the autonomy levels, policies, approvals and limits you configure.
+          AutonomOS helps you map recurring work, choose what to automate, and run AI agents that act in your connected systems under the modes, policies, approvals and limits you configure.
           We improve the service continuously, so features may change.
         </p>
 
@@ -44,8 +44,8 @@ export default function TermsPage() {
 
         <h2>4. Agents and automated actions</h2>
         <p>
-          Agents can make mistakes. We provide controls such as tool allowlists, a policy engine, approvals, money limits, hard limits and an emergency stop. Start agents at a low autonomy level, on
-          sandbox data, and raise the level only when you are satisfied with their record.
+          Agents can make mistakes. We provide controls such as tool allowlists, a policy engine, approvals, money limits, hard limits and an emergency stop. Start agents in Draft or Approve mode, on
+          sandbox data, and move them to Auto only when you are satisfied with their record.
         </p>
 
         <h2>5. Your data</h2>

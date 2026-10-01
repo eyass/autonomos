@@ -293,7 +293,7 @@ export async function seedDemoOrganization(db: DbClient, userId: string, options
       estimated_cost_saved_monthly: 1440,
       estimated_build_complexity: "Low",
       required_integrations: ["Zendesk", "Stripe"],
-      required_approvals: ["Refunds above the autonomous limit", "Any refund at L3"],
+      required_approvals: ["Refunds above the autonomous limit", "Every refund while in Approve mode"],
       human_involvement: ["Approve refunds above the limit", "Handle suspected fraud", "Review weekly refund summary"],
       major_risks: ["Refunding an ineligible order", "Duplicate refunds", "Instructions hidden in customer messages"],
       rationale: "High volume, clear policy, both systems have APIs, and every action is logged.",

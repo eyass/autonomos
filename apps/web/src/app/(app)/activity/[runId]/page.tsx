@@ -1,3 +1,4 @@
+import { modeOf } from "@autonomos/schemas";
 import { getTool } from "@autonomos/integrations";
 import { registerWorkspaceTools } from "@/server/tool-catalog";
 import { reconcileStuckRuns } from "@/server/run-health";
@@ -67,7 +68,7 @@ export default async function RunPage({ params, searchParams }: { params: Promis
               {proc.title}
             </Link>
             <span>
-              · v{version.version} · L{version.autonomy_level} · {dateTime(run.queued_at)}
+              · v{version.version} · {modeOf(version.autonomy_level).name} · {dateTime(run.queued_at)}
             </span>
           </span>
         }

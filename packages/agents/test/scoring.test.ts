@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { agentStats, autonomyRecommendation, autonomyScore, opportunityScore } from "../src";
 
 describe("metrics", () => {
-  it("computes the company autonomy score from monthly time and coefficients", () => {
+  it("computes the share of work on agents from monthly time and coefficients", () => {
     const processes = [
       { id: "a", departmentId: null, status: "active", currentAutonomyLevel: 1 as const, estimatedOccurrencesPerMonth: 10, estimatedMinutesPerOccurrence: 60 },
       { id: "b", departmentId: null, status: "active", currentAutonomyLevel: 1 as const, estimatedOccurrencesPerMonth: 10, estimatedMinutesPerOccurrence: 60 },
     ];
     expect(autonomyScore(processes, new Map())).toBe(0);
-    expect(autonomyScore(processes, new Map([["a", 4]]))).toBeCloseTo(0.375);
+    expect(autonomyScore(processes, new Map([["a", 4]]))).toBeCloseTo(0.4);
     expect(autonomyScore([], new Map())).toBeNull();
   });
 

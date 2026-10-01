@@ -24,8 +24,8 @@ export function HeroRun() {
           <span className="signal-pulse size-2 shrink-0 rounded-full bg-highlight" aria-hidden />
           <span className="truncate text-sm font-semibold">Refund handling</span>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-strong">
-          <LevelMeter level={3} className="h-3" /> L3
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand-soft px-1.5 py-0.5 text-[11px] font-semibold text-brand-strong">
+          <LevelMeter level={3} className="h-3" /> Approve
         </span>
       </div>
       <ol className="space-y-2.5 px-4 py-4 text-[13px] leading-snug">

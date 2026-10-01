@@ -67,7 +67,7 @@ describe("SupabaseRunStore with the run engine", () => {
     expect(approvals).toHaveLength(1);
     expect(approvals![0]!.title).toContain("€72.00");
 
-    // Approve everything the L3 agent asks for, resuming the run each time.
+    // Approve everything the Approve-mode agent asks for, resuming the run each time.
     for (let i = 0; i < 5; i++) {
       const { data: pending } = await db.from("approval_requests").select("id").eq("agent_run_id", runId).eq("status", "pending");
       if (!pending?.length) break;

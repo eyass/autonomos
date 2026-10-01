@@ -5,7 +5,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "AutonomOS: find the recurring work, deploy constrained AI agents";
 
-const LEVELS = ["Human only", "Agent assists", "Agent proposes", "Agent executes", "Autonomous"];
+const LEVELS = ["Manual", "Draft", "Approve", "Auto"];
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -27,8 +27,8 @@ export default function OpengraphImage() {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
         {LEVELS.map((name, i) => (
           <div key={name} style={{ display: "flex", flexDirection: "column", gap: 10, width: 200 }}>
-            <div style={{ display: "flex", fontSize: 22, color: i === 4 ? "#f0561f" : "rgba(245,243,238,0.7)" }}>{`L${i + 1} ${name}`}</div>
-            <div style={{ height: 14 + i * 14, borderRadius: 6, background: i === 4 ? "#f0561f" : "#ffffff", opacity: i === 4 ? 1 : 0.25 + i * 0.15 }} />
+            <div style={{ display: "flex", fontSize: 22, color: i === 3 ? "#f0561f" : "rgba(245,243,238,0.7)" }}>{name}</div>
+            <div style={{ height: 14 + i * 18, borderRadius: 6, background: i === 3 ? "#f0561f" : "#ffffff", opacity: i === 3 ? 1 : 0.25 + i * 0.2 }} />
           </div>
         ))}
       </div>

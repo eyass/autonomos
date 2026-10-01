@@ -1,29 +1,32 @@
-import { AUTONOMY_LEVELS } from "@autonomos/schemas";
+import { AUTONOMY_LEVELS, modeOf } from "@autonomos/schemas";
+import { LevelMeter } from "@/components/brand/logo";
 import { Bot, Check, User, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-// Always show the autonomy vocabulary with the current level highlighted (PRD section 111).
+// The modes in order with the current one highlighted (PRD section 111): words, never numbers.
 export function AutonomyLadder({ current, target, size = "md" }: { current: number; target?: number | null; size?: "sm" | "md" }) {
+  const now = modeOf(current);
+  const goal = target ? modeOf(target) : null;
   return (
-    <div className="inline-flex items-center gap-1" aria-label={`Autonomy L${current}${target ? `, target L${target}` : ""}`}>
+    <div className="inline-flex items-center gap-1" aria-label={`Mode: ${now.name}${goal && goal.level !== now.level ? `, could go to ${goal.name}` : ""}`}>
       {AUTONOMY_LEVELS.map((l) => {
-        const isCurrent = l.level === current;
-        const isTarget = target && l.level === target && target !== current;
-        const reached = l.level <= current;
+        const isCurrent = l.level === now.level;
+        const isTarget = goal && l.level === goal.level && goal.level !== now.level;
+        const reached = l.level <= now.level;
         return (
           <span
             key={l.level}
-            title={`${l.code} ${l.name}: ${l.short}`}
+            title={`${l.name}: ${l.short}`}
             className={cn(
-              "inline-flex items-center justify-center rounded font-semibold tabular-nums",
-              size === "sm" ? "h-5 w-6 text-[10px]" : "h-6 w-8 text-xs",
+              "inline-flex items-center justify-center rounded px-1.5 font-semibold",
+              size === "sm" ? "h-5 text-[10px]" : "h-6 text-xs",
               isCurrent ? "text-white" : reached ? "bg-brand-soft text-brand-strong" : "bg-muted text-muted-foreground",
               isTarget && "ring-2 ring-primary ring-offset-1 ring-offset-surface text-primary bg-primary/10",
             )}
-            style={isCurrent ? { background: `var(--level-${Math.max(l.level, 3)})` } : undefined}
+            style={isCurrent ? { background: `var(--level-${Math.max(l.level + 1, 3)})` } : undefined}
           >
-            {l.code}
+            {l.name}
           </span>
         );
       })}
@@ -33,16 +36,27 @@ export function AutonomyLadder({ current, target, size = "md" }: { current: numb
 
 export function AutonomyLegend() {
   return (
-    <ul className="grid gap-2 text-sm sm:grid-cols-5">
+    <ul className="grid gap-2 text-sm sm:grid-cols-4">
       {AUTONOMY_LEVELS.map((l) => (
         <li key={l.level} className="rounded-md border border-border bg-card px-3 py-2">
-          <div className="text-xs font-semibold" style={{ color: `var(--level-${Math.max(l.level, 3)})` }}>
-            {l.code} · {l.name}
+          <div className="text-xs font-semibold" style={{ color: `var(--level-${Math.max(l.level + 1, 3)})` }}>
+            {l.name}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">{l.short}</div>
         </li>
       ))}
     </ul>
+  );
+}
+
+// The mode of an agent or process as a small labelled meter, for lists and headers.
+export function ModeBadge({ level, className }: { level: number; className?: string }) {
+  const m = modeOf(level);
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap font-medium", className)} title={m.short}>
+      <LevelMeter level={m.level} className="h-3" />
+      {m.name}
+    </span>
   );
 }
 
@@ -80,12 +94,14 @@ export function Scores({ value, difficulty, risk, className }: { value: number |
   );
 }
 
-// "L1 → L4": where something is and where it could go.
+// "Manual → Auto": the mode something runs in and the one it could reach.
 export function LevelChange({ from, to }: { from: number; to?: number | null }) {
+  const a = modeOf(from);
+  const b = to ? modeOf(to) : null;
   return (
-    <span className="whitespace-nowrap font-medium tabular-nums">
-      L{from}
-      {to && to !== from ? <span className="text-muted-foreground"> → L{to}</span> : null}
+    <span className="whitespace-nowrap font-medium">
+      {a.name}
+      {b && b.level !== a.level ? <span className="text-muted-foreground"> → {b.name}</span> : null}
     </span>
   );
 }
